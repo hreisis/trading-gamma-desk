@@ -1,0 +1,18 @@
+# Private product docs
+docs/BACKBONE.md
+
+# Secrets — .env.example is tracked on purpose
+.env
+.env.*
+!.env.example
+
+# Local data cache and snapshots
+data/
+
+# Dependencies and build output
+node_modules/
+.next/
+coverage/
+
+# OS
+.DS_Store
