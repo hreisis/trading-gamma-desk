@@ -17,6 +17,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.2.0 | `confidence` (0–1) → `confidenceScore` (0–100) + `confidenceComponents` | Avoids implying a calibrated probability; makes the number auditable |
 | 0.2.0 | Added `contradictions`, `riskDirection`, `polarity`, `AssetRole` enum, `proxyFor`, `methodology` | Milestone 1 required outputs were not expressible in 0.1.0 |
 | 0.2.0 | Added `MacroFeature`, `RegimeSignatureConfig`, evidence `id`s | Volatility-window rules and signature versioning must be contractual, not implicit |
+| 0.2.0 | Added `distinctiveness` component and `confidenceDetail` | `patternMatch` alone cannot tell “looks like this regime” from “looks like this regime rather than another”; margin required now scales with template similarity |
+| 0.2.0 | `breadth` → `effectiveBreadth` over correlation blocks | Counting confirming assets over-counts correlated ones, so a violent 2Y move alone could still produce high `fed_rates` confidence |
+| 0.2.0 | Aggregation fixed as weighted geometric mean; band labels gated on `calibrated` | A raw product of five sub-unit terms compresses the 0–100 scale to meaninglessness |
 
 ---
 
@@ -40,12 +43,13 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-1 | Verify sources hands-on | Treasury, CBOE and Tiingo responses checked for actual dates and fields per symbol; results recorded in `architecture.md` |
 | M1-2 | Zod contracts from `data-contracts.md` 0.2.0 | Fixtures validate; `RegimeSignatureConfig` has its own schema |
 | M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` |
-| M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; multiplicative gating; all four hard override rules implemented |
-| M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass |
+| M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented |
+| M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move |
 | M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data |
+| M1-6b | Calibrate `confidenceParams` | `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs set from fixtures; `calibrated: true` |
 | M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; immutable snapshot with versions |
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template |
-| M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidenceScore` with component tooltip, evidence, `proxyFor` labels, staleness banner |
+| M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidenceScore` with component breakdown, evidence, `proxyFor` labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
 
 **Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists.
 

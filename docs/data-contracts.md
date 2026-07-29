@@ -106,10 +106,20 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
   "confidenceScore": 74,
   "confidenceComponents": {
     "patternMatch": 0.81,
+    "distinctiveness": 0.64,
     "coherence": 0.88,
-    "breadth": 0.75,
+    "effectiveBreadth": 0.75,
     "strength": 0.92,
     "coveragePenalty": 0.0
+  },
+  "confidenceDetail": {
+    "runnerUpRegime": "liquidity",
+    "scoreTop": 0.81,
+    "scoreSecond": 0.63,
+    "templateSimilarity": 0.42,
+    "effectiveConfirmations": 3.0,
+    "blocksWithNonZeroWeight": 4,
+    "capsApplied": []
   },
 
   "evidence": [
@@ -244,9 +254,25 @@ Signature weights are **data, not code** — reviewable and diffable. They get t
   "signatures": {
     "fed_rates": { "US2Y": 1.0, "US10Y": 0.6, "USD_PROXY": 0.5, "GOLD": -0.4, "BTC": -0.3, "VIX": 0.2 }
   },
-  "riskVector": { "BTC": 1.0, "COPPER": 0.6, "VIX": -1.0, "USD_PROXY": -0.4, "GOLD": -0.2 }
+  "riskVector": { "BTC": 1.0, "COPPER": 0.6, "VIX": -1.0, "USD_PROXY": -0.4, "GOLD": -0.2 },
+  "confidenceParams": {
+    "marginRef": 0.15,
+    "ambiguityFloor": 0.2,
+    "concentrationThreshold": 0.6,
+    "lambda": {
+      "patternMatch": 0.2,
+      "distinctiveness": 0.2,
+      "coherence": 0.2,
+      "effectiveBreadth": 0.2,
+      "strength": 0.2
+    },
+    "calibrated": false
+  },
+  "sigmaFloors": { "US2Y": 1.0, "US10Y": 1.0, "VIX": 0.5 }
 }
 ```
+
+`confidenceParams.calibrated` must stay `false` until the fixture suite exists. UI must not present band labels (`high` / `medium` / `low`) while it is `false` — show the numeric score and its components instead.
 
 `blockWeightBudget` exists because the 8 dimensions are **not orthogonal** (2Y/10Y correlate strongly; Oil/Copper/Gold cluster). Plain cosine treats them as independent, so a signature that spreads weight across a correlated block gets an unearned boost. Budgeting weight per block, rather than per asset, contains that bias without attempting covariance whitening on a 20-sample window.
 
@@ -264,22 +290,62 @@ Confidence components, all in `[0, 1]`:
 
 | Component | Definition |
 | --- | --- |
-| `patternMatch` | `abs(s_top)` |
+| `patternMatch` | `abs(s_top)` — how well today matches the winning signature |
+| `distinctiveness` | how far the winner separates from the runner-up (below) |
 | `coherence` | confirming contribution / (confirming + \|contradicting\|) contribution |
-| `breadth` | valid confirming assets / non-zero-weight assets in the signature |
+| `effectiveBreadth` | independent confirmations across correlation blocks (below) |
 | `strength` | `min(1, rms(z) / 2)` — is the market moving at all |
 | `coveragePenalty` | share of core dimensions missing or stale |
 
-`confidenceScore = round(100 × clamp(patternMatch × coherence × breadthFactor × strength − coveragePenalty))`.
+`patternMatch` and `distinctiveness` answer different questions: *does today look like this regime* versus *does it look like this regime rather than another one*. A day can score high on the first and low on the second, and that day is ambiguous, not confident.
 
-Gating is **multiplicative** so that any one weak dimension caps the result, rather than being averaged away.
+#### distinctiveness
+
+```text
+templateSimilarity  = abs(cos(w_top, w_second))            over observed dims
+effectiveMarginRef  = marginRef × (1 + templateSimilarity)
+distinctiveness     = clamp01((abs(s_top) - abs(s_second)) / effectiveMarginRef)
+```
+
+The margin required scales with how similar the two competing templates are. When two signatures overlap heavily (growth and inflation share commodity weights), the data genuinely cannot separate them, so the same raw gap should buy less confidence. `marginRef` lives in `RegimeSignatureConfig` and is calibrated from fixtures.
+
+This component also supersedes a separate ambiguity threshold: `mixed_unresolved` is decided by `distinctiveness` falling below `ambiguityFloor`.
+
+#### effectiveBreadth
+
+Counting confirming assets directly over-counts correlated ones — 2Y and 10Y agreeing is not two independent confirmations. Breadth is therefore measured over `correlationBlocks`:
+
+```text
+for each block b with non-zero weight in the winning signature:
+    contribution_b = confirmingObserved_b / nonZeroWeightObserved_b     // ≤ 1
+
+effectiveConfirmations = Σ_b contribution_b
+effectiveBreadth       = effectiveConfirmations / blocksWithNonZeroWeight
+```
+
+Each block contributes **at most one** independent confirmation, so a fully confirming rates block counts as 1, not 2. Denominators count observed assets only; missing inputs are handled by `coveragePenalty`, not double-counted here.
+
+This is what defeats the failure case where 2Y alone moves violently and `fed_rates` still scores high: the rates block caps at 1 confirmation, so `effectiveConfirmations` cannot reach 2.
+
+#### Aggregation
+
+```text
+gate = Π_i component_i ^ λ_i        with Σ λ_i = 1   (λ default: equal)
+confidenceScore = round(100 × clamp01(gate - coveragePenalty))
+```
+
+A **weighted geometric mean**, not a raw product. Multiplicative gating is the right shape — any component at zero vetoes the score, and weak components drag the result down in log space rather than being averaged away. But a raw product of five sub-unit terms compresses everything toward zero and makes the 0–100 scale meaningless (five plausible components at ~0.8 would yield 33). The geometric mean keeps the veto property while leaving the scale usable. Non-negotiables are enforced by the hard caps below rather than by the aggregation.
+
+`λ` weights live in `RegimeSignatureConfig` and are calibrated with fixtures.
 
 **Hard rules that override the score**
 
-1. Fewer than 2 valid confirming assets → `confidenceScore` capped below the `high` band.
-2. Top contributor accounts for > 60% of `Σ|w_i z_i|` while `breadth < 2` → `primaryRegime = single_asset_shock`, regardless of cosine.
-3. Top two `|s_r|` within the ambiguity margin → `primaryRegime = mixed_unresolved`.
+1. `effectiveConfirmations < 2` → `confidenceScore` capped below the `high` band. Raw confirming-asset count is never used for this test.
+2. Top contributor accounts for > 60% of `Σ|w_i z_i|` while `effectiveConfirmations < 2` → `primaryRegime = single_asset_shock`, regardless of cosine.
+3. `distinctiveness < ambiguityFloor` → `primaryRegime = mixed_unresolved`.
 4. Any core rate missing, or fewer than 6 of 8 core assets present → `primaryRegime = insufficient_data`, no driver claim emitted.
+
+**Uncalibrated parameters.** `marginRef`, `ambiguityFloor`, the 60% concentration threshold, `λ` weights, per-asset sigma floors, and the high/medium/low band cut-offs are all placeholders until scenario fixtures exist. The formula and the component set are frozen; the numbers are not.
 
 ---
 
