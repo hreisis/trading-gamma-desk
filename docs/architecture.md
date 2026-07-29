@@ -104,7 +104,7 @@ FRED is **not** viable as a primary source: it republishes upstream data with a 
 | FRED | Backfill and cross-check only | none | Lagging by design |
 | Stooq | **Rejected** | none | Bot challenge, see M1-1 findings |
 
-Yields keep native **bps** semantics from Treasury data. `UUP` is closer to DXY composition than FRED’s broad-dollar index, but it is still a proxy and must be labelled `proxyFor: "DXY"`.
+Yields keep native **bps** semantics from Treasury data. `UUP` is closer to DXY composition than FRED’s broad-dollar index, but it is still a proxy: it is carried as `symbol: "USD"` with `instrument: "UUP"` and `isProxy: true`, and surfaced as “USD via UUP”.
 
 ### M1-1 verification findings (2026-07-29)
 

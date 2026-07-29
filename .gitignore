@@ -13,6 +13,8 @@ data/
 node_modules/
 .next/
 coverage/
+next-env.d.ts
+*.tsbuildinfo
 
 # OS
 .DS_Store

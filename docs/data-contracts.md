@@ -91,7 +91,7 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
 ```json
 {
   "$id": "DominantDriver",
-  "schemaVersion": "0.2.0",
+  "schemaVersion": "0.2.1",
 
   "marketSessionDate": "2026-07-28",
   "generatedAt": "2026-07-29T08:15:00-04:00",
@@ -103,30 +103,37 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
   "riskDirection": "risk_on",
   "label": "Rates-led risk-on",
 
-  "confidenceScore": 74,
-  "confidenceComponents": {
-    "patternMatch": 0.81,
-    "distinctiveness": 0.64,
-    "coherence": 0.88,
-    "effectiveBreadth": 0.75,
-    "strength": 0.92,
-    "coveragePenalty": 0.0
-  },
-  "confidenceDetail": {
-    "runnerUpRegime": "liquidity",
-    "scoreTop": 0.81,
-    "scoreSecond": 0.63,
-    "templateSimilarity": 0.42,
-    "effectiveConfirmations": 3.0,
-    "blocksWithNonZeroWeight": 4,
-    "capsApplied": []
+  "confidence": {
+    "score": 60,
+    "aggregation": "weighted_geometric_mean",
+    "components": [
+      { "name": "patternMatch", "value": 0.784, "weight": 0.2 },
+      { "name": "distinctiveness", "value": 0.37, "weight": 0.2 },
+      { "name": "coherence", "value": 0.898, "weight": 0.2 },
+      { "name": "effectiveBreadth", "value": 0.6, "weight": 0.2 },
+      { "name": "strength", "value": 0.48, "weight": 0.2 }
+    ],
+    "coveragePenalty": 0,
+    "zeroedBy": null,
+    "hardCapsApplied": [],
+    "calibrated": false,
+    "detail": {
+      "runnerUpRegime": "liquidity",
+      "scoreTop": -0.784,
+      "scoreSecond": -0.679,
+      "templateSimilarity": 0.9,
+      "effectiveConfirmations": 3.0,
+      "blocksWithNonZeroWeight": 5
+    }
   },
 
   "evidence": [
     {
       "id": "ev_us2y",
       "symbol": "US2Y",
-      "statement": "US 2Y yield fell 8 bps (z = -1.8)",
+      "instrument": "UST 2Y par yield",
+      "isProxy": false,
+      "statement": "US 2Y fell 8 bps (z = -1.80)",
       "value": -8,
       "unit": "bps",
       "zScore": -1.8,
@@ -134,9 +141,10 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
     },
     {
       "id": "ev_usd",
-      "symbol": "USD_PROXY",
-      "proxyFor": "DXY",
-      "statement": "USD proxy (UUP) fell 0.6% (z = -1.2)",
+      "symbol": "USD",
+      "instrument": "UUP",
+      "isProxy": true,
+      "statement": "USD via UUP fell 0.60% (z = -1.20)",
       "value": -0.6,
       "unit": "pct",
       "zScore": -1.2,
@@ -144,30 +152,31 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
     }
   ],
 
-  "contradictions": ["ev_copper"],
+  "contradictions": ["ev_gold"],
 
   "assets": [
     {
-      "symbol": "GOLD_PROXY",
-      "proxyFor": "XAU",
-      "value": 0.4,
+      "symbol": "GOLD",
+      "instrument": "GLD",
+      "isProxy": true,
+      "value": -0.9,
       "unit": "pct",
-      "zScore": 0.6,
-      "role": "confirming",
-      "contribution": 0.11,
+      "zScore": -0.7,
+      "role": "contradicting",
+      "contribution": 0.1,
       "sourceDate": "2026-07-28",
       "staleDays": 0
     }
   ],
 
   "interpretation": {
-    "text": "The market is repricing policy easing rather than stronger growth.",
+    "text": "Front-end yields and the dollar fell together, which reprices policy easing rather than stronger growth.",
     "evidenceIds": ["ev_us2y", "ev_usd"],
     "generator": "template"
   },
 
   "methodology": {
-    "methodologyVersion": "0.2.0",
+    "methodologyVersion": "0.2.1",
     "signatureVersion": "sig-2026-07-01",
     "window": 20,
     "excludesCurrentObservation": true,
@@ -185,12 +194,30 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
 
 - `primaryRegime` is either a `Regime` or a `RegimeFallback`. When it is a fallback, `label` must not imply a driver.
 - When `primaryRegime` is `risk_sentiment`, `label` is `"Risk-on (broad)"` / `"Risk-off (broad)"` — **not** `"Risk-sentiment-led risk-off"`.
-- `contradictions` holds `evidence[].id` references, never free text.
+- `contradictions` holds `evidence[].id` references, never free text, and each referenced asset’s `role` must actually be `contradicting`.
 - `interpretation.evidenceIds` must be a non-empty subset of `evidence[].id`.
-- `proxyFor` is required whenever the input is a proxy instrument; UI must surface it.
-- `confidenceScore` is derived only from `confidenceComponents`, deterministically. The interpretation layer may not alter it.
+- `confidence` is derived only from its own components, deterministically. The interpretation layer may not alter it.
 
 **Input (conceptual):** per-asset daily changes plus a trailing volatility window that **ends at the prior session** (see 1.1). Credit spreads have a reserved slot and may be absent in Milestone 1.
+
+---
+
+### 1.0 Asset registry
+
+`symbol` is the canonical macro concept; `instrument` is what was actually measured. Keeping them separate is what allows the UI to say “Gold (via GLD)” rather than passing an ETF off as the underlying. Units and proxy status are owned by the registry, so no payload can relabel them.
+
+| symbol | unit | block | M1 instrument | proxy |
+| --- | --- | --- | --- | --- |
+| `US2Y` | bps | rates | UST 2Y par yield | no |
+| `US10Y` | bps | rates | UST 10Y par yield | no |
+| `COPPER` | pct | growth_commodities | CPER | yes |
+| `OIL` | pct | growth_commodities | USO | yes |
+| `GOLD` | pct | haven | GLD | yes |
+| `USD` | pct | usd | UUP | yes |
+| `VIX` | pct | volatility | VIX index | no |
+| `BTC` | pct | crypto | btcusd | no |
+
+Blocks group only genuinely substitutable inputs. 2Y and 10Y move together, and copper and oil share the growth impulse. **Gold stands alone** rather than sitting in a commodity bucket, because its haven and real-rate content is information that neither copper nor VIX carries — bucketing it with oil would have quietly discounted a real independent confirmation.
 
 ---
 
@@ -202,7 +229,8 @@ Deterministic per-asset output. Contains every number that any downstream statem
 {
   "$id": "MacroFeature",
   "symbol": "US2Y",
-  "proxyFor": null,
+  "instrument": "UST 2Y par yield",
+  "isProxy": false,
   "unit": "bps",
   "currentChange": -8,
   "currentFrom": "2026-07-27",
@@ -246,15 +274,24 @@ Signature weights are **data, not code** — reviewable and diffable. They get t
   "polarityConvention": "positive = tightening / higher inflation / stronger growth / risk-on",
   "correlationBlocks": {
     "rates": ["US2Y", "US10Y"],
-    "commodities": ["OIL", "COPPER", "GOLD"],
-    "usd": ["USD_PROXY"],
-    "risk": ["VIX", "BTC"]
+    "growth_commodities": ["COPPER", "OIL"],
+    "haven": ["GOLD"],
+    "usd": ["USD"],
+    "volatility": ["VIX"],
+    "crypto": ["BTC"]
   },
-  "blockWeightBudget": { "rates": 1.0, "commodities": 1.0, "usd": 0.6, "risk": 1.0 },
+  "blockWeightBudget": {
+    "rates": 1.0,
+    "growth_commodities": 1.0,
+    "haven": 0.8,
+    "usd": 0.6,
+    "volatility": 0.8,
+    "crypto": 0.6
+  },
   "signatures": {
-    "fed_rates": { "US2Y": 1.0, "US10Y": 0.6, "USD_PROXY": 0.5, "GOLD": -0.4, "BTC": -0.3, "VIX": 0.2 }
+    "fed_rates": { "US2Y": 0.7, "US10Y": 0.3, "USD": 0.5, "GOLD": -0.4, "BTC": -0.3, "VIX": 0.2 }
   },
-  "riskVector": { "BTC": 1.0, "COPPER": 0.6, "VIX": -1.0, "USD_PROXY": -0.4, "GOLD": -0.2 },
+  "riskVector": { "BTC": 0.6, "COPPER": 0.5, "VIX": -0.8, "USD": -0.4, "GOLD": -0.2 },
   "confidenceParams": {
     "marginRef": 0.15,
     "ambiguityFloor": 0.2,
@@ -274,7 +311,9 @@ Signature weights are **data, not code** — reviewable and diffable. They get t
 
 `confidenceParams.calibrated` must stay `false` until the fixture suite exists. UI must not present band labels (`high` / `medium` / `low`) while it is `false` — show the numeric score and its components instead.
 
-`blockWeightBudget` exists because the 8 dimensions are **not orthogonal** (2Y/10Y correlate strongly; Oil/Copper/Gold cluster). Plain cosine treats them as independent, so a signature that spreads weight across a correlated block gets an unearned boost. Budgeting weight per block, rather than per asset, contains that bias without attempting covariance whitening on a 20-sample window.
+`blockWeightBudget` exists because the 8 dimensions are **not orthogonal** (2Y/10Y correlate strongly; copper and oil share the growth impulse). Plain cosine treats them as independent, so a signature that spreads weight across a correlated block gets an unearned boost. Budgeting weight per block, rather than per asset, contains that bias without attempting covariance whitening on a 20-sample window.
+
+The budget is **mechanically enforced**: the sum of `|w|` a signature spends inside one block may not exceed that block’s budget, and the schema rejects configs that overspend. Blocks must also partition the registry exactly, otherwise `effectiveBreadth` has an ill-defined denominator.
 
 ---
 
@@ -330,13 +369,19 @@ This is what defeats the failure case where 2Y alone moves violently and `fed_ra
 #### Aggregation
 
 ```text
-gate = Π_i component_i ^ λ_i        with Σ λ_i = 1   (λ default: equal)
-confidenceScore = round(100 × clamp01(gate - coveragePenalty))
+gate  = Π_i component_i ^ λ_i        with Σ λ_i = 1   (λ default: equal)
+score = round(100 × clamp01(gate - coveragePenalty))
+
+if any component_i <= 0:
+    score    = 0                     // explicit, not merely a small product
+    zeroedBy = name of that component
 ```
 
 A **weighted geometric mean**, not a raw product. Multiplicative gating is the right shape — any component at zero vetoes the score, and weak components drag the result down in log space rather than being averaged away. But a raw product of five sub-unit terms compresses everything toward zero and makes the 0–100 scale meaningless (five plausible components at ~0.8 would yield 33). The geometric mean keeps the veto property while leaving the scale usable. Non-negotiables are enforced by the hard caps below rather than by the aggregation.
 
-`λ` weights live in `RegimeSignatureConfig` and are calibrated with fixtures.
+`λ` weights must sum to 1 and are validated by the schema.
+
+**The breakdown is part of the output, not a debug aid.** Every payload carries each component’s `value` *and* its `weight`, plus `coveragePenalty`, `zeroedBy` and `hardCapsApplied` with the measured `basis` that triggered each cap. A score that cannot be recomputed from its own payload is not auditable, and an unauditable confidence number is exactly the thing this product must not ship.
 
 **Hard rules that override the score**
 
@@ -527,4 +572,5 @@ Desktop primary fields map 1:1: structure badge, spot/flip/walls/range, since-op
 5. **Numbers never originate in the interpretation layer.** Every numeric fact is produced by compute and carried in `evidence[]`. The LLM path may only select and phrase around `evidenceId` references.
 6. **Enforceable numeric guardrail:** reject any generated prose containing a numeral that does not appear in the referenced evidence values or statements. Fall back to the template generator on rejection.
 7. Snapshots must persist `methodology.signatureVersion` and `methodology.methodologyVersion`, so a past conclusion can be reproduced after weights change.
-8. Proxy instruments must carry `proxyFor` end to end. Never display a proxy under the name of the thing it proxies (e.g. a broad-dollar or UUP series must not be labelled `DXY`).
+8. Proxy inputs must carry `instrument` and `isProxy` end to end, matching the registry. Never display a proxy under the name of the thing it proxies without naming the instrument (e.g. a UUP series is `USD via UUP`, never bare `DXY`).
+9. While `confidenceParams.calibrated` is `false`, no surface may render band labels (`high` / `medium` / `low`). Show the numeric score and its component breakdown instead.

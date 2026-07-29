@@ -1,0 +1,90 @@
+{
+  "signatureVersion": "sig-2026-07-01",
+  "methodologyVersion": "0.2.1",
+  "polarityConvention": "positive = tightening rates / rising inflation / stronger growth / tighter liquidity / risk-on",
+  "correlationBlocks": {
+    "rates": ["US2Y", "US10Y"],
+    "growth_commodities": ["COPPER", "OIL"],
+    "haven": ["GOLD"],
+    "usd": ["USD"],
+    "volatility": ["VIX"],
+    "crypto": ["BTC"]
+  },
+  "blockWeightBudget": {
+    "rates": 1.0,
+    "growth_commodities": 1.0,
+    "haven": 0.8,
+    "usd": 0.6,
+    "volatility": 0.8,
+    "crypto": 0.6
+  },
+  "signatures": {
+    "fed_rates": {
+      "US2Y": 0.7,
+      "US10Y": 0.3,
+      "USD": 0.5,
+      "GOLD": -0.4,
+      "BTC": -0.3,
+      "VIX": 0.2
+    },
+    "inflation": {
+      "OIL": 0.6,
+      "COPPER": 0.35,
+      "GOLD": 0.6,
+      "US10Y": 0.6,
+      "US2Y": 0.3,
+      "USD": -0.2
+    },
+    "growth": {
+      "COPPER": 0.6,
+      "OIL": 0.35,
+      "US10Y": 0.5,
+      "US2Y": 0.3,
+      "VIX": -0.4,
+      "BTC": 0.3,
+      "GOLD": -0.2,
+      "USD": -0.2
+    },
+    "liquidity": {
+      "BTC": -0.6,
+      "USD": 0.6,
+      "GOLD": -0.4,
+      "US2Y": 0.4,
+      "US10Y": 0.2,
+      "VIX": 0.4
+    },
+    "risk_sentiment": {
+      "VIX": -0.8,
+      "BTC": 0.6,
+      "COPPER": 0.5,
+      "OIL": 0.3,
+      "GOLD": -0.4,
+      "USD": -0.4
+    }
+  },
+  "riskVector": {
+    "BTC": 0.6,
+    "COPPER": 0.5,
+    "VIX": -0.8,
+    "USD": -0.4,
+    "GOLD": -0.2
+  },
+  "confidenceParams": {
+    "marginRef": 0.15,
+    "ambiguityFloor": 0.2,
+    "concentrationThreshold": 0.6,
+    "lambda": {
+      "patternMatch": 0.2,
+      "distinctiveness": 0.2,
+      "coherence": 0.2,
+      "effectiveBreadth": 0.2,
+      "strength": 0.2
+    },
+    "calibrated": false
+  },
+  "sigmaFloors": {
+    "US2Y": 1.0,
+    "US10Y": 1.0,
+    "VIX": 0.5
+  }
+}

@@ -4,7 +4,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro** (specs corrected; ready to implement)
+**Milestone 1 — Cross-Asset Macro.** M1-2 done; next is M1-3 (transforms and z-scores).
+
+> **M1-1 is not complete.** Treasury and CBOE are verified, but the Tiingo path is unverified pending a token. Real field and session-date verification **must** land before M1-7 (ingest adapter) starts.
 
 ---
 
@@ -20,6 +22,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.2.0 | Added `distinctiveness` component and `confidenceDetail` | `patternMatch` alone cannot tell “looks like this regime” from “looks like this regime rather than another”; margin required now scales with template similarity |
 | 0.2.0 | `breadth` → `effectiveBreadth` over correlation blocks | Counting confirming assets over-counts correlated ones, so a violent 2Y move alone could still produce high `fed_rates` confidence |
 | 0.2.0 | Aggregation fixed as weighted geometric mean; band labels gated on `calibrated` | A raw product of five sub-unit terms compresses the 0–100 scale to meaninglessness |
+| 0.2.1 | `proxyFor` replaced by registry-owned `symbol` + `instrument` + `isProxy` | 0.2.0 examples used both `GOLD` and `GOLD_PROXY` for one asset; the concept and the measured instrument are now separate fields, so units and proxy status cannot be relabelled by a payload |
+| 0.2.1 | `confidenceScore` / `confidenceComponents` / `confidenceDetail` collapsed into one `confidence` object | Each component now carries its own `weight` alongside its `value`, plus `zeroedBy` and `hardCapsApplied` with the triggering `basis`, so a score can be recomputed from its own payload |
+| 0.2.1 | Correlation blocks split into `rates`, `growth_commodities`, `haven`, `usd`, `volatility`, `crypto` | 0.2.0 bucketed gold with oil and copper, and VIX with BTC, which discounted genuinely independent confirmations |
 
 ---
 
@@ -41,7 +46,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | ID | Task | Done when |
 | --- | --- | --- |
 | M1-1 | Verify sources hands-on | Treasury, CBOE and Tiingo responses checked for actual dates and fields per symbol; results recorded in `architecture.md` — ✅ Treasury and CBOE verified, Stooq rejected, **Tiingo blocked on token** |
-| M1-2 | Zod contracts from `data-contracts.md` 0.2.0 | Fixtures validate; `RegimeSignatureConfig` has its own schema |
+| M1-2 | Zod contracts from `data-contracts.md` 0.2.1 | Fixtures validate; `RegimeSignatureConfig` has its own schema — ✅ 30 contract tests green, `tsc` and `next build` clean |
 | M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` |
 | M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented |
 | M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move |
@@ -49,7 +54,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-6b | Calibrate `confidenceParams` | `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs set from fixtures; `calibrated: true` |
 | M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; year-boundary merge for Treasury; response validation rules enforced; immutable snapshot with versions |
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template |
-| M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidenceScore` with component breakdown, evidence, `proxyFor` labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
+| M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
 
 **Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists.
 
