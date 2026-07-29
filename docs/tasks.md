@@ -40,14 +40,14 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| M1-1 | Verify sources hands-on | Treasury, CBOE and Tiingo responses checked for actual dates and fields per symbol; results recorded in `architecture.md` |
+| M1-1 | Verify sources hands-on | Treasury, CBOE and Tiingo responses checked for actual dates and fields per symbol; results recorded in `architecture.md` — ✅ Treasury and CBOE verified, Stooq rejected, **Tiingo blocked on token** |
 | M1-2 | Zod contracts from `data-contracts.md` 0.2.0 | Fixtures validate; `RegimeSignatureConfig` has its own schema |
 | M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` |
 | M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented |
 | M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move |
 | M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data |
 | M1-6b | Calibrate `confidenceParams` | `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs set from fixtures; `calibrated: true` |
-| M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; immutable snapshot with versions |
+| M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; year-boundary merge for Treasury; response validation rules enforced; immutable snapshot with versions |
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template |
 | M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidenceScore` with component breakdown, evidence, `proxyFor` labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
 
