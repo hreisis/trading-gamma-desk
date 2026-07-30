@@ -8,10 +8,13 @@ import {
 } from "./common";
 
 export const VolatilityWindow = z.object({
+  /** Requested window length. */
   length: z.number().int().positive(),
-  /** Last session included in the window. Must be t-1, never t. */
+  /** Latest session the window may reach, i.e. t-1. Never t. */
   endsAt: IsoDate,
+  /** End date of each historical change actually used, ascending. */
   sessionDates: z.array(IsoDate),
+  /** Historical changes actually available; may fall short of `length`. */
   validCount: z.number().int().min(0),
 });
 
@@ -69,19 +72,36 @@ export const MacroFeature = MacroFeatureBase.superRefine((f, ctx) => {
     });
   }
 
-  if (f.window.sessionDates.length !== f.window.length) {
+  if (f.window.sessionDates.length !== f.window.validCount) {
     ctx.addIssue({
       code: "custom",
       path: ["window", "sessionDates"],
-      message: `expected ${f.window.length} session dates, got ${f.window.sessionDates.length}`,
+      message: `expected ${f.window.validCount} session dates, got ${f.window.sessionDates.length}`,
     });
   }
 
-  if (f.window.validCount !== f.window.length) {
+  if (f.window.validCount > f.window.length) {
     ctx.addIssue({
       code: "custom",
       path: ["window", "validCount"],
-      message: "validCount must equal window length; short windows are not valid input",
+      message: "validCount may not exceed the requested window length",
+    });
+  }
+
+  // A short window is representable, but it can never produce a z-score.
+  if (f.zScore !== null && f.window.validCount !== f.window.length) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["window", "validCount"],
+      message: `a z-score requires a full window of ${f.window.length}, got ${f.window.validCount}`,
+    });
+  }
+
+  if (f.window.validCount < f.window.length && !f.flags.includes("insufficientHistory")) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["flags"],
+      message: "a short window must be flagged insufficientHistory",
     });
   }
 
@@ -97,12 +117,23 @@ export const MacroFeature = MacroFeatureBase.superRefine((f, ctx) => {
   }
 
   const last = f.window.sessionDates.at(-1);
-  if (last !== undefined && last !== f.window.endsAt) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["window", "sessionDates"],
-      message: `last session date ${last} must equal window.endsAt ${f.window.endsAt}`,
-    });
+  if (last !== undefined) {
+    if (last > f.window.endsAt) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["window", "sessionDates"],
+        message: `last session date ${last} may not exceed window.endsAt ${f.window.endsAt}`,
+      });
+    }
+    // Rule: the last historical change ends exactly at t-1 whenever a z-score
+    // is claimed. A shorter reach is only acceptable alongside a null z-score.
+    if (f.zScore !== null && last !== f.window.endsAt) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["window", "sessionDates"],
+        message: `a z-score requires the window to reach ${f.window.endsAt}, got ${last}`,
+      });
+    }
   }
 
   if (f.window.sessionDates.some((d) => d >= f.currentTo)) {
@@ -160,9 +191,16 @@ export const MacroFeature = MacroFeatureBase.superRefine((f, ctx) => {
   }
 
   if (f.zScore === null) {
-    const explained = (["volUnavailable", "missing", "stale", "gapSkipped"] as const).some(
-      (flag) => f.flags.includes(flag),
-    );
+    const explained = (
+      [
+        "volUnavailable",
+        "insufficientHistory",
+        "missingAdjacentSession",
+        "invalidPrice",
+        "missing",
+        "stale",
+      ] as const
+    ).some((flag) => f.flags.includes(flag));
     if (!explained) {
       ctx.addIssue({
         code: "custom",
@@ -172,12 +210,24 @@ export const MacroFeature = MacroFeatureBase.superRefine((f, ctx) => {
     }
   }
 
-  if (!f.consecutiveSessions && !f.flags.includes("gapSkipped")) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["flags"],
-      message: "non-consecutive sessions must be flagged gapSkipped",
-    });
+  // Never bridge a gap: without an adjacent prior session there is no
+  // single-session change to report, so the value must be absent rather than
+  // silently spanning two sessions.
+  if (!f.consecutiveSessions) {
+    if (!f.flags.includes("missingAdjacentSession")) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["flags"],
+        message: "non-adjacent sessions must be flagged missingAdjacentSession",
+      });
+    }
+    if (f.currentChange !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["currentChange"],
+        message: "a change may not span non-adjacent sessions",
+      });
+    }
   }
 });
 

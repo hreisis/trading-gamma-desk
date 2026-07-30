@@ -15,6 +15,8 @@ Status: **stack locked for Milestone 1** (single TypeScript runtime). Data flow 
 | Concern | Choice | Rationale |
 | --- | --- | --- |
 | Runtime | **TypeScript, single app** (Next.js App Router) | Milestone 1 compute is statistics over ~8 assets × 21 sessions; a second runtime would cost more than it saves |
+| Versions | Exact pins in `package.json`, Node in `.nvmrc`, `engines` declared | Next 16 needs `experimental.useTypeScriptCli` under TypeScript 7, so a floating range could silently change build behaviour |
+| CI | `npm ci` then typecheck, test **and `next build`** | The TypeScript 7 workaround lives in the build path; without building in CI it would only ever be exercised locally |
 | Schemas | **Zod**, generated from `docs/data-contracts.md` | One source of truth shared by API, compute and UI |
 | Tests | **Vitest** | Pure-function and property tests over fixtures |
 | Compute | Pure TS modules, no IO, no network | Deterministic and reproducible |

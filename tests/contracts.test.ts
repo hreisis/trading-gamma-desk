@@ -70,13 +70,42 @@ describe("volatility window cannot include the current observation", () => {
     );
   });
 
-  it("rejects a short window", () => {
+  it("rejects a z-score built on a short window", () => {
     expectRejected(
       MacroFeature,
       mutate(featureFixture, (f) => {
         f.window.validCount = 18;
+        f.window.sessionDates = f.window.sessionDates.slice(2);
+        f.flags = ["insufficientHistory"];
       }),
-      /validCount must equal window length/,
+      /a z-score requires a full window of 20, got 18/,
+    );
+  });
+
+  it("accepts a short window only alongside a null z-score", () => {
+    const short = mutate(featureFixture, (f: any) => {
+      f.window.validCount = 18;
+      f.window.sessionDates = f.window.sessionDates.slice(2);
+      f.zScore = null;
+      f.sigmaRaw = null;
+      f.sigmaUsed = null;
+      f.flags = ["insufficientHistory", "volUnavailable"];
+    });
+    expect(MacroFeature.safeParse(short).success).toBe(true);
+  });
+
+  it("requires a short window to be flagged", () => {
+    expectRejected(
+      MacroFeature,
+      mutate(featureFixture, (f) => {
+        f.window.validCount = 18;
+        f.window.sessionDates = f.window.sessionDates.slice(2);
+        f.zScore = null;
+        f.sigmaRaw = null;
+        f.sigmaUsed = null;
+        f.flags = ["volUnavailable"];
+      }),
+      /short window must be flagged insufficientHistory/,
     );
   });
 });
@@ -116,13 +145,25 @@ describe("degenerate volatility is reported, not smoothed over", () => {
     );
   });
 
-  it("rejects an unflagged session gap", () => {
+  it("rejects an unflagged missing adjacent session", () => {
     expectRejected(
       MacroFeature,
       mutate(featureFixture, (f) => {
         f.consecutiveSessions = false;
       }),
-      /must be flagged gapSkipped/,
+      /must be flagged missingAdjacentSession/,
+    );
+  });
+
+  it("rejects a change that spans non-adjacent sessions", () => {
+    expectRejected(
+      MacroFeature,
+      mutate(featureFixture, (f) => {
+        f.consecutiveSessions = false;
+        f.zScore = null;
+        f.flags = ["missingAdjacentSession", "volUnavailable"];
+      }),
+      /may not span non-adjacent sessions/,
     );
   });
 });
@@ -334,7 +375,7 @@ describe("signature config keeps the scoring model honest", () => {
     expectRejected(
       RegimeSignatureConfig,
       mutate(signatureFixture, (c) => {
-        c.correlationBlocks.rates = ["US2Y"];
+        c.evidenceBlocks.rates = ["US2Y"];
       }),
       /US10Y must appear in exactly one block/,
     );
@@ -344,8 +385,8 @@ describe("signature config keeps the scoring model honest", () => {
     expectRejected(
       RegimeSignatureConfig,
       mutate(signatureFixture, (c) => {
-        c.correlationBlocks.rates = ["US2Y", "US10Y", "GOLD"];
-        c.correlationBlocks.haven = [];
+        c.evidenceBlocks.rates = ["US2Y", "US10Y", "GOLD"];
+        c.evidenceBlocks.haven = [];
       }),
       /GOLD belongs to block haven/,
     );

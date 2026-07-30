@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   ALL_SYMBOLS,
   blockOf,
-  CorrelationBlock,
+  EvidenceBlock,
   MacroSymbol,
   Regime,
   SemVer,
@@ -42,8 +42,8 @@ const RegimeSignatureConfigBase = z.object({
   signatureVersion: z.string().min(1),
   methodologyVersion: SemVer,
   polarityConvention: z.string().min(1),
-  correlationBlocks: z.record(CorrelationBlock, z.array(MacroSymbol).nonempty()),
-  blockWeightBudget: z.record(CorrelationBlock, z.number().positive()),
+  evidenceBlocks: z.record(EvidenceBlock, z.array(MacroSymbol).nonempty()),
+  blockWeightBudget: z.record(EvidenceBlock, z.number().positive()),
   signatures: z.record(Regime, SignatureWeights),
   riskVector: SignatureWeights,
   confidenceParams: ConfidenceParams,
@@ -72,17 +72,17 @@ export const RegimeSignatureConfig = RegimeSignatureConfigBase.superRefine(
 
     // Blocks must partition the registry, otherwise effectiveBreadth has an
     // ill-defined denominator.
-    const assigned = new Map<MacroSymbol, CorrelationBlock[]>();
-    for (const [block, symbols] of Object.entries(config.correlationBlocks)) {
+    const assigned = new Map<MacroSymbol, EvidenceBlock[]>();
+    for (const [block, symbols] of Object.entries(config.evidenceBlocks)) {
       for (const symbol of symbols ?? []) {
         const blocks = assigned.get(symbol) ?? [];
-        blocks.push(block as CorrelationBlock);
+        blocks.push(block as EvidenceBlock);
         assigned.set(symbol, blocks);
 
         if (blockOf(symbol) !== block) {
           ctx.addIssue({
             code: "custom",
-            path: ["correlationBlocks", block],
+            path: ["evidenceBlocks", block],
             message: `${symbol} belongs to block ${blockOf(symbol)} in the asset registry`,
           });
         }
@@ -94,14 +94,14 @@ export const RegimeSignatureConfig = RegimeSignatureConfigBase.superRefine(
       if (blocks.length !== 1) {
         ctx.addIssue({
           code: "custom",
-          path: ["correlationBlocks"],
+          path: ["evidenceBlocks"],
           message: `${symbol} must appear in exactly one block, found ${blocks.length}`,
         });
       }
     }
 
-    for (const block of Object.keys(config.correlationBlocks)) {
-      if (config.blockWeightBudget[block as CorrelationBlock] === undefined) {
+    for (const block of Object.keys(config.evidenceBlocks)) {
+      if (config.blockWeightBudget[block as EvidenceBlock] === undefined) {
         ctx.addIssue({
           code: "custom",
           path: ["blockWeightBudget"],
@@ -114,7 +114,7 @@ export const RegimeSignatureConfig = RegimeSignatureConfigBase.superRefine(
     // plain cosine from rewarding a signature for spreading weight across
     // inputs that carry the same information.
     for (const [regime, weights] of Object.entries(config.signatures)) {
-      const spentByBlock = new Map<CorrelationBlock, number>();
+      const spentByBlock = new Map<EvidenceBlock, number>();
       for (const [symbol, weight] of Object.entries(weights ?? {})) {
         const block = blockOf(symbol as MacroSymbol);
         spentByBlock.set(

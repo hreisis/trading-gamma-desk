@@ -75,8 +75,12 @@ export const ConfidenceDetail = z.object({
   scoreTop: z.number().min(-1).max(1),
   scoreSecond: z.number().min(-1).max(1).nullable(),
   templateSimilarity: z.number().min(0).max(1).nullable(),
+  /** Unweighted count of independent confirmations, one per block at most. */
   effectiveConfirmations: z.number().min(0),
-  blocksWithNonZeroWeight: z.number().int().min(0),
+  /** Blocks carrying signature weight *and* a valid observation. */
+  blocksScored: z.number().int().min(0),
+  /** Denominator of the exposure-weighted breadth. */
+  exposureTotal: z.number().min(0),
 });
 
 const ConfidenceBase = z.object({

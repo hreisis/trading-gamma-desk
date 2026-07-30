@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "0.2.1",
+  "schemaVersion": "0.2.2",
   "marketSessionDate": "2026-07-28",
   "generatedAt": "2026-07-29T08:15:00-04:00",
   "sessionAlignment": "aligned",
@@ -28,7 +28,8 @@
       "scoreSecond": -0.679,
       "templateSimilarity": 0.9,
       "effectiveConfirmations": 3,
-      "blocksWithNonZeroWeight": 5
+      "blocksScored": 5,
+      "exposureTotal": 2.6
     }
   },
   "evidence": [
@@ -193,7 +194,7 @@
     "generator": "template"
   },
   "methodology": {
-    "methodologyVersion": "0.2.1",
+    "methodologyVersion": "0.2.2",
     "signatureVersion": "sig-2026-07-01",
     "window": 20,
     "excludesCurrentObservation": true,

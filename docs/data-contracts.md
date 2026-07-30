@@ -91,7 +91,7 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
 ```json
 {
   "$id": "DominantDriver",
-  "schemaVersion": "0.2.1",
+  "schemaVersion": "0.2.2",
 
   "marketSessionDate": "2026-07-28",
   "generatedAt": "2026-07-29T08:15:00-04:00",
@@ -123,7 +123,8 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
       "scoreSecond": -0.679,
       "templateSimilarity": 0.9,
       "effectiveConfirmations": 3.0,
-      "blocksWithNonZeroWeight": 5
+      "blocksScored": 5,
+      "exposureTotal": 2.6
     }
   },
 
@@ -176,7 +177,7 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
   },
 
   "methodology": {
-    "methodologyVersion": "0.2.1",
+    "methodologyVersion": "0.2.2",
     "signatureVersion": "sig-2026-07-01",
     "window": 20,
     "excludesCurrentObservation": true,
@@ -217,7 +218,7 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
 | `VIX` | pct | volatility | VIX index | no |
 | `BTC` | pct | crypto | btcusd | no |
 
-Blocks group only genuinely substitutable inputs. 2Y and 10Y move together, and copper and oil share the growth impulse. **Gold stands alone** rather than sitting in a commodity bucket, because its haven and real-rate content is information that neither copper nor VIX carries — bucketing it with oil would have quietly discounted a real independent confirmation.
+Blocks express an **editorial judgement about evidence redundancy** for Milestone 1. They are *not* a claim that the members are stably statistically correlated, and nothing in the pipeline measures a correlation matrix. Gold, VIX and BTC each stand alone because each carries information the others do not; bucketing gold with oil and copper would quietly discount a real independent confirmation.
 
 ---
 
@@ -239,7 +240,7 @@ Deterministic per-asset output. Contains every number that any downstream statem
   "window": {
     "length": 20,
     "endsAt": "2026-07-27",
-    "sessionDates": ["2026-06-29", "…"],
+    "sessionDates": ["2026-06-29", "…", "2026-07-27"],
     "validCount": 20
   },
   "sigmaRaw": 4.4,
@@ -250,15 +251,26 @@ Deterministic per-asset output. Contains every number that any downstream statem
 }
 ```
 
+**Change rules**
+
+1. `currentChange` spans `t-1 → t`, where `t-1` is the **previous expected session** from the market calendar. Sessions either side of a holiday are adjacent; a genuinely absent session is not.
+2. If `t-1` has no valid observation, `currentChange` is `null` with `missingAdjacentSession`. A change is **never** bridged across a gap — doing so would report a multi-session move as a daily one.
+3. Price assets use a **simple return** (`p_t / p_{t-1} - 1`), not a log return. Yields use a first difference. Nothing is rounded in the compute layer; rounding belongs to presentation and would otherwise move the number being scored.
+4. Reported units are the asset’s contract unit: `pct` means **percentage points** (`0.6` is +0.6%), `bps` means basis points. Sigma floors are expressed in the same units.
+5. Price assets require finite, strictly positive inputs. Yields may legitimately be zero or negative, so only non-finite yields are rejected. Either failure is `invalidPrice`.
+
 **Volatility window rules**
 
-1. `currentChange` spans `t-1 → t`. The window holds the **20 valid daily changes ending at `t-1`** — the current observation never participates in estimating its own scale.
-2. This requires ≥ 22 consecutive valid price points. Ingest should request **45–60 calendar days** to absorb weekends and holidays.
-3. `sigmaRaw = 1.4826 × median(|Δ|)`, taken **about zero** to stay consistent with `muAssumption: "zero"`.
-4. `sigmaUsed = max(sigmaRaw, assetFloor)`. The floor only rescues small-but-nonzero scale.
-5. If `sigmaRaw == 0`, emit `zScore: null` and flag `volUnavailable`. Because MAD is a median, zero also means **more than half the window is identical** — treat it as a data-quality alarm (`repeatedPrints`), not merely a quiet market.
+1. The window holds the **20 valid single-session changes ending at `t-1`**, so the observation being scored never contributes to the scale it is divided by. `window.endsAt` always equals `currentFrom`.
+2. `window.sessionDates` are the **end dates of the historical changes actually used**, ascending. `validCount` may fall short of `length`; a short window is representable but can never yield a z-score, and must carry `insufficientHistory`.
+3. A full window needs ≥ 22 consecutive valid points. Ingest should request **45–60 calendar days** to absorb weekends and holidays.
+4. `sigmaRaw = 1.4826 × median(|Δ|)`, taken **about zero** to stay consistent with `muAssumption: "zero"`. A median-centred spread paired with a zero-centred numerator would mix two conventions in one ratio.
+5. The floor applies **only when `0 < sigmaRaw < floor`**, recording `sigmaUsed` and `sigmaFloorApplied`. At or above the floor, sigma is untouched.
+6. If `sigmaRaw == 0`, emit `zScore: null` with **both** `volUnavailable` and `repeatedPrints`, and do **not** let the floor rescue it. Because MAD is a median, zero means more than half the window is identical, which is a data-quality alarm rather than a quiet market.
 
-`flags` enum: `volUnavailable` | `repeatedPrints` | `sigmaFloorApplied` | `gapSkipped` | `stale` | `missing`
+**Distinct failure reasons.** `insufficientHistory`, `missingAdjacentSession` and `repeatedPrints` fail for different reasons and need different fixes, so they are never collapsed into one flag.
+
+`flags` enum: `insufficientHistory` | `missingAdjacentSession` | `repeatedPrints` | `volUnavailable` | `sigmaFloorApplied` | `invalidPrice` | `stale` | `missing`
 
 ---
 
@@ -272,7 +284,7 @@ Signature weights are **data, not code** — reviewable and diffable. They get t
   "signatureVersion": "sig-2026-07-01",
   "methodologyVersion": "0.2.0",
   "polarityConvention": "positive = tightening / higher inflation / stronger growth / risk-on",
-  "correlationBlocks": {
+  "evidenceBlocks": {
     "rates": ["US2Y", "US10Y"],
     "growth_commodities": ["COPPER", "OIL"],
     "haven": ["GOLD"],
@@ -352,19 +364,29 @@ This component also supersedes a separate ambiguity threshold: `mixed_unresolved
 
 #### effectiveBreadth
 
-Counting confirming assets directly over-counts correlated ones — 2Y and 10Y agreeing is not two independent confirmations. Breadth is therefore measured over `correlationBlocks`:
+Counting confirming assets directly over-counts redundant ones — 2Y and 10Y agreeing is not two independent confirmations. Breadth is measured over `evidenceBlocks`, **weighted by the exposure the winning signature actually takes in each block**:
 
 ```text
-for each block b with non-zero weight in the winning signature:
-    contribution_b = confirmingObserved_b / nonZeroWeightObserved_b     // ≤ 1
+scored blocks = blocks that both
+                  (a) carry non-zero weight in the winning signature, and
+                  (b) have at least one valid current observation
 
-effectiveConfirmations = Σ_b contribution_b
-effectiveBreadth       = effectiveConfirmations / blocksWithNonZeroWeight
+for each scored block b:
+    exposure_b     = min(Σ_{i∈b, observed} |w_i|, blockWeightBudget_b)
+    confirmRatio_b = confirmingObserved_b / observedNonZeroWeight_b     // ≤ 1
+
+effectiveConfirmations = Σ_b confirmRatio_b            // a count, for the hard gate
+effectiveBreadth       = Σ_b exposure_b × confirmRatio_b / Σ_b exposure_b
 ```
 
-Each block contributes **at most one** independent confirmation, so a fully confirming rates block counts as 1, not 2. Denominators count observed assets only; missing inputs are handled by `coveragePenalty`, not double-counted here.
+Two properties matter:
 
-This is what defeats the failure case where 2Y alone moves violently and `fed_rates` still scores high: the rates block caps at 1 confirmation, so `effectiveConfirmations` cannot reach 2.
+1. **The denominator is never a fixed block count.** Only blocks the winning signature actually uses, and for which data exists, can appear. Charging a signature for a block it places no weight on would penalise it for evidence it never claimed.
+2. **Missing data is penalised once.** It is handled by `coveragePenalty` and the hard gates, and does not also inflate the breadth denominator.
+
+`effectiveConfirmations` stays an unweighted sum so the hard gate keeps its plain meaning — “at least two independent confirmations” — while `effectiveBreadth` reports the exposure-weighted share that confirmed, which is what belongs in a `[0, 1]` score component.
+
+This is what defeats the failure case where 2Y alone moves violently and `fed_rates` still scores high: the rates block caps at one confirmation, so `effectiveConfirmations` cannot reach 2.
 
 #### Aggregation
 

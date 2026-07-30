@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CONTRACT_SCHEMA_VERSION = "0.2.1";
+export const CONTRACT_SCHEMA_VERSION = "0.2.2";
 
 export const IsoDate = z
   .string()
@@ -48,11 +48,24 @@ export const Unit = z.enum(["pct", "bps"]);
 export const SessionAlignment = z.enum(["aligned", "partial", "stale"]);
 export const InterpretationGenerator = z.enum(["template", "llm"]);
 
+/**
+ * Failure reasons are deliberately distinct. "no history", "no adjacent
+ * session" and "repeated prints" fail for different reasons and need
+ * different fixes, so collapsing them into one flag would hide the cause.
+ */
 export const FeatureFlag = z.enum([
-  "volUnavailable",
+  /** Fewer valid historical changes than the requested window length. */
+  "insufficientHistory",
+  /** The expected t-1 session has no valid observation, so t-1 -> t is unavailable. */
+  "missingAdjacentSession",
+  /** MAD is zero: over half the window is identical, i.e. repeated or filled prints. */
   "repeatedPrints",
+  /** Scale could not be estimated, so no z-score exists. */
+  "volUnavailable",
+  /** The floor raised a small but non-zero sigma. */
   "sigmaFloorApplied",
-  "gapSkipped",
+  /** Non-finite, or non-positive where the asset is price-based. */
+  "invalidPrice",
   "stale",
   "missing",
 ]);
@@ -82,13 +95,13 @@ export const MacroSymbol = z.enum([
 export type MacroSymbol = z.infer<typeof MacroSymbol>;
 
 /**
- * Correlation blocks cap how much independent confirmation a group of
- * redundant inputs can contribute. Only genuinely substitutable inputs share
- * a block: 2Y/10Y move together, and copper/oil share the growth impulse.
- * Gold carries haven and real-rate information that neither of those does, so
- * it stands alone rather than being averaged into a commodity bucket.
+ * Evidence blocks cap how much independent confirmation a group of redundant
+ * inputs can contribute. This expresses an editorial judgement about which
+ * inputs carry the same evidence for Milestone 1; it is **not** a claim that
+ * the members are stably statistically correlated. Gold, VIX and BTC each
+ * stand alone because each carries information the others do not.
  */
-export const CorrelationBlock = z.enum([
+export const EvidenceBlock = z.enum([
   "rates",
   "growth_commodities",
   "haven",
@@ -96,13 +109,13 @@ export const CorrelationBlock = z.enum([
   "volatility",
   "crypto",
 ]);
-export type CorrelationBlock = z.infer<typeof CorrelationBlock>;
+export type EvidenceBlock = z.infer<typeof EvidenceBlock>;
 
 export interface AssetDefinition {
   readonly symbol: MacroSymbol;
   readonly label: string;
   readonly unit: Unit;
-  readonly block: CorrelationBlock;
+  readonly block: EvidenceBlock;
   /** M1 instrument actually measured. */
   readonly instrument: string;
   readonly isProxy: boolean;
@@ -193,7 +206,7 @@ export function expectedUnit(symbol: MacroSymbol): Unit {
   return ASSET_REGISTRY[symbol].unit;
 }
 
-export function blockOf(symbol: MacroSymbol): CorrelationBlock {
+export function blockOf(symbol: MacroSymbol): EvidenceBlock {
   return ASSET_REGISTRY[symbol].block;
 }
 

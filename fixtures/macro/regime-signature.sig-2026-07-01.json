@@ -1,8 +1,8 @@
 {
   "signatureVersion": "sig-2026-07-01",
-  "methodologyVersion": "0.2.1",
+  "methodologyVersion": "0.2.2",
   "polarityConvention": "positive = tightening rates / rising inflation / stronger growth / tighter liquidity / risk-on",
-  "correlationBlocks": {
+  "evidenceBlocks": {
     "rates": ["US2Y", "US10Y"],
     "growth_commodities": ["COPPER", "OIL"],
     "haven": ["GOLD"],

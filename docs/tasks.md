@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-2 done; next is M1-3 (transforms and z-scores).
+**Milestone 1 — Cross-Asset Macro.** M1-3 done; next is M1-4 (signature scoring and confidence).
 
 > **M1-1 is not complete.** Treasury and CBOE are verified, but the Tiingo path is unverified pending a token. Real field and session-date verification **must** land before M1-7 (ingest adapter) starts.
 
@@ -25,6 +25,10 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.2.1 | `proxyFor` replaced by registry-owned `symbol` + `instrument` + `isProxy` | 0.2.0 examples used both `GOLD` and `GOLD_PROXY` for one asset; the concept and the measured instrument are now separate fields, so units and proxy status cannot be relabelled by a payload |
 | 0.2.1 | `confidenceScore` / `confidenceComponents` / `confidenceDetail` collapsed into one `confidence` object | Each component now carries its own `weight` alongside its `value`, plus `zeroedBy` and `hardCapsApplied` with the triggering `basis`, so a score can be recomputed from its own payload |
 | 0.2.1 | Correlation blocks split into `rates`, `growth_commodities`, `haven`, `usd`, `volatility`, `crypto` | 0.2.0 bucketed gold with oil and copper, and VIX with BTC, which discounted genuinely independent confirmations |
+| 0.2.2 | `correlationBlocks` → `evidenceBlocks`, `CorrelationBlock` → `EvidenceBlock` | The grouping is an editorial judgement about evidence redundancy, not a measured correlation; the old name asserted something the pipeline never computes |
+| 0.2.2 | `effectiveBreadth` denominator is exposure-weighted over scored blocks, never a fixed block count; `confidenceDetail` gains `blocksScored` and `exposureTotal` | Charging a signature for blocks it places no weight on penalised evidence it never claimed, and missing data was being counted twice |
+| 0.2.2 | Flags split into `insufficientHistory`, `missingAdjacentSession`, `repeatedPrints`, `invalidPrice`; `gapSkipped` removed | These fail for different reasons and need different fixes; `gapSkipped` also implied bridging a gap was acceptable |
+| 0.2.2 | `window.validCount` may be shorter than `length`, with `sessionDates` matching `validCount` | An insufficient-history feature was literally unrepresentable under 0.2.1, which surfaced while implementing M1-3 |
 
 ---
 
@@ -47,7 +51,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | --- | --- | --- |
 | M1-1 | Verify sources hands-on | Treasury, CBOE and Tiingo responses checked for actual dates and fields per symbol; results recorded in `architecture.md` — ✅ Treasury and CBOE verified, Stooq rejected, **Tiingo blocked on token** |
 | M1-2 | Zod contracts from `data-contracts.md` 0.2.1 | Fixtures validate; `RegimeSignatureConfig` has its own schema — ✅ 30 contract tests green, `tsc` and `next build` clean |
-| M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` |
+| M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` — ✅ session calendar, simple returns, floor boundary and eight counterexample classes covered by 33 tests |
 | M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented |
 | M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move |
 | M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data |
