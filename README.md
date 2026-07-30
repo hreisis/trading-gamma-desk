@@ -82,6 +82,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run catalyst:results:fetch` | Pull BLS CPI/Employment **actuals** → `data/catalyst/results-latest.json` |
 | `npm run catalyst:documents:fetch` | Pull Fed/BLS/BEA **official release documents** → `data/catalyst/documents-latest.json` |
 | `npm run catalyst:briefs:build` | Build **rule-based evidence briefs** from local documents → `data/catalyst/briefs-latest.json` (offline) |
+| `npm run catalyst:briefs:enhance` | Rewrite eligible briefs via OpenAI Responses API → `data/catalyst/ai-briefs-latest.json` (reads briefs cache only) |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -109,7 +110,9 @@ If any calendar provider fails, successful sources still write a usable cache wi
 
 **Official release documents (M2-3A):** `npm run catalyst:documents:fetch` writes `data/catalyst/documents-latest.json` (independent of calendar/results). Sources: Fed monetary-policy press RSS, BLS CPI + Employment Situation RSS, BEA news RSS (GDP / Personal Income / Trade only). Documents are evidence — linked onto existing catalysts when family+period (or schedule day) match; never expanded into dozens of new catalysts. Default UI shows a 30-day Official Updates window. No LLM summaries; FOMC statement text is stored/linked without parsing rates, votes, or SEP. Public demo uses labelled synthetic document fixtures only.
 
-**Evidence-grounded briefs (M2-3B):** `npm run catalyst:briefs:build` reads local documents (optional results for cross-check) and writes `data/catalyst/briefs-latest.json` — **offline only**. Each fact cites an exact excerpt + offsets from the official document. UI labels these **Rule-based summary** (not AI, not a substitute for the full release). Unextracted ≠ agency omitted. No hawkish/dovish or trade advice. Public demo derives briefs from synthetic documents at load time.
+**Evidence-grounded briefs (M2-3B):** `npm run catalyst:briefs:build` reads local documents (optional results for cross-check) and writes `data/catalyst/briefs-latest.json` — **offline only**. Each fact cites an exact excerpt + offsets from the official document. UI labels these **Rule-based facts** (not AI, not a substitute for the full release). Unextracted ≠ agency omitted. No hawkish/dovish or trade advice. Public demo derives briefs from synthetic documents at load time.
+
+**AI official briefs (M2-3C):** `npm run catalyst:briefs:enhance` reads `briefs-latest.json` only (no documents/calendar/results fetch) and writes `data/catalyst/ai-briefs-latest.json`. The LLM sees verified facts + evidence excerpts + controlled metadata — **not** full document text. Output is validated locally (citations, numbers, prohibited inference); `rejected` / `unavailable` falls back to the rule-based brief. Configure with `OPENAI_API_KEY` and optional `CATALYST_LLM_MODEL` (config default `gpt-5.6-luna`). ChatGPT/Cursor subscription credits are **not** API credits. Tests use an injected fake narrator — CI never calls OpenAI. Public demo serves checked-in synthetic AI fixtures labelled **Demo AI brief · Synthetic data**.
 
 ### Desk URLs (local)
 
@@ -202,4 +205,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-3B** (schedules + BLS actuals + official documents + rule-based briefs). Consensus/surprise, BEA results series, LLM summarization, and hawkish/dovish inference remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-3C** (schedules + BLS actuals + official documents + rule-based briefs + evidence-grounded AI briefs). Consensus/surprise, BEA results series, free-form LLM over full documents, and hawkish/dovish inference remain out of scope. Market Temperature stays in the backlog.

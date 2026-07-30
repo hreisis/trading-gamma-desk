@@ -546,6 +546,26 @@ Independent canonical contract `OfficialBrief` (built offline into `data/catalys
 
 Briefs are **rule-based fact extracts**, not official prose and not AI interpretation. They must not invent hawkish/dovish, beat/miss, market direction, or trade advice. Headline templates may only restate evidenced facts. When M2-2C1 structured results exist for the same family+period, document values are cross-checked within explicit tolerances — never used to overwrite structured observations, and never used to invent undocumented facts. Local: `npm run catalyst:briefs:build` (reads documents/results caches; no network). Public demo derives briefs from synthetic documents at load time.
 
+### Evidence-grounded AI briefs (M2-3C)
+
+Independent canonical contract `OfficialAiBrief` (built offline into `data/catalyst/ai-briefs-latest.json`). **Never overwrites** the deterministic `OfficialBrief` grounding layer.
+
+| Field | Notes |
+| --- | --- |
+| `inputBriefId` / `documentId` / `documentContentHash` / `extractorVersion` / `promptVersion` / `model` | Cache identity — any change forces regenerate |
+| `status` | `complete` \| `partial` \| `rejected` \| `unavailable` |
+| `headline` + `bullets[]` | 2–4 bullets; each bullet must cite ≥1 valid `factId` from the input brief |
+| `validation` | Local hard checks after structured LLM output (`citationsValid`, `numbersValid`, `prohibitedInferenceDetected`, `errors`) |
+| `synthetic` | Public demo fixtures are `true` and checked in |
+
+**Input boundary:** the model receives only brief metadata, verified `facts[]` + evidence excerpts, omissions/warnings, and structured cross-check status — **not** full `contentText`, other news, prices, or consensus invention. Unavailable deterministic briefs do not call the model; partial inputs may, but output must stay `partial` / incomplete.
+
+**Deterministic vs AI:** rule-based facts are the grounding layer; AI briefs are a readable rewrite of those cited facts only. Schema-valid JSON is never enough — local validation rejects bad citations, unsupported numbers/dates, prohibited inference/trading language, and entity mismatches. On `rejected` / `unavailable`, the UI falls back to the M2-3B rule-based brief (no empty AI card). Validation can catch citations/numbers/banned phrases but cannot prove all natural language entails the source — UI keeps fact/evidence expanders.
+
+**Provider:** OpenAI Responses API adapter behind a `BriefNarrator` interface; `OPENAI_API_KEY` + `CATALYST_LLM_MODEL` (config default `gpt-5.6-luna`); reasoning effort `none`; strict Structured Outputs. Tests inject a fake narrator — CI never calls a real model. Missing key → `unavailable` (no fake-AI fallback). ChatGPT/Cursor subscription credits are not API credits.
+
+Local: `npm run catalyst:briefs:enhance` (reads `briefs-latest.json` only; no documents/calendar/results fetch). Public demo uses labelled synthetic AI fixtures only (`synthetic: true`); build/request paths never call an LLM.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

@@ -7,6 +7,7 @@ import type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
   ReleaseObservation,
@@ -145,6 +146,24 @@ export interface CatalystFeedResponse {
       readonly feedBriefCount?: number;
       readonly extractorVersion?: string;
     };
+    readonly aiBriefs?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly status?:
+        | "ok"
+        | "error"
+        | "missing"
+        | "synthetic"
+        | "partial"
+        | "failed"
+        | "unavailable";
+      readonly error?: string;
+      readonly archiveBriefCount?: number;
+      readonly feedBriefCount?: number;
+      readonly promptVersion?: string;
+      readonly model?: string;
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -155,6 +174,8 @@ export interface CatalystFeedResponse {
   readonly documents?: OfficialDocument[];
   /** Rule-based briefs for the default ~30d window (not AI). */
   readonly briefs?: OfficialBrief[];
+  /** Evidence-grounded LLM narratives (M2-3C); may be empty when rejected/unavailable. */
+  readonly aiBriefs?: OfficialAiBrief[];
   readonly validationErrors: Array<{
     readonly index: number;
     readonly error: string;
@@ -204,6 +225,7 @@ export type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
   ReleaseObservation,

@@ -5,3 +5,4 @@ export * from "./dominant-driver";
 export * from "./catalyst";
 export * from "./official-document";
 export * from "./official-brief";
+export * from "./ai-brief";

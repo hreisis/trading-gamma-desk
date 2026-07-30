@@ -31,6 +31,13 @@ describe("catalyst UI payload", () => {
     expect(feed.briefs?.length).toBeGreaterThan(0);
     expect(feed.source.briefs?.status).toBe("synthetic");
     expect(feed.disclaimer).toMatch(/rule-based/i);
+    expect(feed.aiBriefs?.length).toBeGreaterThan(0);
+    expect(feed.source.aiBriefs?.status).toBe("synthetic");
+    expect(feed.disclaimer).toMatch(/AI briefs/i);
+    for (const ai of feed.aiBriefs ?? []) {
+      expect(ai.synthetic).toBe(true);
+      expect(ai.bullets.length).toBeGreaterThanOrEqual(2);
+    }
   });
 
   it("keeps catalyst demo copy distinct from macro illustrative banner", () => {

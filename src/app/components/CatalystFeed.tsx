@@ -1,6 +1,7 @@
 import type {
   Catalyst,
   CatalystFeedResponse,
+  OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
   ReleaseResult,
@@ -69,44 +70,56 @@ function providerLabel(provider: string): string {
   return provider;
 }
 
-function OfficialBriefBlock({
+function OfficialAiBriefBlock({
+  ai,
   brief,
   documentUrl,
-  provider,
+  demo,
 }: {
+  ai: OfficialAiBrief;
   brief: OfficialBrief;
   documentUrl?: string;
-  provider: string;
+  demo?: boolean;
 }) {
-  const topFacts = brief.facts.slice(0, 4);
+  const factsById = new Map(brief.facts.map((f) => [f.id, f]));
   return (
-    <div className="catalyst-official-brief" data-testid="catalyst-official-brief">
+    <div
+      className="catalyst-official-ai-brief"
+      data-testid="catalyst-official-ai-brief"
+    >
       <p className="catalyst-release-meta">
-        Official brief · Rule-based summary · {providerLabel(provider)}
+        {demo
+          ? "Demo AI brief · Synthetic data"
+          : "AI official brief · Generated from cited official facts"}
       </p>
       <p className="catalyst-release-meta">
-        Status: {brief.status}
+        AI-generated · Status: {ai.status}
         {brief.referencePeriod ? ` · ref ${brief.referencePeriod}` : ""}
       </p>
-      <p className="catalyst-headline">{brief.headline}</p>
+      <p className="catalyst-headline">{ai.headline}</p>
       <ul className="catalyst-release-obs">
-        {topFacts.map((f) => (
-          <li key={f.id}>
-            <span>{f.text}</span>
+        {ai.bullets.map((b) => (
+          <li key={b.id}>
+            <span>{b.text}</span>
             <details>
-              <summary>Evidence excerpt</summary>
-              <p className="catalyst-release-meta" data-testid="catalyst-brief-evidence">
-                “{f.evidence.excerpt}”
-              </p>
+              <summary>Cited facts / evidence</summary>
+              {b.factIds.map((fid) => {
+                const f = factsById.get(fid);
+                if (!f) return null;
+                return (
+                  <p
+                    key={fid}
+                    className="catalyst-release-meta"
+                    data-testid="catalyst-ai-brief-evidence"
+                  >
+                    {f.label}: “{f.evidence.excerpt}”
+                  </p>
+                );
+              })}
             </details>
           </li>
         ))}
       </ul>
-      {brief.warnings.length > 0 ? (
-        <p className="catalyst-release-meta">
-          Warnings: {brief.warnings.length} (cross-check / extraction)
-        </p>
-      ) : null}
       {documentUrl ? (
         <p className="catalyst-release-meta">
           <a href={documentUrl} target="_blank" rel="noopener noreferrer">
@@ -115,9 +128,91 @@ function OfficialBriefBlock({
         </p>
       ) : null}
       <p className="catalyst-release-meta">
-        Rule-based fact extract — not official prose and not AI interpretation.
-        Does not replace the full release.
+        AI-generated narrative over cited facts — not official prose, not a
+        source-provided summary.
       </p>
+    </div>
+  );
+}
+
+function OfficialBriefBlock({
+  brief,
+  aiBrief,
+  documentUrl,
+  provider,
+  demo,
+}: {
+  brief: OfficialBrief;
+  aiBrief?: OfficialAiBrief;
+  documentUrl?: string;
+  provider: string;
+  demo?: boolean;
+}) {
+  const topFacts = brief.facts.slice(0, 4);
+  const showAi =
+    aiBrief &&
+    (aiBrief.status === "complete" || aiBrief.status === "partial") &&
+    aiBrief.validation.errors.length === 0;
+
+  return (
+    <div className="catalyst-official-brief" data-testid="catalyst-official-brief">
+      {showAi ? (
+        <OfficialAiBriefBlock
+          ai={aiBrief}
+          brief={brief}
+          documentUrl={documentUrl}
+          demo={demo}
+        />
+      ) : null}
+      <details open={!showAi}>
+        <summary>
+          Rule-based facts · {providerLabel(provider)}
+          {showAi ? " (grounding)" : ""}
+        </summary>
+        <p className="catalyst-release-meta">
+          Official brief · Rule-based summary · {providerLabel(provider)}
+        </p>
+        <p className="catalyst-release-meta">
+          Status: {brief.status}
+          {brief.referencePeriod ? ` · ref ${brief.referencePeriod}` : ""}
+        </p>
+        <p className="catalyst-headline">{brief.headline}</p>
+        <ul className="catalyst-release-obs">
+          {topFacts.map((f) => (
+            <li key={f.id}>
+              <span>{f.text}</span>
+              <details>
+                <summary>Evidence excerpt</summary>
+                <p
+                  className="catalyst-release-meta"
+                  data-testid="catalyst-brief-evidence"
+                >
+                  “{f.evidence.excerpt}”
+                </p>
+              </details>
+            </li>
+          ))}
+        </ul>
+        {brief.warnings.length > 0 ? (
+          <p className="catalyst-release-meta">
+            Warnings: {brief.warnings.length} (cross-check / extraction)
+          </p>
+        ) : null}
+        {documentUrl ? (
+          <p className="catalyst-release-meta">
+            <a href={documentUrl} target="_blank" rel="noopener noreferrer">
+              View official document
+            </a>
+          </p>
+        ) : null}
+        <p className="catalyst-release-meta">
+          Rule-based fact extract — not official prose.
+          {showAi
+            ? ""
+            : " AI brief unavailable/rejected — showing rule-based facts."}{" "}
+          Does not replace the full release.
+        </p>
+      </details>
     </div>
   );
 }
@@ -125,14 +220,19 @@ function OfficialBriefBlock({
 function OfficialDocumentBlock({
   docs,
   briefsByDocId,
+  aiByBriefId,
+  demo,
 }: {
   docs: NonNullable<Catalyst["officialDocuments"]>;
   briefsByDocId: ReadonlyMap<string, OfficialBrief>;
+  aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
+  demo?: boolean;
 }) {
   return (
     <div className="catalyst-official-doc" data-testid="catalyst-official-doc">
       {docs.map((d) => {
         const brief = briefsByDocId.get(d.id);
+        const ai = brief ? aiByBriefId.get(brief.id) : undefined;
         return (
           <div key={d.id} className="catalyst-official-doc-item">
             <p className="catalyst-release-meta">
@@ -157,8 +257,10 @@ function OfficialDocumentBlock({
             {brief ? (
               <OfficialBriefBlock
                 brief={brief}
+                aiBrief={ai}
                 documentUrl={d.canonicalUrl}
                 provider={d.provider}
+                demo={demo}
               />
             ) : null}
           </div>
@@ -171,23 +273,30 @@ function OfficialDocumentBlock({
 function OfficialUpdates({
   documents,
   briefs,
+  aiBriefs,
+  demo,
 }: {
   documents: readonly OfficialDocument[];
   briefs: readonly OfficialBrief[];
+  aiBriefs: readonly OfficialAiBrief[];
+  demo?: boolean;
 }) {
   if (documents.length === 0 && briefs.length === 0) return null;
   const briefsByDoc = new Map(briefs.map((b) => [b.documentId, b]));
+  const aiByBriefId = new Map(aiBriefs.map((b) => [b.inputBriefId, b]));
   return (
     <div className="catalyst-official-updates" data-testid="catalyst-official-updates">
       <h3>Official Updates</h3>
       <p className="desk-section-note">
-        Source release documents and rule-based briefs from the last 30 days —
-        evidence only, not additional macro catalysts. Briefs are rule-based
-        fact extracts, not AI interpretation.
+        Source release documents, rule-based facts, and AI briefs (when
+        validated) from the last 30 days — evidence only, not additional macro
+        catalysts. AI rewrites cited facts only; rejected AI falls back to
+        rule-based facts.
       </p>
       <ul className="catalyst-list">
         {documents.map((d) => {
           const brief = briefsByDoc.get(d.id);
+          const ai = brief ? aiByBriefId.get(brief.id) : undefined;
           return (
             <li key={d.id} className="catalyst-row">
               <div className="catalyst-when">{formatWhen(d.publishedAt)}</div>
@@ -215,8 +324,10 @@ function OfficialUpdates({
                 {brief ? (
                   <OfficialBriefBlock
                     brief={brief}
+                    aiBrief={ai}
                     documentUrl={d.canonicalUrl}
                     provider={d.provider}
+                    demo={demo}
                   />
                 ) : null}
               </div>
@@ -231,9 +342,13 @@ function OfficialUpdates({
 function CatalystRow({
   c,
   briefsByDocId,
+  aiByBriefId,
+  demo,
 }: {
   c: Catalyst;
   briefsByDocId: ReadonlyMap<string, OfficialBrief>;
+  aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
+  demo?: boolean;
 }) {
   return (
     <li key={c.id} className="catalyst-row">
@@ -262,6 +377,8 @@ function CatalystRow({
           <OfficialDocumentBlock
             docs={c.officialDocuments}
             briefsByDocId={briefsByDocId}
+            aiByBriefId={aiByBriefId}
+            demo={demo}
           />
         ) : null}
       </div>
@@ -298,6 +415,10 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
   const briefsByDocId = new Map(
     (feed.briefs ?? []).map((b) => [b.documentId, b]),
   );
+  const aiByBriefId = new Map(
+    (feed.aiBriefs ?? []).map((b) => [b.inputBriefId, b]),
+  );
+  const demo = feed.mode === "synthetic_demo" || feed.isPublicDemo;
 
   return (
     <section className="desk-section" aria-labelledby="catalyst-heading">
@@ -319,6 +440,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           : ""}
         {feed.source.briefs
           ? ` · briefs:${feed.source.briefs.status ?? (feed.source.briefs.available ? "ok" : "missing")}`
+          : ""}
+        {feed.source.aiBriefs
+          ? ` · aiBriefs:${feed.source.aiBriefs.status ?? (feed.source.aiBriefs.available ? "ok" : "missing")}`
           : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
@@ -351,7 +475,13 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       ) : (
         <ul className="catalyst-list" data-testid="catalyst-list">
           {feed.catalysts.map((c) => (
-            <CatalystRow key={c.id} c={c} briefsByDocId={briefsByDocId} />
+            <CatalystRow
+              key={c.id}
+              c={c}
+              briefsByDocId={briefsByDocId}
+              aiByBriefId={aiByBriefId}
+              demo={demo}
+            />
           ))}
         </ul>
       )}
@@ -361,6 +491,8 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
         <OfficialUpdates
           documents={feed.documents ?? []}
           briefs={feed.briefs ?? []}
+          aiBriefs={feed.aiBriefs ?? []}
+          demo={demo}
         />
       ) : null}
 

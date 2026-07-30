@@ -1,14 +1,20 @@
 import syntheticBatch from "../../fixtures/catalyst/synthetic-events.json";
 import syntheticResults from "../../fixtures/catalyst/synthetic-results.json";
 import syntheticDocuments from "../../fixtures/catalyst/synthetic-documents.json";
+import syntheticAiBriefs from "../../fixtures/catalyst/synthetic-ai-briefs.json";
 import { isPublicDemoMode } from "@/desk/public-demo";
 import type {
   Catalyst,
+  OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
   ReleaseResult,
 } from "@/contracts";
-import { OfficialDocument as OfficialDocumentSchema } from "@/contracts";
+import {
+  OfficialAiBrief as OfficialAiBriefSchema,
+  OfficialDocument as OfficialDocumentSchema,
+} from "@/contracts";
+import { loadAiBriefsCache } from "./briefs/ai/cache";
 import { applyStructuredCrossCheck, indexStructuredReleases } from "./briefs/cross-check";
 import { extractBriefFromDocument } from "./briefs/extract";
 import { loadBriefsCache } from "./briefs/cache";
@@ -38,13 +44,13 @@ export const CATALYST_DEMO_BANNER =
   "Illustrative catalyst demo · synthetic events";
 
 export const CATALYST_DEMO_DISCLAIMER =
-  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results, official-document fixtures, and rule-based briefs (when shown) are illustrative — Consensus unavailable · Surprise unavailable. Briefs are rule-based fact extracts, not AI interpretation.";
+  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results, documents, rule-based briefs, and Demo AI briefs (when shown) are illustrative — Consensus unavailable · Surprise unavailable. AI briefs are narratives over cited synthetic facts, not live LLM calls.";
 
 export const CATALYST_OFFICIAL_BANNER =
   "Official US macro calendar · schedules + BLS series results when linked";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Official release documents and rule-based briefs are source evidence / fact extracts — not AI interpretation and not a substitute for the full official document. Unextracted facts mean the extractor lacked reliable evidence, not that the agency did not report them. A past schedule time alone does not mark an event released.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Rule-based briefs are fact extracts with evidence offsets. AI briefs rewrite only those cited facts — not official prose; rejected/unavailable AI falls back to rule-based facts. Unextracted ≠ agency omitted. A past schedule time alone does not mark an event released.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";
@@ -72,8 +78,42 @@ export const OFFICIAL_DOCUMENTS_CACHE_NAME =
 
 export const OFFICIAL_BRIEFS_CACHE_NAME = "data/catalyst/briefs-latest.json";
 
+export const OFFICIAL_AI_BRIEFS_CACHE_NAME =
+  "data/catalyst/ai-briefs-latest.json";
+
 export const SYNTHETIC_DOCUMENTS_FIXTURE_NAME =
   "fixtures/catalyst/synthetic-documents.json";
+
+export const SYNTHETIC_AI_BRIEFS_FIXTURE_NAME =
+  "fixtures/catalyst/synthetic-ai-briefs.json";
+
+function syntheticOfficialAiBriefs(): OfficialAiBrief[] {
+  const briefs = (syntheticAiBriefs as { briefs?: unknown[] }).briefs;
+  if (!Array.isArray(briefs)) return [];
+  const out: OfficialAiBrief[] = [];
+  for (const b of briefs) {
+    const parsed = OfficialAiBriefSchema.safeParse(b);
+    if (parsed.success && parsed.data.synthetic) out.push(parsed.data);
+  }
+  return out;
+}
+
+function filterAiBriefsForFeed(
+  aiBriefs: readonly OfficialAiBrief[],
+  deterministic: readonly OfficialBrief[],
+): OfficialAiBrief[] {
+  const byId = new Map(deterministic.map((b) => [b.id, b]));
+  return aiBriefs.filter((b) => {
+    const det = byId.get(b.inputBriefId);
+    if (!det) return false;
+    if (b.status !== "complete" && b.status !== "partial") return false;
+    if (b.validation.errors.length > 0) return false;
+    // Stale grounding: reject AI briefs that no longer match the deterministic layer.
+    if (b.documentContentHash !== det.documentContentHash) return false;
+    if (b.extractorVersion !== det.extractorVersion) return false;
+    return true;
+  });
+}
 
 function slimDocumentForFeed(doc: OfficialDocument): OfficialDocument {
   const { contentText: _body, ...rest } = doc;
@@ -184,6 +224,8 @@ function loadSyntheticFeed(
     options.now,
     30,
   );
+  const synAi = syntheticOfficialAiBriefs();
+  const feedAi = filterAiBriefsForFeed(synAi, feedBriefs);
   const filtered = filterCatalysts(withDocs.catalysts, query);
   return {
     kind: "CatalystFeed",
@@ -226,11 +268,21 @@ function loadSyntheticFeed(
         feedBriefCount: feedBriefs.length,
         extractorVersion: BRIEF_EXTRACTOR_VERSION,
       },
+      aiBriefs: {
+        available: true,
+        status: "synthetic",
+        fetchedAt: options.now.toISOString(),
+        stale: false,
+        archiveBriefCount: synAi.length,
+        feedBriefCount: feedAi.length,
+        model: "synthetic",
+      },
     },
     count: filtered.length,
     catalysts: filtered,
     documents: withDocs.documents,
     briefs: feedBriefs,
+    aiBriefs: feedAi,
     validationErrors,
     linkingWarnings: linked.linkingWarnings,
     documentLinkingWarnings: withDocs.documentLinkingWarnings,
@@ -295,6 +347,10 @@ export function loadCatalystFeed(
     dataRoot: options.dataRoot,
     now,
   });
+  const aiBriefsLoaded = loadAiBriefsCache({
+    dataRoot: options.dataRoot,
+    now,
+  });
 
   function resolveFeedBriefs(
     archiveDocs: readonly OfficialDocument[] | undefined,
@@ -340,6 +396,41 @@ export function loadCatalystFeed(
     };
   }
 
+  function resolveFeedAiBriefs(
+    deterministic: readonly OfficialBrief[] | undefined,
+  ): {
+    aiBriefs: OfficialAiBrief[] | undefined;
+    meta: NonNullable<CatalystFeedResponse["source"]["aiBriefs"]>;
+  } {
+    if (!aiBriefsLoaded.ok) {
+      return {
+        aiBriefs: undefined,
+        meta: {
+          available: false,
+          status: "missing",
+          error: aiBriefsLoaded.error,
+        },
+      };
+    }
+    const feed = filterAiBriefsForFeed(
+      aiBriefsLoaded.cache.briefs,
+      deterministic ?? [],
+    );
+    return {
+      aiBriefs: feed,
+      meta: {
+        available: true,
+        status: aiBriefsLoaded.cache.buildStatus,
+        fetchedAt: aiBriefsLoaded.cache.generatedAt,
+        stale: aiBriefsLoaded.stale,
+        archiveBriefCount: aiBriefsLoaded.cache.briefs.length,
+        feedBriefCount: feed.length,
+        promptVersion: aiBriefsLoaded.cache.promptVersion,
+        model: aiBriefsLoaded.cache.model,
+      },
+    };
+  }
+
   if (!loaded.ok) {
     // Calendar unavailable: still surface latest CPI/Employment observations.
     if (resultsLoaded.ok) {
@@ -357,6 +448,7 @@ export function loadCatalystFeed(
       const briefPack = resolveFeedBriefs(
         documentsLoaded.ok ? documentsLoaded.cache.documents : undefined,
       );
+      const aiPack = resolveFeedAiBriefs(briefPack.briefs);
       return {
         kind: "CatalystFeed",
         schemaVersion: "0.1.0",
@@ -386,11 +478,13 @@ export function loadCatalystFeed(
               }
             : { available: false, status: "missing", error: documentsLoaded.error },
           briefs: briefPack.meta,
+          aiBriefs: aiPack.meta,
         },
         count: filtered.length,
         catalysts: filtered,
         documents: withDocs?.documents,
         briefs: briefPack.briefs,
+        aiBriefs: aiPack.aiBriefs,
         validationErrors: [
           { index: -1, error: loaded.error },
         ],
@@ -506,6 +600,7 @@ export function loadCatalystFeed(
   const briefPack = resolveFeedBriefs(
     documentsLoaded.ok ? documentsLoaded.cache.documents : undefined,
   );
+  const aiPack = resolveFeedAiBriefs(briefPack.briefs);
 
   const filtered = filterCatalysts(catalysts, query);
   const partialFailure = cache.partialFailure;
@@ -525,6 +620,9 @@ export function loadCatalystFeed(
   }
   if (briefPack.meta.stale) {
     banner = `${banner} · stale briefs`;
+  }
+  if (aiPack.meta.stale) {
+    banner = `${banner} · stale AI briefs`;
   }
 
   return {
@@ -547,11 +645,13 @@ export function loadCatalystFeed(
       results: resultsMeta,
       documents: documentsMeta,
       briefs: briefPack.meta,
+      aiBriefs: aiPack.meta,
     },
     count: filtered.length,
     catalysts: filtered,
     documents: feedDocuments,
     briefs: briefPack.briefs,
+    aiBriefs: aiPack.aiBriefs,
     validationErrors: cache.validationErrors,
     linkingWarnings,
     documentLinkingWarnings,

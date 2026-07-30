@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 2 — Catalyst.** **M2-3B** evidence-grounded deterministic briefs from official documents. No LLM, hawkish/dovish, consensus/surprise, news aggregation, Market Temperature, or catalyst→regime linkage.
+**Milestone 2 — Catalyst.** **M2-3C** evidence-grounded LLM briefs over M2-3B facts (OpenAI Responses API). No hawkish/dovish, consensus/surprise, news aggregation, Market Temperature, or catalyst→regime linkage.
 
 ### Queued (not started)
 
@@ -90,8 +90,9 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M2-2C1 | Official BLS release results | CPI + Employment Situation via BLS Public Data API; optional `releaseResult` + calculation `inputs` provenance; archive vs feed materialization (latest per family + linked window only); deterministic BLS period ordering; linking diagnostics by family+period; consensus/surprise unavailable; public-demo synthetic results only — ✅ |
 | M2-3A | Official release document ingestion | Fed monetary-policy press RSS + BLS CPI/Employment RSS + BEA news RSS (GDP/PI/Trade); canonical `OfficialDocument`; strict document↔catalyst linking; content-hash revisions; `catalyst:documents:fetch` → `documents-latest.json`; 30-day feed vs archive; no LLM / no rate-decision parsing; public-demo synthetic documents only — ✅ |
 | M2-3B | Evidence-grounded deterministic briefs | Per-document-type extractors; `OfficialBrief` with exact excerpt offsets; structured-result cross-check; `catalyst:briefs:build` → `briefs-latest.json` (offline); 30-day UI window; Rule-based summary label; no LLM / hawkish-dovish / trade advice — ✅ |
+| M2-3C | Evidence-grounded LLM briefs | `OfficialAiBrief` + `BriefNarrator`; OpenAI Responses API (`OPENAI_API_KEY` / `CATALYST_LLM_MODEL`); facts/excerpts only; local citation/number/prohibited validation; `catalyst:briefs:enhance` → `ai-briefs-latest.json`; rejected/unavailable → rule-based fallback; public-demo synthetic AI fixtures; tests use fake narrator — ✅ |
 | M2-2C | Consensus / surprise / BEA / more series | Deferred — PPI/JOLTS/ECI, BEA results, consensus, surprise, FOMC decision text parsing |
-| M2-2+ | News / X / LLM | Deferred |
+| M2-2+ | News / X / free-form LLM over full docs | Deferred |
 
 ### Deferred out of Milestone 1
 

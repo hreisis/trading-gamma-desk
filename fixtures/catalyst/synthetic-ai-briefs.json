@@ -1,0 +1,168 @@
+{
+  "kind": "CatalystSyntheticAiBriefFixtureBatch",
+  "schemaVersion": "0.1.0",
+  "disclaimer": "Synthetic AI brief fixtures for public demo — generated from synthetic deterministic facts. Not live LLM output.",
+  "promptVersion": "0.1.0",
+  "briefs": [
+    {
+      "schemaVersion": "0.1.0",
+      "id": "oaibrief_ac9c496bed64cec0",
+      "inputBriefId": "obrief_3d0df56c6d08c13c",
+      "documentId": "odoc_e290aabba3caad80",
+      "documentContentHash": "93d676577060160de90e155cfe8b615d9003a4176937976951ea315e2522ddaa",
+      "extractorVersion": "0.1.1",
+      "promptVersion": "0.1.0",
+      "provider": "synthetic_fixture",
+      "model": "synthetic",
+      "generatedAt": "2026-07-29T18:00:00.000Z",
+      "status": "partial",
+      "headline": "Maintained target range · 4.25–4.5% · Vote 9–3",
+      "bullets": [
+        {
+          "id": "syn_b1",
+          "text": "The Committee decided to maintain the target range for the federal funds rate at 4.25 to 4.50 percent",
+          "factIds": [
+            "odoc_e290aabba3caad80_policy_action"
+          ]
+        },
+        {
+          "id": "syn_b2",
+          "text": "Vote 9–3",
+          "factIds": [
+            "odoc_e290aabba3caad80_vote_result"
+          ]
+        },
+        {
+          "id": "syn_b3",
+          "text": "Voting against this monetary policy action were Governor A and Governor B.",
+          "factIds": [
+            "odoc_e290aabba3caad80_dissenters"
+          ]
+        }
+      ],
+      "limitations": [
+        "Synthetic demo AI brief — not a live model output.",
+        "Summary is incomplete because the source brief is partial.",
+        "Input deterministic brief was partial — summary may be incomplete."
+      ],
+      "validation": {
+        "schemaValid": true,
+        "citationsValid": true,
+        "numbersValid": true,
+        "prohibitedInferenceDetected": false,
+        "errors": []
+      },
+      "synthetic": true
+    },
+    {
+      "schemaVersion": "0.1.0",
+      "id": "oaibrief_3bb77d0105030953",
+      "inputBriefId": "obrief_9ceccde4ae0b8c7c",
+      "documentId": "odoc_89da6c00f149582a",
+      "documentContentHash": "705485fce67e1eec6833268a2d0894a0a50926fd04c7f3090b5bc70f8a7743e3",
+      "extractorVersion": "0.1.1",
+      "promptVersion": "0.1.0",
+      "provider": "synthetic_fixture",
+      "model": "synthetic",
+      "generatedAt": "2026-07-29T18:00:00.000Z",
+      "status": "complete",
+      "headline": "Headline CPI monthly 0.1% · Headline CPI 12-month 2.7% · Core CPI monthly 0.2%",
+      "bullets": [
+        {
+          "id": "syn_b1",
+          "text": "Headline CPI monthly: 0.1 percent (seasonally adjusted)",
+          "factIds": [
+            "odoc_89da6c00f149582a_headline_cpi_sa_mom"
+          ]
+        },
+        {
+          "id": "syn_b2",
+          "text": "Headline CPI 12-month: 2.7 percent",
+          "factIds": [
+            "odoc_89da6c00f149582a_headline_cpi_sa_yoy"
+          ]
+        },
+        {
+          "id": "syn_b3",
+          "text": "Core CPI monthly: 0.2 percent",
+          "factIds": [
+            "odoc_89da6c00f149582a_core_cpi_sa_mom"
+          ]
+        },
+        {
+          "id": "syn_b4",
+          "text": "Core CPI 12-month: 2.9 percent",
+          "factIds": [
+            "odoc_89da6c00f149582a_core_cpi_sa_yoy"
+          ]
+        }
+      ],
+      "limitations": [
+        "Synthetic demo AI brief — not a live model output."
+      ],
+      "validation": {
+        "schemaValid": true,
+        "citationsValid": true,
+        "numbersValid": true,
+        "prohibitedInferenceDetected": false,
+        "errors": []
+      },
+      "synthetic": true
+    },
+    {
+      "schemaVersion": "0.1.0",
+      "id": "oaibrief_174647c6adade981",
+      "inputBriefId": "obrief_9441534af3b47f9f",
+      "documentId": "odoc_b1f85f1ee54dcb56",
+      "documentContentHash": "8d0898a7438db33f558a70559c49aacdb75d32d9d3c9d05d2613971abd72938c",
+      "extractorVersion": "0.1.1",
+      "promptVersion": "0.1.0",
+      "provider": "synthetic_fixture",
+      "model": "synthetic",
+      "generatedAt": "2026-07-29T18:00:00.000Z",
+      "status": "complete",
+      "headline": "Payrolls +147k · UR 4.1%",
+      "bullets": [
+        {
+          "id": "syn_b1",
+          "text": "Nonfarm payrolls: 147 thousand",
+          "factIds": [
+            "odoc_b1f85f1ee54dcb56_total_nonfarm_payrolls_mom"
+          ]
+        },
+        {
+          "id": "syn_b2",
+          "text": "Unemployment rate: 4.1 percent",
+          "factIds": [
+            "odoc_b1f85f1ee54dcb56_unemployment_rate"
+          ]
+        },
+        {
+          "id": "syn_b3",
+          "text": "The change in total nonfarm payroll employment for May was revised down by 22",
+          "factIds": [
+            "odoc_b1f85f1ee54dcb56_payroll_prior_month_revision"
+          ]
+        },
+        {
+          "id": "syn_b4",
+          "text": "JUNE 2026",
+          "factIds": [
+            "odoc_b1f85f1ee54dcb56_reference_month"
+          ]
+        }
+      ],
+      "limitations": [
+        "Synthetic demo AI brief — not a live model output."
+      ],
+      "validation": {
+        "schemaValid": true,
+        "citationsValid": true,
+        "numbersValid": true,
+        "prohibitedInferenceDetected": false,
+        "errors": []
+      },
+      "synthetic": true
+    }
+  ]
+}
