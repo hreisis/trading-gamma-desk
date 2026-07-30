@@ -4,7 +4,13 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-11 public demo deployment ✅ (fixture-only portfolio host; no cloud Tiingo). Do not start Milestone 2.
+**Milestone 1 — Cross-Asset Macro.** M1-11 public demo deployment ✅ (synthetic illustrative fixture; no cloud Tiingo). Do not start Milestone 2.
+
+### Queued (not started)
+
+| Item | Notes |
+| --- | --- |
+| **Market Temperature (experimental)** | Deterministic 0–100 risk-on/risk-off summary derived from the canonical snapshot, displayed separately from Signal Confidence, with a five-session trend. Spec only — do not implement until scheduled. |
 
 ### M1-6b calibration status (split)
 
@@ -67,7 +73,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template — ✅ `interpretSnapshot` reads compute snapshot only, copies confidence verbatim, template generator + equity-claim/band-label/number guardrails; no LLM on this path |
 | M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` — ✅ `loadMacroDesk` + `/api/macro/latest` + desk page (local driver or fixture; no classify in UI) |
 | M1-10 | Productization wrap-up | Loading / empty / malformed / stale / pipeline-error states; malformed live never silent-fixtures; `npm run daily` atomic driver write keeps last good; README + demo frames; no Tiingo/`data/` in git — ✅ |
-| M1-11 | Public demo deployment | `GAMMADESK_PUBLIC_DEMO=1` serves frozen `public-demo.2026-07-29` fixture; banner **Historical demo · fixture data · 2026-07-29**; `?source=live` → live unavailable; portfolio meta + GitHub link; no cloud Tiingo / no `data/` on host — ✅ |
+| M1-11 | Public demo deployment | `GAMMADESK_PUBLIC_DEMO=1` serves synthetic `public-demo.2026-07-29` fixture; banner **Illustrative demo · synthetic scenario** + synthetic disclaimer; `?source=live` → **Live data unavailable in public demo**; portfolio meta + GitHub link; no cloud Tiingo / no `data/` on host — ✅ |
 
 **Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists. Public deploy is fixture-only (M1-11); cloud Tiingo and Milestone 2 remain out of scope.
 
@@ -81,6 +87,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | Credit spreads | Reserved contract slot, source undecided |
 | True DXY and VIX spot | Paid index source |
 | 2s10s as a scoring dimension | Would double-count 2Y/10Y; stays derived evidence only |
+| Market Temperature (experimental) | Explicit schedule — see Queued above; not part of M1-11 |
 
 ---
 

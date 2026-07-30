@@ -6,6 +6,7 @@ import {
   FIXTURE_DRIVER_PATH,
   LIVE_DATA_UNAVAILABLE_MESSAGE,
   PUBLIC_DEMO_BANNER,
+  PUBLIC_DEMO_DISCLAIMER,
   PUBLIC_DEMO_FIXTURE_PATH,
   PUBLIC_DEMO_SESSION,
   SITE_DESCRIPTION,
@@ -42,7 +43,7 @@ describe("isPublicDemoMode", () => {
 });
 
 describe("production public demo mode", () => {
-  it("serves the frozen 2026-07-29 fixture and never a live driver", () => {
+  it("serves the synthetic fixture without live provenance or historical claims", () => {
     const root = tempRoot();
     plantLiveDriver(root);
 
@@ -58,8 +59,10 @@ describe("production public demo mode", () => {
     expect(view.isLiveDriver).toBe(false);
     expect(view.source).toBe("fixture");
     expect(view.sourceLabel).toBe(PUBLIC_DEMO_BANNER);
-    expect(view.sourceLabel).toContain("Historical demo");
-    expect(view.sourceLabel).toContain(PUBLIC_DEMO_SESSION);
+    expect(view.sourceLabel).toBe("Illustrative demo · synthetic scenario");
+    expect(view.sourceLabel!.toLowerCase()).not.toContain("historical");
+    expect(view.sourceLabel!).not.toContain(PUBLIC_DEMO_SESSION);
+    expect(PUBLIC_DEMO_DISCLAIMER.toLowerCase()).toContain("synthetic");
     expect(view.driver?.marketSessionDate).toBe(PUBLIC_DEMO_SESSION);
     expect(view.driver?.label).not.toBe("LIVE_SHOULD_NOT_APPEAR");
     expect(view.driver?.confidence.calibrated).toBe(false);
@@ -87,7 +90,7 @@ describe("production public demo mode", () => {
     expect(view.source).toBeNull();
     expect(view.error?.code).toBe("live_unavailable");
     expect(view.error?.message).toBe(LIVE_DATA_UNAVAILABLE_MESSAGE);
-    expect(view.error?.message.toLowerCase()).toContain("live data unavailable");
+    expect(view.error?.message).toBe("Live data unavailable in public demo");
   });
 
   it("does not imply live when source=fixture under public demo", () => {
@@ -139,11 +142,11 @@ describe("local mode unchanged without public demo", () => {
 });
 
 describe("portfolio metadata", () => {
-  it("exposes a portfolio title and description mentioning historical demo", () => {
+  it("describes an illustrative synthetic demo, not a real session", () => {
     expect(SITE_TITLE).toMatch(/GammaDesk/);
-    expect(SITE_TITLE).toMatch(/Historical Demo/i);
-    expect(SITE_DESCRIPTION.toLowerCase()).toContain("historical");
+    expect(SITE_TITLE).toMatch(/Illustrative Demo/i);
+    expect(SITE_DESCRIPTION.toLowerCase()).toContain("synthetic");
     expect(SITE_DESCRIPTION.toLowerCase()).toContain("uncalibrated");
-    expect(SITE_DESCRIPTION.toLowerCase()).toContain("not live market data");
+    expect(SITE_DESCRIPTION.toLowerCase()).not.toContain("historical fixture");
   });
 });

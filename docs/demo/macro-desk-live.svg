@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-label="GammaDesk live driver frame">
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-label="GammaDesk local live driver frame">
   <rect width="920" height="420" fill="#0e1216"/>
   <rect x="0" y="0" width="920" height="420" fill="url(#g)" opacity="0.9"/>
   <defs>
@@ -8,14 +8,14 @@
     </radialGradient>
   </defs>
   <text x="40" y="56" fill="#e8edf2" font-family="Georgia, serif" font-size="36" font-weight="600">GammaDesk</text>
-  <text x="40" y="84" fill="#8b97a5" font-family="ui-sans-serif, sans-serif" font-size="13">Driver ’ Catalyst ’ Structure ’ Confirmation ’ Updated View</text>
+  <text x="40" y="84" fill="#8b97a5" font-family="ui-sans-serif, sans-serif" font-size="13">Driver ? Catalyst ? Structure ? Confirmation ? Updated View</text>
   <rect x="40" y="108" width="840" height="1" fill="#2a3340"/>
-  <text x="40" y="136" fill="#8b97a5" font-family="ui-monospace, monospace" font-size="13">Macro session 2026-07-29 · aligned · </text>
+  <text x="40" y="136" fill="#8b97a5" font-family="ui-monospace, monospace" font-size="13">Macro session (local) · aligned · </text>
   <text x="318" y="136" fill="#6f9e7f" font-family="ui-monospace, monospace" font-size="13">live driver</text>
   <text x="40" y="178" fill="#8b97a5" font-family="ui-sans-serif, sans-serif" font-size="12" letter-spacing="2">DOMINANT DRIVER</text>
-  <text x="40" y="214" fill="#e8edf2" font-family="Georgia, serif" font-size="28" font-weight="600">Inflation-led risk-off</text>
-  <text x="40" y="244" fill="#8b97a5" font-family="ui-monospace, monospace" font-size="13">inflation · positive · risk_off</text>
-  <text x="40" y="276" fill="#7eb0c8" font-family="ui-monospace, monospace" font-size="16">68/100 (uncalibrated)</text>
-  <text x="40" y="318" fill="#e8edf2" font-family="ui-sans-serif, sans-serif" font-size="16">Gold and oil confirmed an inflation impulse; not a call on equities.</text>
-  <text x="40" y="372" fill="#8b97a5" font-family="ui-sans-serif, sans-serif" font-size="12">Read-only payload · no frontend classify</text>
+  <text x="40" y="214" fill="#e8edf2" font-family="Georgia, serif" font-size="28" font-weight="600">Local live payload</text>
+  <text x="40" y="244" fill="#8b97a5" font-family="ui-monospace, monospace" font-size="13">from data/drivers after npm run daily</text>
+  <text x="40" y="276" fill="#7eb0c8" font-family="ui-monospace, monospace" font-size="16">N/100 (uncalibrated)</text>
+  <text x="40" y="318" fill="#e8edf2" font-family="ui-sans-serif, sans-serif" font-size="16">Local-only. Public deploy never shows this path.</text>
+  <text x="40" y="372" fill="#8b97a5" font-family="ui-sans-serif, sans-serif" font-size="12">Requires GAMMADESK_PUBLIC_DEMO unset · Tiingo stays off the public host</text>
 </svg>

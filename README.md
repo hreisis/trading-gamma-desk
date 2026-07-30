@@ -6,7 +6,7 @@ Reasoning chain: **Driver → Catalyst → Structure → Confirmation → Update
 
 Milestone 1 ships a **read-only Macro Desk**: cross-asset regime, evidence, and an interpreted `DominantDriver`. The UI never classifies markets or recomputes confidence — it only renders precomputed payloads.
 
-**Public portfolio demo:** historical fixture only (`2026-07-29`). Not live market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
+**Public portfolio demo:** synthetic scenario fixture only — illustrative, not live or historical market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
 
 ---
 
@@ -29,7 +29,7 @@ Next.js desk (app/) + GET /api/macro/latest
 
 Public deploy (GAMMADESK_PUBLIC_DEMO=1):
   fixtures/macro/public-demo.2026-07-29.json  →  desk UI
-  (no Tiingo, no data/, no live driver label)
+  (synthetic scenario; no Tiingo; no data/; no live label)
 ```
 
 | Layer | Role |
@@ -79,7 +79,9 @@ Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md).
 
 ## Public demo deployment (M1-11)
 
-Goal: a portfolio-safe host that never implies live data and never needs Tiingo.
+Goal: a portfolio-safe host that never implies live or real-session data and never needs Tiingo.
+
+The public page uses a **synthetic** `DominantDriver` fixture (`fixtures/macro/public-demo.2026-07-29.json`). The embedded date is for schema/structure tests only; the UI labels the page as an illustrative synthetic scenario. Example regimes such as “Rates-led risk-on” are **not** a real-market call for 2026-07-29.
 
 1. Build from a clean checkout (no `data/`, no secrets):
    ```bash
@@ -91,9 +93,10 @@ Goal: a portfolio-safe host that never implies live data and never needs Tiingo.
    - `GAMMADESK_PUBLIC_DEMO=1`
    - Do **not** set `TIINGO_TOKEN`, do **not** upload `data/`
 3. Expected behaviour:
-   - `/` shows **Historical demo · fixture data · 2026-07-29**
+   - `/` shows **Illustrative demo · synthetic scenario**
+   - Disclaimer: **Synthetic values for product demonstration — not actual market observations.**
    - Confidence shows `N/100 (uncalibrated)` — no band labels
-   - `/?source=live` shows **Live data unavailable** (no silent fixture, no live label)
+   - `/?source=live` shows **Live data unavailable in public demo** (no silent fixture, no live label)
    - Page title / description are portfolio-oriented; GitHub link in header/footer
 
 Preview public mode locally without touching daily:
@@ -103,7 +106,7 @@ GAMMADESK_PUBLIC_DEMO=1 npm run dev
 # then open / and /?source=live
 ```
 
-This milestone does **not** wire cloud Tiingo. Creating the external host is left to you after local acceptance.
+This milestone does **not** wire cloud Tiingo. Creating the external host is left to you after acceptance.
 
 ---
 
@@ -128,7 +131,7 @@ On failure:
 | `.env` / tokens | **No** | Local only; see `.env.example` |
 | `data/bars/` (incl. Tiingo EOD) | **No** | gitignored raw cache |
 | `data/snapshots/`, `data/drivers/`, `data/pipeline/`, `data/calibration/` | **No** | Generated locally |
-| `fixtures/macro/**` | Yes | Contracts, scenarios, **public-demo.2026-07-29** — no Tiingo redistribution |
+| `fixtures/macro/**` | Yes | Contracts, scenarios, **synthetic public-demo fixture** — no Tiingo redistribution |
 | `fixtures/macro/calibration/*.json` | Yes | Aggregates only |
 
 Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKEN` on the public demo host.
@@ -147,4 +150,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11** (public fixture demo). **Do not start Milestone 2** until explicitly scheduled. Cloud Tiingo on the public host remains out of scope.
+Milestone 1 Macro path through **M1-11** (public synthetic demo). **Do not start Milestone 2** until explicitly scheduled. Cloud Tiingo on the public host remains out of scope.

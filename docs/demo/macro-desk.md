@@ -22,15 +22,14 @@ GAMMADESK_PUBLIC_DEMO=1 npm run dev
 
 | Case | Pass when |
 | --- | --- |
-| `/` | Banner **Historical demo · fixture data · 2026-07-29**; no live label |
-| `/?source=live` | **Live data unavailable**; no driver payload; not disguised as live |
+| `/` | Banner **Illustrative demo · synthetic scenario**; disclaimer that values are synthetic; no live label; fixture date not presented as a real session |
+| `/?source=live` | **Live data unavailable in public demo**; no driver payload; not disguised as live |
 | Confidence | `N/100 (uncalibrated)` only |
+| Narrative | Example only — do **not** treat “Rates-led risk-on” as a real 2026-07-29 market call |
 
 API mirror: `GET /api/macro/latest` and `?source=fixture` / `?source=live`.
 
 ## SVG frames
 
-- [macro-desk-live.svg](./macro-desk-live.svg) — live driver chrome
-- [macro-desk-fixture.svg](./macro-desk-fixture.svg) — demo / fixture chrome
-
-These are illustrative frames for docs review, not pixel captures of a deployed host (deployment deferred).
+- [macro-desk-fixture.svg](./macro-desk-fixture.svg) — illustrative synthetic demo chrome
+- [macro-desk-live.svg](./macro-desk-live.svg) — local live path (not used on public host)

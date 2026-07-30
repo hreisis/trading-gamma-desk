@@ -2,6 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DominantDriver } from "@/contracts";
 import {
+  LIVE_DATA_UNAVAILABLE_MESSAGE,
+  PUBLIC_DEMO_BANNER,
+  PUBLIC_DEMO_DISCLAIMER,
   PUBLIC_DEMO_FIXTURE_PATH,
   PUBLIC_DEMO_SESSION,
   SITE_DESCRIPTION,
@@ -14,11 +17,12 @@ import {
  * Deployment smoke checks for the public portfolio demo.
  * Does not call Tiingo or read generated data/.
  */
-describe("deploy smoke (public demo fixture)", () => {
-  it("ships a parseable frozen public-demo DominantDriver", () => {
+describe("deploy smoke (public synthetic demo)", () => {
+  it("ships a parseable synthetic public-demo DominantDriver", () => {
     expect(existsSync(PUBLIC_DEMO_FIXTURE_PATH)).toBe(true);
     const raw = JSON.parse(readFileSync(PUBLIC_DEMO_FIXTURE_PATH, "utf8"));
     const driver = DominantDriver.parse(raw);
+    // Date retained for structure tests only.
     expect(driver.marketSessionDate).toBe(PUBLIC_DEMO_SESSION);
     expect(driver.confidence.calibrated).toBe(false);
     expect(formatConfidenceScore(driver.confidence)).toMatch(
@@ -27,7 +31,7 @@ describe("deploy smoke (public demo fixture)", () => {
     expect(driver.interpretation.text.length).toBeGreaterThan(0);
   });
 
-  it("resolves the public demo homepage view without live provenance", () => {
+  it("resolves the public demo homepage as illustrative synthetic, not live/historical", () => {
     const view = resolveDeskRequest({
       publicDemo: true,
       fixturePath: PUBLIC_DEMO_FIXTURE_PATH,
@@ -36,8 +40,11 @@ describe("deploy smoke (public demo fixture)", () => {
     expect(view.status).toBe("ready");
     expect(view.isPublicDemo).toBe(true);
     expect(view.isLiveDriver).toBe(false);
-    expect(view.sourceLabel).toContain("Historical demo");
-    expect(view.sourceLabel).toContain(PUBLIC_DEMO_SESSION);
+    expect(view.sourceLabel).toBe(PUBLIC_DEMO_BANNER);
+    expect(view.sourceLabel).toContain("Illustrative demo");
+    expect(view.sourceLabel).toContain("synthetic");
+    expect(view.sourceLabel).not.toContain(PUBLIC_DEMO_SESSION);
+    expect(PUBLIC_DEMO_DISCLAIMER).toMatch(/not actual market observations/i);
     expect(JSON.stringify(view).toLowerCase()).not.toContain('"live driver"');
   });
 
@@ -50,17 +57,18 @@ describe("deploy smoke (public demo fixture)", () => {
     expect(view.status).toBe("live_unavailable");
     expect(view.driver).toBeNull();
     expect(view.isLiveDriver).toBe(false);
+    expect(view.error?.message).toBe(LIVE_DATA_UNAVAILABLE_MESSAGE);
   });
 
   it("keeps portfolio metadata suitable for a public host", () => {
     expect(SITE_TITLE.length).toBeGreaterThan(10);
     expect(SITE_DESCRIPTION.length).toBeGreaterThan(40);
-    expect(SITE_DESCRIPTION).toContain(PUBLIC_DEMO_SESSION);
+    expect(SITE_DESCRIPTION.toLowerCase()).toContain("synthetic");
+    expect(SITE_TITLE.toLowerCase()).not.toContain("historical");
   });
 
   it("does not require Tiingo token or data/ for the public path", () => {
     expect(process.env.TIINGO_TOKEN ?? "").toEqual(expect.any(String));
-    // Smoke must pass even if token is empty — public demo never reads it.
     const view = resolveDeskRequest({
       publicDemo: true,
       fixturePath: PUBLIC_DEMO_FIXTURE_PATH,

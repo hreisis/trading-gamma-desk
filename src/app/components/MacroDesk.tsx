@@ -42,24 +42,39 @@ function DriverBody({
   return (
     <>
       <p className="desk-banner" data-testid="banner-session">
-        {isPublicDemo
-          ? `Historical session ${driver.marketSessionDate}`
-          : sessionBannerText(driver)}
-        <span className="desk-banner-meta">
-          · {driver.sessionAlignment}
-          {driver.isCompleteSession ? "" : " · incomplete"}
-          {" · "}
-          <span
-            className={
-              showAsFixture
-                ? "desk-source desk-source-fixture"
-                : "desk-source desk-source-live"
-            }
-            data-desk-source={showAsFixture ? "fixture" : "local_driver"}
-          >
-            {sourceLabel}
-          </span>
-        </span>
+        {isPublicDemo ? (
+          <>
+            Synthetic scenario
+            <span className="desk-banner-meta">
+              {" · "}
+              <span
+                className="desk-source desk-source-fixture"
+                data-desk-source="fixture"
+              >
+                {sourceLabel}
+              </span>
+            </span>
+          </>
+        ) : (
+          <>
+            {sessionBannerText(driver)}
+            <span className="desk-banner-meta">
+              · {driver.sessionAlignment}
+              {driver.isCompleteSession ? "" : " · incomplete"}
+              {" · "}
+              <span
+                className={
+                  showAsFixture
+                    ? "desk-source desk-source-fixture"
+                    : "desk-source desk-source-live"
+                }
+                data-desk-source={showAsFixture ? "fixture" : "local_driver"}
+              >
+                {sourceLabel}
+              </span>
+            </span>
+          </>
+        )}
       </p>
 
       <section className="desk-driver" aria-labelledby="driver-heading">
@@ -115,7 +130,9 @@ function DriverBody({
                 <td>{formatSignedChange(asset.value, asset.unit)}</td>
                 <td>{formatZScore(asset.zScore)}</td>
                 <td>{roleLabel(asset.role)}</td>
-                <td>{asset.sourceDate ?? "—"}</td>
+                <td>
+                  {isPublicDemo ? "synthetic" : (asset.sourceDate ?? "—")}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -202,9 +219,10 @@ export function MacroDesk({ view }: { view: MacroDeskView }) {
               "This public deployment does not serve live drivers."}
           </p>
           <p className="desk-section-note">
-            Open <a href="/">the historical demo</a> for frozen fixture data.
-            Local development can still use <code>npm run daily</code> with
-            live mode when <code>GAMMADESK_PUBLIC_DEMO</code> is unset.
+            Open <a href="/">the illustrative demo</a> for the synthetic
+            scenario. Local development can still use{" "}
+            <code>npm run daily</code> with live mode when{" "}
+            <code>GAMMADESK_PUBLIC_DEMO</code> is unset.
           </p>
         </section>
       </DeskChrome>

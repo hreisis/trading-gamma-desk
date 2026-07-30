@@ -1,5 +1,8 @@
 import type { MacroDeskView } from "@/desk";
-import { PUBLIC_DEMO_BANNER } from "@/desk/public-demo";
+import {
+  PUBLIC_DEMO_BANNER,
+  PUBLIC_DEMO_DISCLAIMER,
+} from "@/desk/public-demo";
 
 export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
   const banners: { className: string; text: string; testId: string }[] = [];
@@ -8,7 +11,12 @@ export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
     banners.push({
       className: "desk-banner desk-banner-demo desk-banner-historical",
       text: PUBLIC_DEMO_BANNER,
-      testId: "banner-historical-demo",
+      testId: "banner-illustrative-demo",
+    });
+    banners.push({
+      className: "desk-banner desk-banner-demo",
+      text: PUBLIC_DEMO_DISCLAIMER,
+      testId: "banner-synthetic-disclaimer",
     });
   } else if (view.isDemo && !view.isPublicDemo) {
     banners.push({
@@ -22,8 +30,7 @@ export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
     banners.push({
       className: "desk-banner desk-banner-error",
       text:
-        view.error?.message ??
-        "Live data unavailable — this public deployment serves a historical fixture only.",
+        view.error?.message ?? "Live data unavailable in public demo",
       testId: "banner-live-unavailable",
     });
   }
