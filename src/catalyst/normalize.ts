@@ -254,16 +254,20 @@ function classificationConfidence(options: {
 /**
  * Pure: raw event → canonical Catalyst, or a structured validation error.
  * Does not touch the network, UI, or macro regime scoring.
+ *
+ * Accepts synthetic fixtures (`synthetic: true`) and official schedule rows
+ * (`synthetic: false`). Never invents actual/forecast/surprise or direction.
  */
 export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
-  if (raw.synthetic !== true) {
+  if (raw.synthetic !== true && raw.synthetic !== false) {
     return {
       ok: false,
-      error: "M2-1 accepts only synthetic raw events (synthetic: true)",
+      error: "synthetic must be explicitly true (fixture) or false (official schedule)",
       path: "synthetic",
       raw,
     };
   }
+  const isSynthetic = raw.synthetic === true;
   if (!raw.headline?.trim()) {
     return { ok: false, error: "headline is required", path: "headline", raw };
   }
@@ -305,8 +309,13 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
       raw,
     };
   }
-  const status = mapStatus(raw.rawStatus) ?? "released";
-  const direction = mapDirection(raw.rawDirection);
+  // Official calendars are schedule-only: always upcoming / unclear direction.
+  const status = isSynthetic
+    ? (mapStatus(raw.rawStatus) ?? "released")
+    : "upcoming";
+  const direction = isSynthetic
+    ? mapDirection(raw.rawDirection)
+    : "unclear";
   const importance = rankImportance({
     category,
     rawImportance: raw.rawImportance,
@@ -331,19 +340,30 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
   const statements =
     raw.evidenceStatements && raw.evidenceStatements.length > 0
       ? raw.evidenceStatements
-      : [`Synthetic fixture: ${raw.headline.trim()}`];
+      : isSynthetic
+        ? [`Synthetic fixture: ${raw.headline.trim()}`]
+        : [
+            `Official schedule entry: ${raw.headline.trim()} (scheduled release time only — not an observed print).`,
+          ];
+  const evidenceBasis =
+    raw.evidenceBasis ??
+    (isSynthetic ? "synthetic_fixture" : "official_release_schedule");
   const evidence = statements.map((statement, i) => ({
     id: `${id}_ev${i + 1}`,
     statement,
-    basis: "synthetic_fixture",
+    basis: evidenceBasis,
   }));
+
+  const sourceType = isSynthetic
+    ? mapSourceType(raw.sourceType)
+    : "calendar";
 
   const candidate = {
     schemaVersion: CATALYST_SCHEMA_VERSION,
     id,
     occurredAt,
     observedAt,
-    sourceType: mapSourceType(raw.sourceType),
+    sourceType,
     sourceName: raw.sourceName.trim(),
     sourceUrl:
       raw.sourceUrl === undefined || raw.sourceUrl === null
@@ -365,7 +385,7 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
     }),
     evidence,
     dedupeKey,
-    synthetic: true as const,
+    synthetic: isSynthetic,
   };
 
   const parsed = Catalyst.safeParse(candidate);

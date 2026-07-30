@@ -104,8 +104,11 @@ export const Catalyst = z.object({
   confidence: CatalystConfidence,
   evidence: z.array(CatalystEvidence).nonempty(),
   dedupeKey: z.string().min(1),
-  /** Always true for M2-1 fixture ingestion. */
-  synthetic: z.literal(true),
+  /**
+   * `true` for synthetic fixtures; `false` for official schedule rows
+   * (scheduled release time only — not an observed print).
+   */
+  synthetic: z.boolean(),
 });
 
 export type Catalyst = z.infer<typeof Catalyst>;

@@ -8,7 +8,8 @@ import { loadCatalystFeed } from "@/catalyst";
 import type { CatalystQuery } from "@/catalyst";
 
 /**
- * Read-only catalyst feed. Fixture-only in M2-1 — no news fetch, no LLM.
+ * Read-only catalyst feed. Public demo: synthetic fixtures only.
+ * Local: official calendar cache when present (no network in the request path).
  * Query: category, status, importance, asset, start, end.
  */
 export const dynamic = "force-dynamic";

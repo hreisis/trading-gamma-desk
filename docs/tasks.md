@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 2 — Catalyst.** **M2-1** catalyst core foundation (schema, normalize, synthetic fixtures, `/api/catalysts`, minimal feed UI). No external news fetch, no LLM, no macro regime/confidence changes. Market Temperature remains backlog.
+**Milestone 2 — Catalyst.** **M2-2A** official US macro calendar (BLS ICS + BEA JSON schedules → local `catalyst:fetch` cache). No actual/forecast/surprise, no news/LLM/FOMC/Market Temperature, no macro regime/confidence changes.
 
 ### Queued (not started)
 
@@ -85,7 +85,8 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | ID | Task | Done when |
 | --- | --- | --- |
 | M2-1 | Catalyst core foundation | Canonical Catalyst schema; deterministic normalize/dedupe; synthetic fixtures; `/api/catalysts` filters; minimal Catalyst Feed UI; public-demo banner **Illustrative catalyst demo · synthetic events**; no news fetch / LLM / macro scoring changes — ✅ |
-| M2-2+ | Live calendar / news / X sources | Deferred — needs source selection and credentials outside M2-1 |
+| M2-2A | Official US macro calendar ingestion | BLS ICS + BEA JSON adapters; explicit event registry; injectable window (now−1d…now+45d); `npm run catalyst:fetch` → gitignored `data/catalyst/calendar-latest.json`; local loader surfaces missing/stale/partial; public demo stays synthetic-only (no BLS/BEA network); schedule ≠ observed print — ✅ |
+| M2-2+ | News / X / FOMC / actuals | Deferred — beyond schedule-only calendar |
 
 ### Deferred out of Milestone 1
 

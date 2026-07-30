@@ -53,9 +53,9 @@ describe("catalyst schema + normalization", () => {
     expect(parsed.occurredAt).toBe("2026-07-10T12:00:00.000Z");
   });
 
-  it("rejects non-synthetic and malformed datetimes", () => {
+  it("rejects unset synthetic and malformed datetimes; accepts official schedule rows", () => {
     expect(
-      normalizeCatalystEvent({ ...base, synthetic: false }).ok,
+      normalizeCatalystEvent({ ...base, synthetic: undefined }).ok,
     ).toBe(false);
     expect(
       normalizeCatalystEvent({ ...base, occurredAt: "tomorrow" }).ok,
@@ -63,6 +63,27 @@ describe("catalyst schema + normalization", () => {
     expect(
       normalizeCatalystEvent({ ...base, rawCategory: "not-a-category" }).ok,
     ).toBe(false);
+
+    const official = normalizeCatalystEvent({
+      ...base,
+      synthetic: false,
+      externalId: "bls:cpi-test",
+      sourceType: "calendar",
+      sourceName: "BLS News Release Schedule",
+      rawCategory: "inflation",
+      rawStatus: "released",
+      rawDirection: "inflationary",
+      evidenceStatements: ["Official schedule only"],
+      evidenceBasis: "official_release_schedule",
+    });
+    expect(official.ok).toBe(true);
+    if (!official.ok) return;
+    expect(official.catalyst.synthetic).toBe(false);
+    expect(official.catalyst.status).toBe("upcoming");
+    expect(official.catalyst.direction).toBe("unclear");
+    expect(official.catalyst.evidence[0]?.basis).toBe(
+      "official_release_schedule",
+    );
   });
 
   it("builds stable ids and dedupe keys via shared identity helper", () => {
@@ -288,7 +309,7 @@ describe("fixture batch + API-shaped feed", () => {
   });
 
   it("filters deterministically", () => {
-    const all = loadCatalystFeed().catalysts;
+    const all = loadCatalystFeed({}, { forceSynthetic: true }).catalysts;
     const labor = filterCatalysts(all, { category: "labor" });
     expect(labor.length).toBeGreaterThan(0);
     expect(labor.every((c) => c.category === "labor")).toBe(true);

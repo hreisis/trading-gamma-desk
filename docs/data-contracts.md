@@ -489,9 +489,18 @@ Catalyst confidence is **classification clarity only**, always `calibrated: fals
 | `status` | `upcoming` \| `released` \| `developing` \| `resolved` |
 | `importance` | `low` \| `medium` \| `high` \| `critical` — ranked in compute, not in the UI |
 | `direction` | `risk-on` \| `risk-off` \| `inflationary` \| `disinflationary` \| `growth-positive` \| `growth-negative` \| `mixed` \| `unclear` |
-| `synthetic` | M2-1 fixtures are always `true`; must not be presented as real news |
+| `synthetic` | `true` for demo fixtures; `false` for official BLS/BEA **schedule** rows (scheduled release time only — not an observed print). Never present schedule rows as confirmed data releases. |
 
 Normalization is deterministic (`src/catalyst/normalize.ts`). The UI and `/api/catalysts` only read the feed — they do not reclassify.
+
+### Official calendar ingestion (M2-2A)
+
+| Source | Format | URL |
+| --- | --- | --- |
+| BLS News Release Schedule | ICS | `https://www.bls.gov/schedule/news_release/bls.ics` |
+| BEA release dates | JSON | `https://apps.bea.gov/API/signup/release_dates.json` |
+
+Local workflow: `npm run catalyst:fetch` → atomic write of gitignored `data/catalyst/calendar-latest.json`. Public demo (`GAMMADESK_PUBLIC_DEMO=1`) never calls BLS/BEA and never reads that cache — synthetic fixtures only. Calendar rows keep `status: upcoming` and `direction: unclear`; the system does **not** ingest actual/forecast/surprise.
 
 ---
 

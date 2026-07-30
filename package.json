@@ -15,6 +15,7 @@
     "interpret": "tsx --env-file=.env scripts/interpret-macro.ts",
     "daily": "tsx --env-file=.env scripts/run-daily.ts",
     "calibrate": "tsx --env-file=.env scripts/calibrate-report.ts",
+    "catalyst:fetch": "tsx scripts/fetch-catalyst-calendar.ts",
     "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts",
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },

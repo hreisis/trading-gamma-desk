@@ -7,10 +7,11 @@ import type {
   CatalystSourceType,
   CatalystStatus,
 } from "@/contracts";
+import type { OfficialCalendarSourceId } from "./registry";
 
 /**
  * Raw upstream-shaped event before canonicalization.
- * M2-1 only ingests synthetic fixtures of this shape.
+ * Synthetic fixtures use `synthetic: true`; official schedules use `false`.
  */
 export interface CatalystRawEvent {
   readonly kind?: string;
@@ -30,6 +31,8 @@ export interface CatalystRawEvent {
   readonly affectedAssets?: readonly string[];
   readonly macroChannels?: readonly string[];
   readonly evidenceStatements?: readonly string[];
+  /** Evidence basis string written onto each evidence row. */
+  readonly evidenceBasis?: string;
   /** When set, replaces a prior event with the same dedupe/external identity. */
   readonly supersedesExternalId?: string;
 }
@@ -57,18 +60,44 @@ export interface CatalystQuery {
   readonly end?: string;
 }
 
+export type CatalystFeedMode =
+  | "synthetic_demo"
+  | "official_calendar"
+  | "stale_calendar"
+  | "live_unavailable";
+
+export type CatalystSourceStatus = "ok" | "error" | "skipped";
+
+export interface CatalystFeedSourceStatus {
+  readonly id: OfficialCalendarSourceId | "fixture";
+  readonly name: string;
+  readonly url?: string;
+  readonly status: CatalystSourceStatus;
+  readonly error?: string;
+  readonly mappedEventCount?: number;
+}
+
 export interface CatalystFeedResponse {
   readonly kind: "CatalystFeed";
   readonly schemaVersion: "0.1.0";
   readonly generatedAt: string;
-  readonly mode: "synthetic_demo";
+  readonly mode: CatalystFeedMode;
   readonly isPublicDemo: boolean;
   readonly banner: string;
   readonly disclaimer: string;
   readonly source: {
-    readonly type: "fixture";
+    readonly type: "fixture" | "official_calendar";
     readonly name: string;
-    readonly synthetic: true;
+    readonly synthetic: boolean;
+    readonly fetchedAt?: string;
+    readonly stale?: boolean;
+    readonly partialFailure?: boolean;
+    readonly window?: {
+      readonly now: string;
+      readonly start: string;
+      readonly end: string;
+    };
+    readonly sources?: readonly CatalystFeedSourceStatus[];
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -77,6 +106,26 @@ export interface CatalystFeedResponse {
     readonly error: string;
     readonly externalId?: string;
   }>;
+}
+
+/** On-disk cache written by `npm run catalyst:fetch` (gitignored). */
+export interface CatalystCalendarCache {
+  readonly kind: "CatalystCalendarCache";
+  readonly schemaVersion: "0.1.0";
+  readonly fetchedAt: string;
+  readonly requestedWindow: {
+    readonly now: string;
+    readonly start: string;
+    readonly end: string;
+  };
+  readonly sources: readonly CatalystFeedSourceStatus[];
+  readonly catalysts: Catalyst[];
+  readonly validationErrors: Array<{
+    readonly index: number;
+    readonly error: string;
+    readonly externalId?: string;
+  }>;
+  readonly partialFailure: boolean;
 }
 
 export type {
