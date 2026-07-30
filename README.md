@@ -28,8 +28,8 @@ Next.js desk (app/) + GET /api/macro/latest
   └─ resolveDeskRequest() — Zod-parse only, no scoring
 
 Public deploy (GAMMADESK_PUBLIC_DEMO=1):
-  fixtures/macro/public-demo.2026-07-29.json  →  desk UI
-  (synthetic scenario; no Tiingo; no data/; no live label)
+  bundled synthetic fixture (static import) → desk UI
+  (no runtime fixtures/ path; no Tiingo; no data/; no live label)
 ```
 
 | Layer | Role |
@@ -62,6 +62,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily` and `/?source
 | `npm run ingest` | Pull + compute snapshot only |
 | `npm run interpret` | Snapshot → atomic driver write |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
+| `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
 
 ### Desk URLs (local)

@@ -5,8 +5,7 @@ import {
 } from "./load-macro-desk";
 import {
   LIVE_DATA_UNAVAILABLE_MESSAGE,
-  PUBLIC_DEMO_FIXTURE_PATH,
-  PUBLIC_DEMO_SOURCE_LABEL,
+  loadPublicDemoDeskView,
   isPublicDemoMode,
 } from "./public-demo";
 
@@ -40,30 +39,11 @@ function liveUnavailableView(publicDemo: boolean): MacroDeskView {
   };
 }
 
-function markPublicDemo(view: MacroDeskView): MacroDeskView {
-  if (!view.driver) {
-    return { ...view, isPublicDemo: true, isLiveDriver: false };
-  }
-  return {
-    ...view,
-    isPublicDemo: true,
-    isDemo: true,
-    isLiveDriver: false,
-    source: "fixture",
-    sourceLabel: PUBLIC_DEMO_SOURCE_LABEL,
-    // Public demo is historical by definition — do not surface local stale/pipeline.
-    sessionStale: false,
-    pipeline: null,
-    error: null,
-    status: "ready",
-  };
-}
-
 /**
  * Resolve page/API query into a desk view.
  *
- * Local (publicDemo=false): unchanged M1-10 behaviour.
- * Public demo: frozen fixture only; `?source=live` → live_unavailable (no silent fixture).
+ * Local (publicDemo=false): unchanged M1-10 filesystem behaviour.
+ * Public demo: bundled synthetic fixture only; `?source=live` → live_unavailable.
  */
 export function resolveDeskRequest(
   options: ResolveDeskRequestOptions = {},
@@ -78,15 +58,8 @@ export function resolveDeskRequest(
     if (source === "live") {
       return liveUnavailableView(true);
     }
-    const view = loadMacroDesk({
-      dataRoot: options.dataRoot ?? "data",
-      fixturePath: options.fixturePath ?? PUBLIC_DEMO_FIXTURE_PATH,
-      preferFixture: true,
-      allowFixture: true,
-      // Never consult live drivers in public demo mode.
-      publicDemoMode: true,
-    });
-    return markPublicDemo(view);
+    // Ignore dataRoot / fixturePath — public demo never opens the filesystem.
+    return loadPublicDemoDeskView();
   }
 
   const loadOptions: LoadMacroDeskOptions = {

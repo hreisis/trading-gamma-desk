@@ -31,8 +31,9 @@ export interface LoadMacroDeskOptions {
    */
   readonly allowFixture?: boolean;
   /**
-   * Public portfolio demo: never read `data/drivers`, only the frozen fixture.
-   * Prefer `resolveDeskRequest()` for request-level wiring.
+   * @deprecated Prefer `resolveDeskRequest({ publicDemo: true })`, which loads
+   * the bundled synthetic fixture. When set, still avoids `data/drivers` but
+   * may read `fixturePath` from disk (local/dev only).
    */
   readonly publicDemoMode?: boolean;
 }
