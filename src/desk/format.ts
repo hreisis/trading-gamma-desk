@@ -82,3 +82,63 @@ export function roleLabel(role: AssetObservation["role"]): string {
       return "Missing";
   }
 }
+
+export function regimeLabel(regime: PrimaryRegime | string): string {
+  switch (regime) {
+    case "fed_rates":
+      return "Rates";
+    case "inflation":
+      return "Inflation";
+    case "growth":
+      return "Growth";
+    case "liquidity":
+      return "Liquidity";
+    case "risk_sentiment":
+      return "Risk sentiment";
+    case "mixed_unresolved":
+      return "Mixed / unresolved";
+    case "single_asset_shock":
+      return "Single-asset shock";
+    case "insufficient_data":
+      return "Insufficient data";
+    default:
+      return String(regime).replace(/_/g, " ");
+  }
+}
+
+export function polarityLabel(polarity: string): string {
+  if (polarity === "positive") return "Positive";
+  if (polarity === "negative") return "Negative";
+  return polarity;
+}
+
+export function riskDirectionLabel(direction: string): string {
+  if (direction === "risk_on") return "Risk-on";
+  if (direction === "risk_off") return "Risk-off";
+  if (direction === "mixed") return "Mixed risk";
+  return direction.replace(/_/g, " ");
+}
+
+export function confidenceComponentLabel(name: string): string {
+  switch (name) {
+    case "patternMatch":
+      return "Pattern match";
+    case "distinctiveness":
+      return "Distinctiveness";
+    case "coherence":
+      return "Coherence";
+    case "effectiveBreadth":
+      return "Effective breadth";
+    case "strength":
+      return "Strength";
+    default:
+      return name.replace(/([A-Z])/g, " $1").trim();
+  }
+}
+
+export function sessionAlignmentLabel(alignment: string): string {
+  if (alignment === "aligned") return "Aligned";
+  if (alignment === "partial") return "Partial";
+  if (alignment === "stale") return "Stale";
+  return alignment;
+}

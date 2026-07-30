@@ -35,6 +35,13 @@ export const PUBLIC_DEMO_BANNER = "Illustrative demo · synthetic scenario";
 export const PUBLIC_DEMO_DISCLAIMER =
   "Synthetic values for product demonstration — not actual market observations.";
 
+/**
+ * Single compact chrome banner for public demo (M3-1.5) — replaces stacked
+ * macro + catalyst demo banners on the page.
+ */
+export const PUBLIC_DEMO_COMPACT_BANNER =
+  "Illustrative demo · synthetic scenario — not actual market or catalyst observations.";
+
 export const PUBLIC_DEMO_SOURCE_LABEL = PUBLIC_DEMO_BANNER;
 
 export const LIVE_DATA_UNAVAILABLE_MESSAGE =

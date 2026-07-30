@@ -4,7 +4,7 @@ import { CatalystEventCard } from "./CatalystEventCard";
 
 function sourceLabel(feed: CatalystFeedDto, synthetic: boolean): string {
   if (feed.mode === "synthetic_demo" || synthetic) {
-    return `synthetic · ${feed.source.name}`;
+    return `Synthetic · ${feed.source.name}`;
   }
   const freshness = feed.source.stale
     ? "stale"
@@ -12,20 +12,22 @@ function sourceLabel(feed: CatalystFeedDto, synthetic: boolean): string {
       ? `fetched ${feed.source.fetchedAt.replace("T", " ").replace(/\.\d+Z$/, "Z")}`
       : "official";
   const partial = feed.source.partialFailure ? " · partial failure" : "";
-  return `official calendar · ${freshness}${partial}`;
+  return `Official calendar · ${freshness}${partial}`;
 }
 
 function LayerStatusStrip({ feed }: { feed: CatalystFeedDto }) {
-  const chips: string[] = [`mode:${feed.mode}`];
-  const push = (key: string, layer?: { available?: boolean; status?: string }) => {
+  const chips: string[] = [`Mode ${feed.mode.replace(/_/g, " ")}`];
+  const push = (label: string, layer?: { available?: boolean; status?: string }) => {
     if (!layer) return;
-    chips.push(`${key}:${layer.status ?? (layer.available ? "ok" : "missing")}`);
+    chips.push(
+      `${label}: ${(layer.status ?? (layer.available ? "ok" : "missing")).replace(/_/g, " ")}`,
+    );
   };
-  push("results", feed.source.results);
-  push("docs", feed.source.documents);
-  push("briefs", feed.source.briefs);
-  push("mctx", feed.source.marketContext);
-  push("mrxn", feed.source.marketReactions);
+  push("Results", feed.source.results);
+  push("Docs", feed.source.documents);
+  push("Briefs", feed.source.briefs);
+  push("Market context", feed.source.marketContext);
+  push("Reactions", feed.source.marketReactions);
   return (
     <p className="cf-layer-strip" data-testid="catalyst-source-meta">
       {chips.join(" · ")}
@@ -47,13 +49,16 @@ export function CatalystFeedSkeleton() {
 }
 
 /**
- * Information-dense catalyst event feed (M3-1).
+ * Information-dense catalyst event feed (M3-1 / M3-1.5).
  * Read-only — does not classify markets or invent beat/miss language.
  */
 export function CatalystFeed({
   feed,
+  suppressDemoChrome,
 }: {
   feed: CatalystFeedDto | null | undefined;
+  /** When true, skip duplicate demo banner (merged into page chrome). */
+  suppressDemoChrome?: boolean;
 }) {
   if (feed === undefined) {
     return <CatalystFeedSkeleton />;
@@ -61,14 +66,20 @@ export function CatalystFeed({
 
   const uiStatus = deriveCatalystFeedUiStatus(feed);
   const demo = feed?.mode === "synthetic_demo" || feed?.isPublicDemo;
+  const hideDemoChrome =
+    Boolean(suppressDemoChrome) &&
+    (feed?.mode === "synthetic_demo" || feed?.isPublicDemo);
 
   if (feed === null || uiStatus === "error") {
     return (
       <section className="desk-section cf-feed" aria-labelledby="catalyst-heading">
         <h2 id="catalyst-heading">Catalyst feed</h2>
         <div className="cf-state cf-state-error" data-testid="catalyst-error">
-          <p className="desk-banner desk-banner-warn">{feed?.banner}</p>
-          <p className="desk-section-note">{feed?.disclaimer}</p>
+          {!hideDemoChrome && feed?.banner ? (
+            <p className="desk-banner desk-banner-warn desk-banner-compact">
+              {feed.banner}
+            </p>
+          ) : null}
           <p className="desk-section-note" data-testid="catalyst-empty">
             Official calendar cache unavailable. Run{" "}
             <code>npm run catalyst:fetch</code> locally (not in public demo).
@@ -96,35 +107,37 @@ export function CatalystFeed({
 
   const bannerClass =
     feed.mode === "synthetic_demo"
-      ? "desk-banner desk-banner-demo"
+      ? "desk-banner desk-banner-demo desk-banner-compact"
       : uiStatus === "partial" || feed.mode === "stale_calendar"
-        ? "desk-banner desk-banner-warn"
-        : "desk-banner";
+        ? "desk-banner desk-banner-warn desk-banner-compact"
+        : "desk-banner desk-banner-compact";
 
   return (
     <section className="desk-section cf-feed" aria-labelledby="catalyst-heading">
       <h2 id="catalyst-heading">Catalyst feed</h2>
-      <p className={bannerClass} data-testid="catalyst-banner">
-        {feed.banner}
-      </p>
-      <p className="desk-section-note" data-testid="catalyst-disclaimer">
-        {feed.disclaimer}
-      </p>
+
+      {!hideDemoChrome ? (
+        <>
+          <p className={bannerClass} data-testid="catalyst-banner">
+            {feed.banner}
+          </p>
+          <p className="desk-section-note" data-testid="catalyst-disclaimer">
+            {feed.disclaimer}
+          </p>
+        </>
+      ) : (
+        <p className="desk-section-note cf-feed-lede">
+          Events that may change the market&apos;s driver — independent of the
+          regime score above.
+        </p>
+      )}
 
       {uiStatus === "partial" ? (
         <p className="cf-state-banner cf-state-partial" data-testid="catalyst-partial">
-          Partial data — some layers missing or stale. Events below show what is
-          available; market reaction may read Awaiting market data.
+          Partial data — some layers missing or stale. Market reaction may read
+          Awaiting market data.
         </p>
       ) : null}
-
-      <LayerStatusStrip feed={feed} />
-
-      <p className="desk-section-note">
-        Events that may change the market&apos;s driver — independent of the
-        regime score above. Scheduled times are not confirmed prints until
-        official results/documents link.
-      </p>
 
       {uiStatus === "empty" ? (
         <div className="cf-state cf-state-empty" data-testid="catalyst-empty">
@@ -148,30 +161,37 @@ export function CatalystFeed({
         </div>
       )}
 
-      {feed.mode !== "live_unavailable" ? (
-        <p className="desk-section-note" data-testid="catalyst-feed-source">
-          Feed source: {sourceLabel(feed, feed.source.synthetic)}
-        </p>
-      ) : null}
-
-      {feed.linkingWarnings && feed.linkingWarnings.length > 0 ? (
-        <p className="desk-section-note" data-testid="catalyst-linking">
-          Linking:{" "}
-          {feed.linkingWarnings
-            .map(
-              (w) =>
-                `${w.releaseFamily ?? "?"} ${w.referencePeriod ?? "?"}${w.reason ? ` (${w.reason})` : ""}`,
-            )
-            .join("; ")}
-        </p>
-      ) : null}
-
-      {feed.validationIssueCount > 0 ? (
-        <p className="desk-section-note" data-testid="catalyst-validation">
-          Validation: {feed.validationIssueCount} issue(s) recorded (malformed
-          rows excluded).
-        </p>
-      ) : null}
+      <details className="desk-fold cf-feed-diagnostics" data-testid="catalyst-feed-diagnostics">
+        <summary>Feed diagnostics</summary>
+        <LayerStatusStrip feed={feed} />
+        {feed.mode !== "live_unavailable" ? (
+          <p className="desk-section-note" data-testid="catalyst-feed-source">
+            Feed source: {sourceLabel(feed, feed.source.synthetic)}
+          </p>
+        ) : null}
+        {feed.linkingWarnings && feed.linkingWarnings.length > 0 ? (
+          <p className="desk-section-note" data-testid="catalyst-linking">
+            Linking:{" "}
+            {feed.linkingWarnings
+              .map(
+                (w) =>
+                  `${w.releaseFamily ?? "?"} ${w.referencePeriod ?? "?"}${w.reason ? ` (${w.reason})` : ""}`,
+              )
+              .join("; ")}
+          </p>
+        ) : null}
+        {feed.validationIssueCount > 0 ? (
+          <p className="desk-section-note" data-testid="catalyst-validation">
+            Validation: {feed.validationIssueCount} issue(s) recorded (malformed
+            rows excluded).
+          </p>
+        ) : null}
+        {!hideDemoChrome ? null : (
+          <p className="desk-section-note" data-testid="catalyst-disclaimer">
+            {feed.disclaimer}
+          </p>
+        )}
+      </details>
     </section>
   );
 }

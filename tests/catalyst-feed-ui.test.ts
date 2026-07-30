@@ -80,9 +80,21 @@ describe("catalyst feed SSR markup", () => {
     expect(html).toContain('data-testid="catalyst-official-brief"');
     expect(html).toContain('data-testid="catalyst-market-reaction-panel"');
     expect(html).toContain('data-testid="catalyst-market-reaction"');
-    expect(html).toContain('data-testid="catalyst-ai-brief-evidence"');
+    expect(html).toContain('data-testid="catalyst-card-details"');
+    expect(html).toContain(" ET");
+    expect(html).toContain("data-risk-light=");
     expect(html).not.toMatch(/officialFactsIdentity/);
     expect(html).not.toMatch(/data\/catalyst\//);
+  });
+
+  it("hides duplicate demo banner when suppressDemoChrome is set", () => {
+    const feed = toPublicCatalystFeed(loadCatalystFeed({}, { publicDemo: true }));
+    const html = renderToStaticMarkup(
+      createElement(CatalystFeed, { feed, suppressDemoChrome: true }),
+    );
+    expect(html).not.toContain('data-testid="catalyst-banner"');
+    expect(html).toContain("Catalyst feed");
+    expect(html).toContain(feed.disclaimer);
   });
 
   it("shows loading skeleton when feed is undefined", () => {

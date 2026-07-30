@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 3 — Catalyst UI.** **M3-1** Catalyst Feed UI (public DTO cards + feed states). No Detail route / This Week UI yet. No Market Temperature / consensus / causation.
+**Milestone 3 — Catalyst UI.** **M3-1.5** UI densify + Risk Traffic Lights. No Detail route / This Week UI yet. No Market Temperature / consensus / causation.
 
 ### Queued (not started)
 
@@ -108,6 +108,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M3-0 | UI / cache contract audit | Data-flow, identity, demo/live isolation, readiness — ✅ (read-only) |
 | M3-0.5 | Contract hardening | Feed drops 4B/4C on `officialFactsIdentity` mismatch; Zod `CatalystFeed` public DTO strips paths/errors/usage/internal identities; docs align This Week field ownership (no new persisted fields); no Detail/This Week UI — ✅ |
 | M3-1 | Catalyst Feed UI | Card layout: title/category/importance/time/status, Official Brief + citations, market reaction core window or explicit awaiting/unavailable; loading/empty/error/partial states; public DTO only; tests — ✅ |
+| M3-1.5 | UI densify + Risk Traffic Lights | Merge demo banners; collapse Evidence/Confidence/Diagnostics; compact feed cards (ET time, brief/reaction summaries; details folded); four-state risk lights (Supportive / Caution / Warning / Unavailable) on Driver, Cross-Asset, released Catalysts — high-beta implication, gray when insufficient; pure functions + tests; no DTO/pipeline change — ✅ |
 
 ### Deferred out of Milestone 1
 

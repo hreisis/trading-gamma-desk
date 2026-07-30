@@ -10,10 +10,14 @@ import type {
 } from "@/contracts";
 import {
   formatCategoryLabel,
+  formatDirectionLabel,
+  formatImportanceLabel,
   formatReleaseStatusLabel,
   providerLabel,
 } from "@/catalyst/feed-view";
-import { formatScheduledAt } from "./format";
+import { deriveCatalystRiskLight } from "@/desk/risk-lights";
+import { RiskTrafficLight } from "../RiskTrafficLight";
+import { formatScheduledAtEt } from "./format";
 import { MarketReactionSection } from "./MarketReactionSection";
 import { OfficialBriefSection } from "./OfficialBriefSection";
 
@@ -67,6 +71,17 @@ export function CatalystEventCard({
   aiReaction?: PublicAiMarketReactionNarrative;
   demo?: boolean;
 }) {
+  const coreWindow =
+    reaction?.windows.find((w) => w.window === "30m") ??
+    reaction?.windows.find((w) => w.window === "5m") ??
+    reaction?.windows[0];
+
+  const riskLight = deriveCatalystRiskLight({
+    status: catalyst.status,
+    equityBreadth: coreWindow?.equityBreadth,
+    equityLeadershipStatus: coreWindow?.equityLeadership.status,
+  });
+
   return (
     <article
       className="cf-card"
@@ -75,61 +90,42 @@ export function CatalystEventCard({
     >
       <header className="cf-card-header">
         <div className="cf-badges">
-          <span className="cf-badge cf-badge-category">
-            {formatCategoryLabel(catalyst.category)}
-          </span>
-          <span
-            className={`cf-badge cf-badge-importance cf-importance-${catalyst.importance}`}
-          >
-            {catalyst.importance}
-          </span>
           <span
             className={`cf-badge cf-badge-status cf-status-${catalyst.status}`}
           >
             {formatReleaseStatusLabel(catalyst.status)}
           </span>
+          <span
+            className={`cf-badge cf-badge-importance cf-importance-${catalyst.importance}`}
+          >
+            {formatImportanceLabel(catalyst.importance)}
+          </span>
           {catalyst.synthetic ? (
-            <span className="cf-badge cf-badge-demo">demo</span>
+            <span className="cf-badge cf-badge-demo">Demo</span>
           ) : null}
+          {(catalyst.status === "released" ||
+            catalyst.status === "developing" ||
+            catalyst.status === "resolved") && (
+            <RiskTrafficLight
+              light={riskLight}
+              compact
+              testId={`catalyst-risk-light-${catalyst.id}`}
+            />
+          )}
         </div>
         <time className="cf-scheduled" dateTime={catalyst.occurredAt}>
-          {formatScheduledAt(catalyst.occurredAt)}
+          {formatScheduledAtEt(catalyst.occurredAt)}
         </time>
       </header>
 
       <h3 className="cf-card-title">{catalyst.headline}</h3>
-
-      <p className="cf-card-meta">
-        <span>{catalyst.direction}</span>
-        {catalyst.referencePeriod ? (
-          <span>ref {catalyst.referencePeriod}</span>
-        ) : null}
-        <span>
-          {catalyst.affectedAssets.length > 0
-            ? catalyst.affectedAssets.join(", ")
-            : "—"}
-        </span>
-        <span className="cf-card-source">
-          {catalyst.synthetic
-            ? `synthetic · ${catalyst.sourceName}`
-            : catalyst.releaseResult
-              ? `released · ${catalyst.sourceName}`
-              : `schedule · ${catalyst.sourceName}`}
-        </span>
-      </p>
-
-      {catalyst.releaseResult ? (
-        <ReleaseResultPanel
-          result={catalyst.releaseResult}
-          synthetic={catalyst.synthetic}
-        />
-      ) : null}
 
       <OfficialBriefSection
         catalyst={catalyst}
         briefsByDocId={briefsByDocId}
         aiByBriefId={aiByBriefId}
         demo={demo}
+        compact
       />
 
       <MarketReactionSection
@@ -139,16 +135,64 @@ export function CatalystEventCard({
         reaction={reaction}
         ai={aiReaction}
         demo={demo}
+        compact
       />
 
-      {catalyst.officialDocuments && catalyst.officialDocuments.length > 0 ? (
-        <p className="cf-panel-note cf-card-footer">
-          Linked docs:{" "}
-          {catalyst.officialDocuments
-            .map((d) => providerLabel(d.provider))
-            .join(", ")}
+      <details className="cf-details cf-card-details" data-testid="catalyst-card-details">
+        <summary>Details &amp; citations</summary>
+
+        <p className="cf-card-meta">
+          <span>{formatCategoryLabel(catalyst.category)}</span>
+          <span>{formatDirectionLabel(catalyst.direction)}</span>
+          {catalyst.referencePeriod ? (
+            <span>ref {catalyst.referencePeriod}</span>
+          ) : null}
+          <span>
+            {catalyst.affectedAssets.length > 0
+              ? catalyst.affectedAssets.join(", ")
+              : "—"}
+          </span>
+          <span className="cf-card-source">
+            {catalyst.synthetic
+              ? `synthetic · ${catalyst.sourceName}`
+              : catalyst.releaseResult
+                ? `released · ${catalyst.sourceName}`
+                : `schedule · ${catalyst.sourceName}`}
+          </span>
         </p>
-      ) : null}
+
+        {catalyst.releaseResult ? (
+          <ReleaseResultPanel
+            result={catalyst.releaseResult}
+            synthetic={catalyst.synthetic}
+          />
+        ) : null}
+
+        <OfficialBriefSection
+          catalyst={catalyst}
+          briefsByDocId={briefsByDocId}
+          aiByBriefId={aiByBriefId}
+          demo={demo}
+        />
+
+        <MarketReactionSection
+          feed={feed}
+          catalystStatus={catalyst.status}
+          context={marketContext}
+          reaction={reaction}
+          ai={aiReaction}
+          demo={demo}
+        />
+
+        {catalyst.officialDocuments && catalyst.officialDocuments.length > 0 ? (
+          <p className="cf-panel-note cf-card-footer">
+            Linked docs:{" "}
+            {catalyst.officialDocuments
+              .map((d) => providerLabel(d.provider))
+              .join(", ")}
+          </p>
+        ) : null}
+      </details>
     </article>
   );
 }

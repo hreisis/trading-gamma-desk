@@ -120,6 +120,36 @@ export function formatReleaseStatusLabel(status: string): string {
   return status.replace(/_/g, " ");
 }
 
+export function formatImportanceLabel(importance: string): string {
+  if (!importance) return importance;
+  return importance.charAt(0).toUpperCase() + importance.slice(1);
+}
+
+export function formatDirectionLabel(direction: string): string {
+  return direction.replace(/-/g, " ");
+}
+
+export function formatEquityBreadthLabel(breadth: string): string {
+  return breadth.replace(/_/g, " ");
+}
+
+export function formatLeadershipLabel(status: string): string {
+  switch (status) {
+    case "nasdaq_proxy_leads":
+      return "Nasdaq proxy leads";
+    case "small_cap_proxy_leads":
+      return "Small-cap proxy leads";
+    case "no_clear_leader":
+      return "No clear leader";
+    case "mixed":
+      return "Mixed leadership";
+    case "unavailable":
+      return "Leadership unavailable";
+    default:
+      return status.replace(/_/g, " ");
+  }
+}
+
 export function providerLabel(provider: string): string {
   if (provider === "federal_reserve") return "Federal Reserve";
   if (provider === "bls") return "BLS";

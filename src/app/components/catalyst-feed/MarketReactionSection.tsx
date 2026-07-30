@@ -11,6 +11,8 @@ import {
 } from "@/catalyst";
 import {
   deriveMarketReactionUiState,
+  formatEquityBreadthLabel,
+  formatLeadershipLabel,
   type MarketReactionUiState,
 } from "@/catalyst/feed-view";
 import type { EventMarketContext } from "@/contracts";
@@ -32,21 +34,28 @@ function ReactionUnavailable({
   );
 }
 
+function coreWindowOf(reaction: PublicEventMarketReaction) {
+  return (
+    reaction.windows.find((w) => w.window === "30m") ??
+    reaction.windows.find((w) => w.window === "5m") ??
+    reaction.windows[0]
+  );
+}
+
 function ReactionSummary({
   reaction,
   context,
   ai,
   demo,
+  compact,
 }: {
   reaction: PublicEventMarketReaction;
   context?: PublicEventMarketContext;
   ai?: PublicAiMarketReactionNarrative;
   demo?: boolean;
+  compact?: boolean;
 }) {
-  const coreWindow =
-    reaction.windows.find((w) => w.window === "30m") ??
-    reaction.windows.find((w) => w.window === "5m") ??
-    reaction.windows[0];
+  const coreWindow = coreWindowOf(reaction);
 
   const showAi =
     ai &&
@@ -64,6 +73,31 @@ function ReactionSummary({
         ).map((e) => [e.evidenceId, e])
       : [],
   );
+
+  if (compact) {
+    return (
+      <div data-testid="catalyst-market-reaction">
+        {showAi ? (
+          <p className="cf-brief-headline" data-testid="catalyst-ai-market-reaction">
+            {ai.headline}
+          </p>
+        ) : null}
+        {coreWindow ? (
+          <p className="cf-mrxn-lede" data-testid="catalyst-mrxn-core">
+            <strong>{windowShort(coreWindow.window)}</strong>
+            {" · "}
+            {formatEquityBreadthLabel(coreWindow.equityBreadth)}
+            {" · "}
+            {formatLeadershipLabel(coreWindow.equityLeadership.status)}
+          </p>
+        ) : (
+          <p className="cf-mrxn-state cf-mrxn-unavailable" data-testid="catalyst-mrxn-state">
+            Market reaction unavailable
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div data-testid="catalyst-market-reaction">
@@ -91,9 +125,9 @@ function ReactionSummary({
           <p className="cf-mrxn-lede">
             <strong>{windowShort(coreWindow.window)}</strong>
             {" · "}
-            {coreWindow.equityBreadth.replace(/_/g, " ")}
+            {formatEquityBreadthLabel(coreWindow.equityBreadth)}
             {" · "}
-            {coreWindow.equityLeadership.status.replace(/_/g, " ")}
+            {formatLeadershipLabel(coreWindow.equityLeadership.status)}
           </p>
           <p className="cf-panel-note">
             {formatCrossAssetSignatureText(coreWindow.crossAssetSignature)}
@@ -126,8 +160,8 @@ function ReactionSummary({
             {reaction.windows.map((w) => (
               <tr key={w.window}>
                 <td>{windowShort(w.window)}</td>
-                <td>{w.equityBreadth.replace(/_/g, " ")}</td>
-                <td>{w.equityLeadership.status.replace(/_/g, " ")}</td>
+                <td>{formatEquityBreadthLabel(w.equityBreadth)}</td>
+                <td>{formatLeadershipLabel(w.equityLeadership.status)}</td>
                 <td className="cf-panel-note">
                   {formatCrossAssetSignatureText(w.crossAssetSignature)}
                 </td>
@@ -204,6 +238,7 @@ export function MarketReactionSection({
   reaction,
   ai,
   demo,
+  compact,
 }: {
   feed: CatalystFeedDto;
   catalystStatus: string;
@@ -211,6 +246,7 @@ export function MarketReactionSection({
   reaction?: PublicEventMarketReaction;
   ai?: PublicAiMarketReactionNarrative;
   demo?: boolean;
+  compact?: boolean;
 }) {
   const mctxMeta = feed.source.marketContext;
   const mrxnMeta = feed.source.marketReactions;
@@ -225,7 +261,10 @@ export function MarketReactionSection({
   });
 
   return (
-    <div className="cf-panel" data-testid="catalyst-market-reaction-panel">
+    <div
+      className={`cf-panel${compact ? " cf-panel-compact" : ""}`}
+      data-testid="catalyst-market-reaction-panel"
+    >
       <h4 className="cf-panel-title">Market reaction</h4>
       {state.kind === "available" && reaction ? (
         <ReactionSummary
@@ -233,6 +272,7 @@ export function MarketReactionSection({
           context={context}
           ai={ai}
           demo={demo}
+          compact={compact}
         />
       ) : (
         <ReactionUnavailable state={state} />

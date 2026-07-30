@@ -1,26 +1,18 @@
 import type { MacroDeskView } from "@/desk";
-import {
-  PUBLIC_DEMO_BANNER,
-  PUBLIC_DEMO_DISCLAIMER,
-} from "@/desk/public-demo";
+import { PUBLIC_DEMO_COMPACT_BANNER } from "@/desk/public-demo";
 
 export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
   const banners: { className: string; text: string; testId: string }[] = [];
 
   if (view.isPublicDemo && view.driver) {
     banners.push({
-      className: "desk-banner desk-banner-demo desk-banner-historical",
-      text: PUBLIC_DEMO_BANNER,
+      className: "desk-banner desk-banner-demo desk-banner-compact",
+      text: PUBLIC_DEMO_COMPACT_BANNER,
       testId: "banner-illustrative-demo",
-    });
-    banners.push({
-      className: "desk-banner desk-banner-demo",
-      text: PUBLIC_DEMO_DISCLAIMER,
-      testId: "banner-synthetic-disclaimer",
     });
   } else if (view.isDemo && !view.isPublicDemo) {
     banners.push({
-      className: "desk-banner desk-banner-demo",
+      className: "desk-banner desk-banner-demo desk-banner-compact",
       text: "Demo · fixture fallback — not a live market session. Run npm run daily for a live driver.",
       testId: "banner-demo",
     });

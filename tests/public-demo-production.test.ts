@@ -9,7 +9,7 @@ import {
 import {
   LIVE_DATA_UNAVAILABLE_MESSAGE,
   PUBLIC_DEMO_BANNER,
-  PUBLIC_DEMO_DISCLAIMER,
+  PUBLIC_DEMO_COMPACT_BANNER,
   PUBLIC_DEMO_DRIVER,
 } from "@/desk";
 
@@ -107,15 +107,17 @@ describe("public demo production build", () => {
     });
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain(PUBLIC_DEMO_BANNER);
-    expect(html).toContain(PUBLIC_DEMO_DISCLAIMER);
+    expect(html).toContain(PUBLIC_DEMO_COMPACT_BANNER);
+    expect(html).toContain("not actual market or catalyst observations");
     expect(html).toContain(PUBLIC_DEMO_DRIVER.label);
     expect(html).toContain(
       `${PUBLIC_DEMO_DRIVER.confidence.score}/100 (uncalibrated)`,
     );
-    expect(html).toContain(CATALYST_DEMO_BANNER);
-    expect(html).toContain(CATALYST_DEMO_DISCLAIMER);
     expect(html).toContain("Catalyst feed");
+    expect(html).toContain('data-testid="driver-risk-light"');
+    expect(html).toContain(CATALYST_DEMO_DISCLAIMER);
+    // Duplicate macro/catalyst demo banners are collapsed into one chrome line.
+    expect(html).not.toContain("Illustrative catalyst demo · synthetic events");
     expect(html.toLowerCase()).not.toContain("live driver");
     expect(html).not.toContain("fixture missing or invalid");
     expect(html).not.toContain("ENOENT");
