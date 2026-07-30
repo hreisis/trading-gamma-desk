@@ -6,7 +6,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 **Milestone 1 — Cross-Asset Macro.** M1-3 done; next is M1-4 (signature scoring and confidence).
 
-> **M1-1 is not complete.** Treasury and CBOE are verified, but the Tiingo path is unverified pending a token. Real field and session-date verification **must** land before M1-7 (ingest adapter) starts.
+> **M1-1 is not complete.** Treasury and CBOE are verified, but the Tiingo path is unverified because `TIINGO_TOKEN` is still empty. The probe is written and waiting: `npm run verify:tiingo`. Real field and session-date verification **must** land before M1-7 (ingest adapter) starts.
 
 ---
 

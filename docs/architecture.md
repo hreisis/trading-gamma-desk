@@ -114,7 +114,11 @@ Yields keep native **bps** semantics from Treasury data. `UUP` is closer to DXY 
 
 **CBOE VIX — usable, one session behind.** 9,239 rows back to `01/02/1990`, columns `DATE,OPEN,HIGH,LOW,CLOSE`, dates `MM/DD/YYYY` **ascending**, no zero or blank OHLC in the recent window. At 19:00 ET on `07/29` the latest row was `07/28`, confirming a CDN update lag and confirming the pre-open schedule choice.
 
-**Tiingo — blocked.** Both `/tiingo/daily/<sym>/prices` and `/tiingo/crypto/prices` return `403 {"detail":"Please supply a token"}`. No token exists in the environment. Once a token is available, verify per symbol: actual latest `date`, whether `adjClose` or `close` is returned, adjustment behaviour across dividends and splits for `GLD` / `CPER` / `USO` / `UUP`, and what timestamp `btcusd` bars carry so the 16:00 ET snap is well defined.
+**Tiingo — still blocked, now one command away.** Both `/tiingo/daily/<sym>/prices` and `/tiingo/crypto/prices` return `403 {"detail":"Please supply a token"}`, and `TIINGO_TOKEN` in `.env` is still empty as of `2026-07-29`.
+
+`npm run verify:tiingo` (`scripts/verify-tiingo.mjs`) performs the verification the moment a token exists. It sends the token as an `Authorization` header rather than a query parameter, so the secret cannot leak through a URL echoed in an error, and redacts it from every line it prints. Per symbol it records: actual field names against the expected set, the real `date` format and latest available session, `close` versus `adjClose` divergence together with `divCash` and `splitFactor` occurrences, non-positive closes, and for `btcusd` the bar timestamp and weekend-bar count that decide whether a 16:00 ET snap is definable. It applies the Stooq lesson by checking `content-type` and payload shape before trusting HTTP 200, and it exits non-zero without writing anything if any probe fails.
+
+It also persists the observed session dates to `fixtures/macro/observed-sessions.tiingo.json` (dates only, no secrets), so the M1-3 market calendar can be reconciled offline against a second independent source. The Treasury file already agrees with that calendar; a second source disagreeing would mean the holiday set is wrong.
 
 **Stooq — rejected.** `stooq.com/q/d/l/` returns **HTTP 200 with a JavaScript proof-of-work bot challenge page**, not CSV. This is the important finding: a client that checks only the status code would parse an HTML challenge as price data and produce silent garbage.
 
