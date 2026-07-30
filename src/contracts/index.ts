@@ -11,3 +11,4 @@ export * from "./market-reaction";
 export * from "./ai-market-reaction";
 export * from "./integration-smoke";
 export * from "./catalyst-update";
+export * from "./catalyst-feed";

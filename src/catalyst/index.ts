@@ -11,6 +11,7 @@ export * from "./registry";
 export * from "./cache";
 export * from "./fetch-calendar";
 export * from "./load";
+export * from "./public-feed";
 export { fetchBlsCalendar, parseBlsIcs, BLS_ICS_URL, BLS_SOURCE_NAME } from "./providers/bls";
 export {
   fetchBeaCalendar,

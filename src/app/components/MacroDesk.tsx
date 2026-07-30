@@ -1,5 +1,5 @@
 import type { DominantDriver } from "@/contracts";
-import type { CatalystFeedResponse } from "@/catalyst";
+import type { CatalystFeed as CatalystFeedDto } from "@/contracts";
 import type { MacroDeskView } from "@/desk";
 import {
   assetDisplayName,
@@ -214,7 +214,7 @@ export function MacroDesk({
   catalystFeed,
 }: {
   view: MacroDeskView;
-  catalystFeed?: CatalystFeedResponse | null;
+  catalystFeed?: CatalystFeedDto | null;
 }) {
   if (view.status === "live_unavailable") {
     return (

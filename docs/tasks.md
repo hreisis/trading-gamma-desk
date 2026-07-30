@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 2 — Catalyst.** **M2-5B** unified incremental `catalyst:update` orchestration. No scheduler/cron. No Market Temperature / consensus / causation.
+**Milestone 3 — Catalyst UI.** **M3-0.5** contract hardening (feed identity gate + public DTO). No Detail route / This Week UI yet. No Market Temperature / consensus / causation.
 
 ### Queued (not started)
 
@@ -98,6 +98,16 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M2-5B | Unified incremental catalyst update | `npm run catalyst:update` (`--dry-run` / `--max-events 2` / `--force`); stages official_facts→AI brief; official_facts+4A→4B→4C; 4B input identity includes official event/facts; identity incremental skip; run lock + stale recovery; atomic manifest `update-latest.json`; no scheduler — ✅ |
 | M2-2C | Consensus / surprise / BEA / more series | Deferred — PPI/JOLTS/ECI, BEA results, consensus, surprise, FOMC decision text parsing |
 | M2-2+ | News / X / free-form LLM over full docs | Deferred |
+
+---
+
+## Milestone 3 — Catalyst UI
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M3-0 | UI / cache contract audit | Data-flow, identity, demo/live isolation, readiness — ✅ (read-only) |
+| M3-0.5 | Contract hardening | Feed drops 4B/4C on `officialFactsIdentity` mismatch; Zod `CatalystFeed` public DTO strips paths/errors/usage/internal identities; docs align This Week field ownership (no new persisted fields); no Detail/This Week UI — ✅ |
+| M3-1 | Catalyst Feed UI (planned) | Not started — Feed-first; Detail deferred |
 
 ### Deferred out of Milestone 1
 

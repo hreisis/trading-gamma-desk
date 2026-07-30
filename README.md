@@ -121,13 +121,13 @@ If any calendar provider fails, successful sources still write a usable cache wi
 
 **Event market context (M2-4A):** `npm run catalyst:market-context:fetch` reads local calendar + results caches only and writes `data/catalyst/market-context-latest.json`. Uses Alpaca Historical Stock Bars (`APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`, optional `CATALYST_MARKET_FEED`, default `sip`) for ETF proxies **SPY / QQQ / IWM / TLT / UUP / GLD** — labelled as ETF proxies, never as DXY, yields, or official index levels. Windows: baseline (last bar before event), +5m, +30m, +2h, regular-session close. UI states **Observed movement does not establish causation**. Missing credentials → unavailable (no fake prices). Public demo uses synthetic fixtures only — never calls Alpaca.
 
-**Deterministic market reactions (M2-4B):** `npm run catalyst:market-reactions:build` reads `market-context-latest.json` only (offline) and writes `data/catalyst/market-reactions-latest.json`. Versioned display deadbands classify each ETF proxy window as up/down/flat; equity breadth uses SPY/QQQ/IWM only; leadership uses QQQ−SPY / IWM−SPY spreads; cross-asset signatures stay ETF/proxy language. Deadbands are **not** statistical significance. `insufficient` / `mixed` are conservative classifications, not errors. Public demo derives reactions from synthetic M2-4A snapshots via the same rules engine.
+**Deterministic market reactions (M2-4B):** `npm run catalyst:market-reactions:build` reads market-context plus official briefs/calendar for **input identity** (offline; classification remains 4A-rule-based) and writes `data/catalyst/market-reactions-latest.json`. Versioned display deadbands classify each ETF proxy window as up/down/flat; equity breadth uses SPY/QQQ/IWM only; leadership uses QQQ−SPY / IWM−SPY spreads; cross-asset signatures stay ETF/proxy language. Deadbands are **not** statistical significance. `insufficient` / `mixed` are conservative classifications, not errors. Public demo derives reactions from synthetic M2-4A snapshots via the same rules engine. The feed drops 4B/4C rows whose `officialFactsIdentity` no longer matches current official facts.
 
 **AI market-reaction narratives (M2-4C):** `npm run catalyst:market-reactions:enhance` reads **only** `market-context-latest.json` + `market-reactions-latest.json` (no Alpaca, calendar, documents, briefs, or news) and writes `data/catalyst/ai-market-reactions-latest.json`. The LLM reorganizes cited 4A percentage changes + 4B rule classifications into a short observed-market narrative — **not** causation, hawkish/dovish, risk-on/off, or trade advice. Local hard validation (citations, numbers, entities, prohibited wording); `rejected` / `unavailable` falls back to the rule-based 4B pattern. Configure with `OPENAI_API_KEY` and optional `CATALYST_REACTION_LLM_MODEL` (config default `gpt-5.6-luna`). Tests use an injected fake narrator — CI never calls OpenAI. Public demo serves checked-in synthetic fixtures labelled **Demo AI reaction brief · Synthetic data**.
 
 **4A vs 4B vs 4C:** 4A stores objective ETF proxy price changes; 4B applies deterministic rule classification; 4C AI only organizes already-cited observed evidence. The validator can check citations, numbers, entities, and banned phrasing, but cannot mathematically prove every natural-language claim is entailed by the input — UI always keeps an expand-original-evidence path.
 
-**Integration smoke (M2-5A-Lite):** Manual validation of existing OpenAI adapters — **not** a daily pipeline (M2-5B not started).
+**Integration smoke (M2-5A-Lite):** Manual validation of existing OpenAI adapters — **not** a scheduler. M2-5B (`catalyst:update`) is the unified incremental orchestrator (see below).
 
 ```bash
 npm run catalyst:integration:smoke -- --dry-run
@@ -136,7 +136,7 @@ npm run catalyst:integration:smoke -- --live --max-events 2
 
 - **Opt-in:** Without `--live`, zero OpenAI/Alpaca calls (plan + eligibility only). `--dry-run` forces the same.
 - **Cost control:** Max **2** events per OpenAI stage; default writes to an isolated temp dir (does not overwrite business AI caches unless `--update-cache` after a validated stage).
-- **Env (repo names):** `OPENAI_API_KEY`, optional `CATALYST_LLM_MODEL` (official briefs), optional `CATALYST_REACTION_LLM_MODEL` (reaction narratives). Alpaca: `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY` — when missing, stage is `awaiting_credentials` (no call, no empty 4A cache, not counted as adapter failure).
+- **Env (repo names):** `OPENAI_API_KEY`, optional `CATALYST_LLM_MODEL` (official briefs), optional `CATALYST_REACTION_LLM_MODEL` (reaction narratives). Alpaca: `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY` — when missing, stage is `awaiting_valid_credentials` (no call, no empty 4A cache, not counted as adapter failure).
 - **Report:** gitignored `data/catalyst/integration-smoke-latest.json` (schema `0.1.0`) — statuses/counts/safe error codes only; keys/headers/prompt/response bodies redacted.
 - **Overall:** OpenAI success with Alpaca still awaiting → `partial` (full M2-5A not closed). `passed` requires all executable live stages including Alpaca.
 - **Tests vs live:** Vitest uses injected fake narrators and never hits the network even if `.env` has keys. Public demo never runs this command and never reads `.env` for providers.
@@ -161,9 +161,9 @@ npm run catalyst:update -- --max-events 2
 | --- | --- |
 | `/` | Live driver when `data/drivers/` has a valid file; otherwise **demo · fixture fallback**. Catalyst: official calendar when `data/catalyst/calendar-latest.json` exists |
 | `/?source=fixture` | Always demo fixture (even if live exists) |
-| `/?source=live` | Live only — empty if no drivers (no silent fixture) |
+| `/?source=live` | Live only — empty if no drivers (no silent fixture). **Public demo:** macro page shows **Live data unavailable**; Catalyst UI is hidden on that page. `/api/catalysts` still returns `synthetic_demo` (API has no `?source=` gate) — intentional until a later M3 split. |
 | `/api/macro/latest` | Same view model as JSON |
-| `/api/catalysts` | Catalyst feed (`?category=&status=&importance=&asset=&start=&end=`) |
+| `/api/catalysts` | Public `CatalystFeed` DTO (`?category=&status=&importance=&asset=&start=&end=`) — no cache paths, raw provider errors, or AI token usage |
 
 Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md).
 

@@ -128,3 +128,27 @@ export function officialEventFactsIdentityFromContext(
     briefIdentities: ["none"],
   });
 }
+
+/** Index current officialFactsIdentity for feed filters (by catalystId). */
+export function officialFactsIdentityIndex(
+  catalysts: readonly Pick<
+    Catalyst,
+    | "id"
+    | "occurredAt"
+    | "releaseFamily"
+    | "referencePeriod"
+    | "releaseResult"
+    | "officialDocuments"
+  >[],
+  briefs: readonly OfficialBrief[] | undefined,
+): Map<string, string> {
+  const briefsByDocumentId = new Map<string, OfficialBrief>();
+  for (const b of briefs ?? []) {
+    briefsByDocumentId.set(b.documentId, b);
+  }
+  const out = new Map<string, string>();
+  for (const c of catalysts) {
+    out.set(c.id, officialEventFactsIdentityForCatalyst(c, briefsByDocumentId));
+  }
+  return out;
+}

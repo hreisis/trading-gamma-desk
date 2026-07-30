@@ -487,7 +487,7 @@ Catalyst confidence is **classification clarity only**, always `calibrated: fals
 | --- | --- |
 | `category` | `monetary-policy` \| `inflation` \| `labor` \| `growth` \| `fiscal` \| `geopolitics` \| `energy` \| `liquidity` \| `earnings` \| `positioning` \| `other` |
 | `status` | `upcoming` \| `released` \| `developing` \| `resolved` |
-| `importance` | `low` \| `medium` \| `high` \| `critical` — ranked in compute, not in the UI |
+| `importance` | `low` \| `medium` \| `high` \| `critical` — set by registry/normalize; ranked in compute (`IMPORTANCE_RANK`); **displayed** on the Catalyst Feed (and planned This Week). Not a UI-invented score. |
 | `direction` | `risk-on` \| `risk-off` \| `inflationary` \| `disinflationary` \| `growth-positive` \| `growth-negative` \| `mixed` \| `unclear` |
 | `synthetic` | `true` for demo fixtures; `false` for official BLS/BEA/FOMC **schedule** rows (scheduled release time only — not an observed print or decision). Never present schedule rows as confirmed data releases. |
 
@@ -642,6 +642,31 @@ Sanitized run report `CatalystIntegrationSmokeReport` written to gitignored `dat
 | `errorCodes` | Safe categories incl. `insufficient_quota`, `awaiting_valid_credentials`, `awaiting_live_smoke` |
 
 **Incremental identity:** each stage reuses existing adapters — recompute only when input identity, rules/prompt/model, or dependency versions change. Run lock `data/catalyst/update.lock.json` (stale after 30m or dead PID). No scheduler.
+
+### Catalyst feed DTO (M3-0.5)
+
+Public Zod contract `CatalystFeed` (`src/contracts/catalyst-feed.ts`, schemaVersion **`0.1.0`**) is what `/api/catalysts` and the desk UI consume (via `toPublicCatalystFeed`). The loader may keep a richer internal payload for cache joins.
+
+| Public keeps | Public strips |
+| --- | --- |
+| `mode`, `banner`, `disclaimer`, layer `available`/`status`/`stale`/counts | Filesystem cache paths in `source.name` / errors |
+| Catalysts, slim documents, briefs, 4A/4B/4C display fields | Raw provider `error` strings |
+| `validationIssueCount` | `validationErrors[]` detail, linking warning dumps |
+| AI brief `validation` gate flags | AI reaction `usage` (token counts) |
+| | `officialFactsIdentity`, `marketContextIdentity`, `marketReactionIdentity` |
+
+**Feed identity gate:** `filterMarketReactionsForFeed` requires `reaction.officialFactsIdentity` to match the current official event/facts identity for that `catalystId`. Mismatches are dropped; 4C narratives that join only via the filtered 4B set cannot hang on stale facts. **4A identity is unchanged** — market context does not depend on official facts.
+
+**This Week field ownership (UI labels only — no new persisted fields):**
+
+| UI label | Ownership |
+| --- | --- |
+| `scheduledAt` | UI alias of `Catalyst.occurredAt` |
+| `eventCategory` | UI alias of `Catalyst.category` |
+| `importance` | `Catalyst.importance` (registry) |
+| `timeStatus` | Derived from `now` + `occurredAt` + `status` + presence of `releaseResult`/docs — never “clock past ⇒ released” |
+| `sessionTiming` | Derived from `occurredAt` in `America/New_York` (+ optional `EventMarketContext.session`) |
+| `calendarSource` | Registry / feed `source.sources[].id` (not implemented as a new Catalyst field) |
 
 ---
 

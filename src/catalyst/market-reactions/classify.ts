@@ -32,6 +32,7 @@ export {
   officialEventFactsIdentity,
   officialEventFactsIdentityForCatalyst,
   officialEventFactsIdentityFromContext,
+  officialFactsIdentityIndex,
   releaseResultFingerprint,
 } from "./official-identity";
 

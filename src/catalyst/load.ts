@@ -42,7 +42,10 @@ import { loadMarketContextCache } from "./market-context/cache";
 import { filterMarketContextForFeed } from "./market-context/materialize";
 import { MARKET_CONTEXT_CALCULATION_VERSION } from "./market-context/version";
 import { classifyMarketReaction } from "./market-reactions/classify";
-import { officialEventFactsIdentityForCatalyst } from "./market-reactions/official-identity";
+import {
+  officialEventFactsIdentityForCatalyst,
+  officialFactsIdentityIndex,
+} from "./market-reactions/official-identity";
 import { loadMarketReactionsCache } from "./market-reactions/cache";
 import { filterMarketReactionsForFeed } from "./market-reactions/materialize";
 import { REACTION_RULES_VERSION } from "./market-reactions/version";
@@ -310,6 +313,12 @@ function loadSyntheticFeed(
     feedMctx,
     options.now,
     30,
+    {
+      officialFactsIdentityByCatalystId: officialFactsIdentityIndex(
+        withDocs.catalysts,
+        archiveBriefs,
+      ),
+    },
   );
   const synAiMrxn = syntheticAiMarketReactions();
   const feedAiMrxn = filterAiMarketReactionsForFeed(synAiMrxn, feedReactions);
@@ -604,6 +613,8 @@ export function loadCatalystFeed(
 
   function resolveFeedMarketReactions(
     contexts: readonly EventMarketContext[] | undefined,
+    feedCatalysts: readonly Catalyst[],
+    feedBriefs: readonly OfficialBrief[] | undefined,
   ): {
     marketReactions: EventMarketReaction[] | undefined;
     meta: NonNullable<CatalystFeedResponse["source"]["marketReactions"]>;
@@ -623,6 +634,12 @@ export function loadCatalystFeed(
       contexts ?? [],
       now,
       30,
+      {
+        officialFactsIdentityByCatalystId: officialFactsIdentityIndex(
+          feedCatalysts,
+          feedBriefs,
+        ),
+      },
     );
     return {
       marketReactions: feed,
@@ -694,7 +711,11 @@ export function loadCatalystFeed(
       );
       const aiPack = resolveFeedAiBriefs(briefPack.briefs);
       const mctxPack = resolveFeedMarketContext(catalysts);
-      const mrxnPack = resolveFeedMarketReactions(mctxPack.marketContext);
+      const mrxnPack = resolveFeedMarketReactions(
+        mctxPack.marketContext,
+        catalysts,
+        briefPack.briefs,
+      );
       const aiMrxnPack = resolveFeedAiMarketReactions(mrxnPack.marketReactions);
       return {
         kind: "CatalystFeed",
@@ -703,7 +724,8 @@ export function loadCatalystFeed(
         mode: "official_calendar",
         isPublicDemo: false,
         banner: CATALYST_RESULTS_ONLY_BANNER,
-        disclaimer: `${CATALYST_OFFICIAL_DISCLAIMER} ${loaded.error}`,
+        // Do not append cache-path error strings into user-facing disclaimer.
+        disclaimer: CATALYST_OFFICIAL_DISCLAIMER,
         source: {
           type: "official_calendar",
           name: OFFICIAL_RESULTS_CACHE_NAME,
@@ -753,7 +775,7 @@ export function loadCatalystFeed(
       mode: "live_unavailable",
       isPublicDemo: false,
       banner: CATALYST_UNAVAILABLE_BANNER,
-      disclaimer: `${CATALYST_OFFICIAL_DISCLAIMER} ${loaded.error}`,
+      disclaimer: CATALYST_OFFICIAL_DISCLAIMER,
       source: {
         type: "official_calendar",
         name: OFFICIAL_CALENDAR_CACHE_NAME,
@@ -855,7 +877,11 @@ export function loadCatalystFeed(
   );
   const aiPack = resolveFeedAiBriefs(briefPack.briefs);
   const mctxPack = resolveFeedMarketContext(catalysts);
-  const mrxnPack = resolveFeedMarketReactions(mctxPack.marketContext);
+  const mrxnPack = resolveFeedMarketReactions(
+    mctxPack.marketContext,
+    catalysts,
+    briefPack.briefs,
+  );
   const aiMrxnPack = resolveFeedAiMarketReactions(mrxnPack.marketReactions);
 
   const filtered = filterCatalysts(catalysts, query);

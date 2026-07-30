@@ -11,10 +11,13 @@ import {
   classifyMarketReaction,
   DEADBAND_PCT,
   deadbandFor,
+  filterAiMarketReactionsForFeed,
+  filterMarketReactionsForFeed,
   formatCrossAssetSignatureText,
   LEADERSHIP_THRESHOLD_PCT,
   loadCatalystFeed,
   marketContextIdentity,
+  marketReactionIdentity,
   REACTION_RULES_VERSION,
 } from "@/catalyst";
 import { writeJsonAtomic } from "@/desk/atomic-write";
@@ -532,6 +535,107 @@ function existsFile(path: string): boolean {
     return false;
   }
 }
+
+describe("feed identity gate (M3-0.5)", () => {
+  it("drops reactions and AI narratives when officialFactsIdentity mismatches", () => {
+    const ctx = baseCtx({
+      symbols: [
+        sym("SPY", {
+          plus5m: 0.2,
+          plus30m: 0.25,
+          plus2h: 0.3,
+          sessionClose: 0.2,
+        }),
+        sym("QQQ", {
+          plus5m: 0.22,
+          plus30m: 0.28,
+          plus2h: 0.32,
+          sessionClose: 0.22,
+        }),
+        sym("IWM", {
+          plus5m: 0.18,
+          plus30m: 0.2,
+          plus2h: 0.24,
+          sessionClose: 0.18,
+        }),
+        sym("TLT", {
+          plus5m: -0.1,
+          plus30m: -0.12,
+          plus2h: -0.14,
+          sessionClose: -0.1,
+        }),
+        sym("UUP", {
+          plus5m: 0.05,
+          plus30m: 0.06,
+          plus2h: 0.07,
+          sessionClose: 0.05,
+        }),
+        sym("GLD", {
+          plus5m: 0.01,
+          plus30m: 0.02,
+          plus2h: 0.02,
+          sessionClose: 0.01,
+        }),
+      ],
+    });
+    const currentFacts = "facts-current";
+    const reaction = classifyMarketReaction(ctx, {
+      generatedAt: "2026-07-15T21:00:00.000Z",
+      officialFactsIdentity: currentFacts,
+    });
+    const stale = {
+      ...reaction,
+      officialFactsIdentity: "facts-stale",
+      id: "mrxn_stale",
+    };
+    const now = new Date("2026-07-29T20:00:00.000Z");
+    const kept = filterMarketReactionsForFeed(
+      [reaction, stale],
+      [ctx],
+      now,
+      30,
+      {
+        officialFactsIdentityByCatalystId: new Map([
+          [ctx.catalystId, currentFacts],
+        ]),
+      },
+    );
+    expect(kept.map((r) => r.id)).toEqual([reaction.id]);
+
+    const staleNarrative = {
+      schemaVersion: "0.1.0" as const,
+      id: "aimrxn_stale",
+      catalystId: stale.catalystId,
+      marketContextId: stale.marketContextId,
+      marketContextIdentity: stale.marketContextIdentity,
+      marketReactionId: stale.id,
+      marketReactionIdentity: marketReactionIdentity(stale),
+      reactionRulesVersion: stale.reactionRulesVersion,
+      promptVersion: "0.1.0",
+      provider: "fake",
+      model: "fake",
+      status: "complete" as const,
+      headline: "Stale narrative",
+      bullets: [
+        {
+          id: "b1",
+          text: "At +30m, equity ETF proxies were mixed.",
+          evidenceIds: ["reaction:30m:equityBreadth"],
+        },
+        {
+          id: "b2",
+          text: "Over the observed window, SPY ETF proxy moved.",
+          evidenceIds: ["context:SPY:30m:changePct"],
+        },
+      ],
+      validationErrors: [] as string[],
+      generatedAt: "2026-07-15T21:00:00.000Z",
+      synthetic: true,
+    };
+    const aiKept = filterAiMarketReactionsForFeed([staleNarrative], kept);
+    expect(aiKept).toEqual([]);
+  });
+});
 
 describe("public demo isolation", () => {
   it("derives synthetic reactions from synthetic market context", () => {

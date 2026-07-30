@@ -4,13 +4,16 @@ import {
   CatalystImportance,
   CatalystStatus,
 } from "@/contracts";
-import { loadCatalystFeed } from "@/catalyst";
+import { loadCatalystFeed, toPublicCatalystFeed } from "@/catalyst";
 import type { CatalystQuery } from "@/catalyst";
 
 /**
- * Read-only catalyst feed. Public demo: synthetic fixtures only.
+ * Read-only catalyst feed DTO. Public demo: synthetic fixtures only.
  * Local: official calendar cache when present (no network in the request path).
  * Query: category, status, importance, asset, start, end.
+ *
+ * Response is the public CatalystFeed contract — cache paths, raw provider
+ * errors, AI token usage, and internal identity fields are stripped.
  */
 export const dynamic = "force-dynamic";
 
@@ -37,6 +40,6 @@ export function GET(request: Request) {
     end: url.searchParams.get("end") ?? undefined,
   };
 
-  const feed = loadCatalystFeed(query);
+  const feed = toPublicCatalystFeed(loadCatalystFeed(query));
   return NextResponse.json(feed);
 }

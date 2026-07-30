@@ -343,7 +343,9 @@ describe("local cache load + feed modes", () => {
     expect(feed.banner).toBe(CATALYST_UNAVAILABLE_BANNER);
     expect(feed.catalysts).toHaveLength(0);
     expect(feed.source.synthetic).toBe(false);
-    expect(feed.disclaimer).toMatch(/npm run catalyst:fetch/i);
+    // User-facing disclaimer stays generic — cache paths stay in validationErrors only.
+    expect(feed.disclaimer).not.toMatch(/data\/catalyst\//);
+    expect(feed.validationErrors.length).toBeGreaterThan(0);
   });
 
   it("loads official cache and marks stale by injected now", async () => {

@@ -1,28 +1,28 @@
 import type {
-  AiMarketReactionNarrative,
   Catalyst,
-  CatalystFeedResponse,
-  EventMarketContext,
-  EventMarketReaction,
-  OfficialAiBrief,
+  CatalystFeed as CatalystFeedDto,
   OfficialBrief,
   OfficialDocument,
+  PublicAiMarketReactionNarrative,
+  PublicEventMarketContext,
+  PublicEventMarketReaction,
+  PublicOfficialAiBrief,
   ReleaseResult,
-} from "@/catalyst";
+} from "@/contracts";
 import {
   buildReactionEvidencePack,
   formatCrossAssetSignatureText,
   formatLeadershipText,
   marketContextIdentity,
-  marketReactionIdentity,
 } from "@/catalyst";
+import type { EventMarketContext } from "@/contracts";
 
 function formatWhen(iso: string): string {
   // Display the contract timestamp as-is (already normalized); keep short.
   return iso.replace("T", " ").replace(/\.\d+/, "");
 }
 
-function sourceLabel(feed: CatalystFeedResponse, synthetic: boolean): string {
+function sourceLabel(feed: CatalystFeedDto, synthetic: boolean): string {
   if (feed.mode === "synthetic_demo" || synthetic) {
     return `synthetic · ${feed.source.name}`;
   }
@@ -86,7 +86,7 @@ function OfficialAiBriefBlock({
   documentUrl,
   demo,
 }: {
-  ai: OfficialAiBrief;
+  ai: PublicOfficialAiBrief;
   brief: OfficialBrief;
   documentUrl?: string;
   demo?: boolean;
@@ -153,7 +153,7 @@ function OfficialBriefBlock({
   demo,
 }: {
   brief: OfficialBrief;
-  aiBrief?: OfficialAiBrief;
+  aiBrief?: PublicOfficialAiBrief;
   documentUrl?: string;
   provider: string;
   demo?: boolean;
@@ -235,7 +235,7 @@ function OfficialDocumentBlock({
 }: {
   docs: NonNullable<Catalyst["officialDocuments"]>;
   briefsByDocId: ReadonlyMap<string, OfficialBrief>;
-  aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
+  aiByBriefId: ReadonlyMap<string, PublicOfficialAiBrief>;
   demo?: boolean;
 }) {
   return (
@@ -288,7 +288,7 @@ function OfficialUpdates({
 }: {
   documents: readonly OfficialDocument[];
   briefs: readonly OfficialBrief[];
-  aiBriefs: readonly OfficialAiBrief[];
+  aiBriefs: readonly PublicOfficialAiBrief[];
   demo?: boolean;
 }) {
   if (documents.length === 0 && briefs.length === 0) return null;
@@ -359,7 +359,7 @@ function MarketContextBlock({
   ctx,
   demo,
 }: {
-  ctx: EventMarketContext;
+  ctx: PublicEventMarketContext;
   demo?: boolean;
 }) {
   return (
@@ -439,18 +439,19 @@ function MarketReactionAiBlock({
   context,
   demo,
 }: {
-  ai: AiMarketReactionNarrative;
-  reaction: EventMarketReaction;
-  context?: EventMarketContext;
+  ai: PublicAiMarketReactionNarrative;
+  reaction: PublicEventMarketReaction;
+  context?: PublicEventMarketContext;
   demo?: boolean;
 }) {
   const evidenceById = new Map(
     context
       ? buildReactionEvidencePack(
-          context,
-          reaction,
-          marketContextIdentity(context),
-          marketReactionIdentity(reaction),
+          context as EventMarketContext,
+          reaction as Parameters<typeof buildReactionEvidencePack>[1],
+          marketContextIdentity(context as EventMarketContext),
+          // Public DTO omits join identities; evidenceIds are stable without them.
+          reaction.id,
         ).map((e) => [e.evidenceId, e])
       : [],
   );
@@ -530,15 +531,14 @@ function MarketReactionBlock({
   ai,
   demo,
 }: {
-  reaction: EventMarketReaction;
-  context?: EventMarketContext;
-  ai?: AiMarketReactionNarrative;
+  reaction: PublicEventMarketReaction;
+  context?: PublicEventMarketContext;
+  ai?: PublicAiMarketReactionNarrative;
   demo?: boolean;
 }) {
   const showAi =
     ai &&
     (ai.status === "complete" || ai.status === "partial") &&
-    ai.validationErrors.length === 0 &&
     Boolean(ai.headline) &&
     Boolean(ai.bullets?.length);
 
@@ -664,10 +664,10 @@ function CatalystRow({
 }: {
   c: Catalyst;
   briefsByDocId: ReadonlyMap<string, OfficialBrief>;
-  aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
-  marketByCatalystId: ReadonlyMap<string, EventMarketContext>;
-  reactionByCatalystId: ReadonlyMap<string, EventMarketReaction>;
-  aiReactionByCatalystId: ReadonlyMap<string, AiMarketReactionNarrative>;
+  aiByBriefId: ReadonlyMap<string, PublicOfficialAiBrief>;
+  marketByCatalystId: ReadonlyMap<string, PublicEventMarketContext>;
+  reactionByCatalystId: ReadonlyMap<string, PublicEventMarketReaction>;
+  aiReactionByCatalystId: ReadonlyMap<string, PublicAiMarketReactionNarrative>;
   demo?: boolean;
 }) {
   return (
@@ -739,7 +739,7 @@ function CatalystRow({
  * Read-only catalyst list. Does not classify, score regimes, or advise trades.
  * Does not invent beat/miss, hot/cold, or market direction from prints.
  */
-export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
+export function CatalystFeed({ feed }: { feed: CatalystFeedDto }) {
   const bannerClass =
     feed.mode === "synthetic_demo"
       ? "desk-banner desk-banner-demo"
@@ -886,9 +886,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
         </p>
       ) : null}
 
-      {feed.validationErrors.length > 0 ? (
+      {feed.validationIssueCount > 0 ? (
         <p className="desk-section-note" data-testid="catalyst-validation">
-          Validation: {feed.validationErrors.length} issue(s) recorded
+          Validation: {feed.validationIssueCount} issue(s) recorded
           (malformed rows kept out of the feed).
         </p>
       ) : null}
