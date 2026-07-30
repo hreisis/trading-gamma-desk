@@ -1,0 +1,79 @@
+[
+  {
+    "ticker": "btcusd",
+    "baseCurrency": "btc",
+    "quoteCurrency": "usd",
+    "priceData": [
+      {
+        "date": "2026-07-24T00:00:00+00:00",
+        "open": 100,
+        "high": 101,
+        "low": 99,
+        "close": 100.5,
+        "volume": 1,
+        "volumeNotional": 100,
+        "tradesDone": 10
+      },
+      {
+        "date": "2026-07-25T00:00:00+00:00",
+        "open": 100.5,
+        "high": 102,
+        "low": 100,
+        "close": 101,
+        "volume": 1,
+        "volumeNotional": 101,
+        "tradesDone": 10
+      },
+      {
+        "date": "2026-07-26T00:00:00+00:00",
+        "open": 101,
+        "high": 103,
+        "low": 100,
+        "close": 102,
+        "volume": 1,
+        "volumeNotional": 102,
+        "tradesDone": 10
+      },
+      {
+        "date": "2026-07-27T00:00:00+00:00",
+        "open": 102,
+        "high": 104,
+        "low": 101,
+        "close": 103,
+        "volume": 1,
+        "volumeNotional": 103,
+        "tradesDone": 10
+      },
+      {
+        "date": "2026-07-28T00:00:00+00:00",
+        "open": 103,
+        "high": 105,
+        "low": 102,
+        "close": 104,
+        "volume": 1,
+        "volumeNotional": 104,
+        "tradesDone": 10
+      },
+      {
+        "date": "2026-07-29T00:00:00+00:00",
+        "open": 104,
+        "high": 106,
+        "low": 103,
+        "close": 105,
+        "volume": 1,
+        "volumeNotional": 105,
+        "tradesDone": 10
+      },
+      {
+        "date": "2026-07-30T00:00:00+00:00",
+        "open": 105,
+        "high": 107,
+        "low": 104,
+        "close": 106,
+        "volume": 1,
+        "volumeNotional": 106,
+        "tradesDone": 10
+      }
+    ]
+  }
+]

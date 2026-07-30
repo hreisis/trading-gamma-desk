@@ -1,0 +1,18 @@
+{
+  "note": "Frozen public-source bars and a classification summary from a successful M1-7 ingest. Tiingo-licensed series (GLD/CPER/USO/UUP/BTC) are intentionally absent from the public repo — they remain only in the gitignored local data/bars/ cache after npm run ingest. Joint calibration (M1-6b) must combine scenario fixtures with a locally regenerated history, not redistribute vendor EOD.",
+  "frozenAt": "2026-07-30T00:43:16.789Z",
+  "marketSessionDate": "2026-07-29",
+  "publicSeries": {
+    "US2Y": "treasury.gov/daily_treasury_yield_curve",
+    "US10Y": "treasury.gov/daily_treasury_yield_curve",
+    "VIX": "cboe/VIX_History"
+  },
+  "excludedFromPublicRepo": [
+    "GOLD",
+    "COPPER",
+    "OIL",
+    "USD",
+    "BTC"
+  ],
+  "localOnly": "data/bars/*.json and data/snapshots/*.json (gitignored)"
+}

@@ -154,13 +154,13 @@ A pull that fails validation is a hard error. It must never degrade into a parti
 
 1. Request **45–60 calendar days** per symbol so that 22 consecutive valid sessions survive weekends and holidays.
 2. **No forward-fill.** A missing session stays missing and surfaces as `staleDays` / `missing`.
-3. A daily change must span consecutive valid sessions for that asset. A gap is flagged `gapSkipped`, never divided into a “daily” move.
+3. A daily change must span consecutive valid sessions for that asset. A gap is flagged `missingAdjacentSession`, never divided into a “daily” move.
 4. **BTC trades weekends; equities do not.** BTC is snapped at the 16:00 ET mark and restricted to equity trading days, so every asset’s window uses the same session calendar.
 5. Persist raw bars before computing, so any snapshot can be recomputed from stored inputs.
 
 ### Run model and persistence
 
-Milestone 1 is **local-first**: a script performs ingest → compute → interpret and writes an immutable snapshot to `data/snapshots/<marketSessionDate>.json`. Files are a valid store here only because writes are single-writer and local.
+Milestone 1 is **local-first**: `npm run ingest` (`scripts/ingest-macro.ts`) pulls Treasury + CBOE VIX + Tiingo, persists raw bars to `data/bars/<SYMBOL>.json`, then writes an immutable compute snapshot to `data/snapshots/<marketSessionDate>.json`. The snapshot holds features, classification and methodology versions so a past conclusion can be recomputed; interpretation (M1-8) is not required to freeze the numbers. Files are a valid store here only because writes are single-writer and local. Use `--force` only when deliberately replacing a session.
 
 Deployment path, when wanted: the local run commits the snapshot (a few KB per session) and the deployed app serves it read-only. **Runtime filesystem writes on serverless hosts are not a database** — if scheduled online updates become a requirement, that is the point at which object storage or Postgres enters, and it is a Milestone 2+ decision, not an M1 design constraint.
 

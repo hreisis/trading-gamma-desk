@@ -1,0 +1,273 @@
+{
+  "symbol": "VIX",
+  "instrument": "VIX index",
+  "isProxy": false,
+  "source": "cboe/VIX_History",
+  "bars": [
+    {
+      "sessionDate": "2026-05-18",
+      "value": 17.82,
+      "rawDate": "05/18/2026"
+    },
+    {
+      "sessionDate": "2026-05-19",
+      "value": 18.06,
+      "rawDate": "05/19/2026"
+    },
+    {
+      "sessionDate": "2026-05-20",
+      "value": 17.44,
+      "rawDate": "05/20/2026"
+    },
+    {
+      "sessionDate": "2026-05-21",
+      "value": 16.76,
+      "rawDate": "05/21/2026"
+    },
+    {
+      "sessionDate": "2026-05-22",
+      "value": 16.7,
+      "rawDate": "05/22/2026"
+    },
+    {
+      "sessionDate": "2026-05-25",
+      "value": 16.59,
+      "rawDate": "05/25/2026"
+    },
+    {
+      "sessionDate": "2026-05-26",
+      "value": 17.01,
+      "rawDate": "05/26/2026"
+    },
+    {
+      "sessionDate": "2026-05-27",
+      "value": 16.29,
+      "rawDate": "05/27/2026"
+    },
+    {
+      "sessionDate": "2026-05-28",
+      "value": 15.74,
+      "rawDate": "05/28/2026"
+    },
+    {
+      "sessionDate": "2026-05-29",
+      "value": 15.32,
+      "rawDate": "05/29/2026"
+    },
+    {
+      "sessionDate": "2026-06-01",
+      "value": 16.05,
+      "rawDate": "06/01/2026"
+    },
+    {
+      "sessionDate": "2026-06-02",
+      "value": 15.77,
+      "rawDate": "06/02/2026"
+    },
+    {
+      "sessionDate": "2026-06-03",
+      "value": 16.06,
+      "rawDate": "06/03/2026"
+    },
+    {
+      "sessionDate": "2026-06-04",
+      "value": 15.4,
+      "rawDate": "06/04/2026"
+    },
+    {
+      "sessionDate": "2026-06-05",
+      "value": 21.51,
+      "rawDate": "06/05/2026"
+    },
+    {
+      "sessionDate": "2026-06-08",
+      "value": 18.92,
+      "rawDate": "06/08/2026"
+    },
+    {
+      "sessionDate": "2026-06-09",
+      "value": 19.87,
+      "rawDate": "06/09/2026"
+    },
+    {
+      "sessionDate": "2026-06-10",
+      "value": 22.22,
+      "rawDate": "06/10/2026"
+    },
+    {
+      "sessionDate": "2026-06-11",
+      "value": 19.44,
+      "rawDate": "06/11/2026"
+    },
+    {
+      "sessionDate": "2026-06-12",
+      "value": 17.68,
+      "rawDate": "06/12/2026"
+    },
+    {
+      "sessionDate": "2026-06-15",
+      "value": 16.2,
+      "rawDate": "06/15/2026"
+    },
+    {
+      "sessionDate": "2026-06-16",
+      "value": 16.41,
+      "rawDate": "06/16/2026"
+    },
+    {
+      "sessionDate": "2026-06-17",
+      "value": 18.44,
+      "rawDate": "06/17/2026"
+    },
+    {
+      "sessionDate": "2026-06-18",
+      "value": 16.4,
+      "rawDate": "06/18/2026"
+    },
+    {
+      "sessionDate": "2026-06-19",
+      "value": 16.78,
+      "rawDate": "06/19/2026"
+    },
+    {
+      "sessionDate": "2026-06-22",
+      "value": 17.28,
+      "rawDate": "06/22/2026"
+    },
+    {
+      "sessionDate": "2026-06-23",
+      "value": 19.49,
+      "rawDate": "06/23/2026"
+    },
+    {
+      "sessionDate": "2026-06-24",
+      "value": 18.63,
+      "rawDate": "06/24/2026"
+    },
+    {
+      "sessionDate": "2026-06-25",
+      "value": 18.89,
+      "rawDate": "06/25/2026"
+    },
+    {
+      "sessionDate": "2026-06-26",
+      "value": 18.41,
+      "rawDate": "06/26/2026"
+    },
+    {
+      "sessionDate": "2026-06-29",
+      "value": 17.65,
+      "rawDate": "06/29/2026"
+    },
+    {
+      "sessionDate": "2026-06-30",
+      "value": 16.45,
+      "rawDate": "06/30/2026"
+    },
+    {
+      "sessionDate": "2026-07-01",
+      "value": 16.59,
+      "rawDate": "07/01/2026"
+    },
+    {
+      "sessionDate": "2026-07-02",
+      "value": 16.15,
+      "rawDate": "07/02/2026"
+    },
+    {
+      "sessionDate": "2026-07-03",
+      "value": 15.81,
+      "rawDate": "07/03/2026"
+    },
+    {
+      "sessionDate": "2026-07-06",
+      "value": 15.57,
+      "rawDate": "07/06/2026"
+    },
+    {
+      "sessionDate": "2026-07-07",
+      "value": 16.13,
+      "rawDate": "07/07/2026"
+    },
+    {
+      "sessionDate": "2026-07-08",
+      "value": 16.9,
+      "rawDate": "07/08/2026"
+    },
+    {
+      "sessionDate": "2026-07-09",
+      "value": 15.84,
+      "rawDate": "07/09/2026"
+    },
+    {
+      "sessionDate": "2026-07-10",
+      "value": 15.03,
+      "rawDate": "07/10/2026"
+    },
+    {
+      "sessionDate": "2026-07-13",
+      "value": 17.16,
+      "rawDate": "07/13/2026"
+    },
+    {
+      "sessionDate": "2026-07-14",
+      "value": 16.5,
+      "rawDate": "07/14/2026"
+    },
+    {
+      "sessionDate": "2026-07-15",
+      "value": 15.67,
+      "rawDate": "07/15/2026"
+    },
+    {
+      "sessionDate": "2026-07-16",
+      "value": 16.73,
+      "rawDate": "07/16/2026"
+    },
+    {
+      "sessionDate": "2026-07-17",
+      "value": 18.77,
+      "rawDate": "07/17/2026"
+    },
+    {
+      "sessionDate": "2026-07-20",
+      "value": 18.65,
+      "rawDate": "07/20/2026"
+    },
+    {
+      "sessionDate": "2026-07-21",
+      "value": 17.05,
+      "rawDate": "07/21/2026"
+    },
+    {
+      "sessionDate": "2026-07-22",
+      "value": 16.64,
+      "rawDate": "07/22/2026"
+    },
+    {
+      "sessionDate": "2026-07-23",
+      "value": 18.7,
+      "rawDate": "07/23/2026"
+    },
+    {
+      "sessionDate": "2026-07-24",
+      "value": 18.58,
+      "rawDate": "07/24/2026"
+    },
+    {
+      "sessionDate": "2026-07-27",
+      "value": 18.67,
+      "rawDate": "07/27/2026"
+    },
+    {
+      "sessionDate": "2026-07-28",
+      "value": 18.21,
+      "rawDate": "07/28/2026"
+    },
+    {
+      "sessionDate": "2026-07-29",
+      "value": 20.66,
+      "rawDate": "07/29/2026"
+    }
+  ]
+}

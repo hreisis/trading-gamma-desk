@@ -1,0 +1,21 @@
+{
+  "marketSessionDate": "2026-07-29",
+  "sessionAlignment": "aligned",
+  "isCompleteSession": true,
+  "primaryRegime": "inflation",
+  "polarity": "positive",
+  "riskDirection": "risk_off",
+  "confidenceScore": 68,
+  "calibrated": false,
+  "signatureVersion": "sig-2026-07-01",
+  "staleDaysByAsset": {
+    "US2Y": 0,
+    "US10Y": 0,
+    "GOLD": 0,
+    "COPPER": 0,
+    "OIL": 0,
+    "USD": 0,
+    "VIX": 0,
+    "BTC": 0
+  }
+}

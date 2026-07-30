@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:tiingo": "node --env-file=.env scripts/verify-tiingo.mjs"
+    "verify:tiingo": "node --env-file=.env scripts/verify-tiingo.mjs",
+    "ingest": "tsx --env-file=.env scripts/ingest-macro.ts"
   },
   "dependencies": {
     "next": "16.2.12",
@@ -22,6 +23,7 @@
     "@types/node": "26.1.2",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "tsx": "4.20.3",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   },
