@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "next": "16.2.12",
+    "node-html-parser": "^9.0.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "4.4.3"

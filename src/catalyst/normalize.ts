@@ -206,8 +206,9 @@ export function rankImportance(options: {
   ) {
     best = "high";
   }
-  if (options.status === "upcoming" && best === "critical") {
-    // Upcoming scheduled prints rarely warrant critical until released.
+  // Keyword-promoted critical is capped for ordinary upcoming prints.
+  // Explicit rawImportance "critical" (e.g. scheduled FOMC decision) is kept.
+  if (options.status === "upcoming" && best === "critical" && raw !== "critical") {
     best = "high";
   }
   return best;

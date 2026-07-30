@@ -3,9 +3,10 @@
  *
  *   npm run catalyst:fetch
  *
- * Pulls BLS ICS + BEA release_dates.json, normalizes through the shared
- * Catalyst pipeline, and atomically writes data/catalyst/calendar-latest.json
- * (gitignored). No actual/forecast/surprise. Disabled under public demo.
+ * Pulls BLS ICS + BEA release_dates.json + Federal Reserve FOMC HTML,
+ * normalizes through the shared Catalyst pipeline, and atomically writes
+ * data/catalyst/calendar-latest.json (gitignored). Schedule times only —
+ * no actual/forecast/surprise/decision text. Disabled under public demo.
  */
 
 import {

@@ -489,18 +489,21 @@ Catalyst confidence is **classification clarity only**, always `calibrated: fals
 | `status` | `upcoming` \| `released` \| `developing` \| `resolved` |
 | `importance` | `low` \| `medium` \| `high` \| `critical` — ranked in compute, not in the UI |
 | `direction` | `risk-on` \| `risk-off` \| `inflationary` \| `disinflationary` \| `growth-positive` \| `growth-negative` \| `mixed` \| `unclear` |
-| `synthetic` | `true` for demo fixtures; `false` for official BLS/BEA **schedule** rows (scheduled release time only — not an observed print). Never present schedule rows as confirmed data releases. |
+| `synthetic` | `true` for demo fixtures; `false` for official BLS/BEA/FOMC **schedule** rows (scheduled release time only — not an observed print or decision). Never present schedule rows as confirmed data releases. |
 
 Normalization is deterministic (`src/catalyst/normalize.ts`). The UI and `/api/catalysts` only read the feed — they do not reclassify.
 
-### Official calendar ingestion (M2-2A)
+### Official calendar ingestion (M2-2A / M2-2B)
 
 | Source | Format | URL |
 | --- | --- | --- |
 | BLS News Release Schedule | ICS | `https://www.bls.gov/schedule/news_release/bls.ics` |
 | BEA release dates | JSON | `https://apps.bea.gov/API/signup/release_dates.json` |
+| Federal Reserve FOMC Calendars | HTML | `https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm` |
 
-Local workflow: `npm run catalyst:fetch` → atomic write of gitignored `data/catalyst/calendar-latest.json`. Public demo (`GAMMADESK_PUBLIC_DEMO=1`) never calls BLS/BEA and never reads that cache — synthetic fixtures only. Calendar rows keep `status: upcoming` and `direction: unclear`; the system does **not** ingest actual/forecast/surprise.
+Local workflow: `npm run catalyst:fetch` → atomic write of gitignored `data/catalyst/calendar-latest.json`. Public demo (`GAMMADESK_PUBLIC_DEMO=1`) never calls BLS/BEA/Federal Reserve and never reads that cache — synthetic fixtures only. Calendar rows keep `status: upcoming` and `direction: unclear`; the system does **not** ingest actual/forecast/surprise, FOMC statement text, SEP figures, or minutes (unless a later milestone has an explicit official timestamp).
+
+FOMC mapping (schedule only): meeting end date → policy decision at 2:00 p.m. America/New_York (`importance: critical`) and Chair press conference at 2:30 p.m. (`importance: high`). SEP meetings (`*` on the Fed calendar) annotate the policy-decision headline/summary; they are not a separate same-instant catalyst. Evidence basis: `official_fomc_schedule`.
 
 ---
 

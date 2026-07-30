@@ -41,5 +41,8 @@ export function zonedLocalToUtc(
   return new Date(utcMs);
 }
 
-/** BLS schedule times are Eastern wall-clock when floating (no Z / offset). */
-export const BLS_SCHEDULE_TIMEZONE = "America/New_York";
+/** US official release / FOMC schedule wall-clock zone. */
+export const AMERICA_NEW_YORK = "America/New_York";
+
+/** @deprecated Prefer AMERICA_NEW_YORK — BLS floating ICS times use Eastern. */
+export const BLS_SCHEDULE_TIMEZONE = AMERICA_NEW_YORK;

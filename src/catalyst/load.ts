@@ -19,7 +19,7 @@ export const CATALYST_OFFICIAL_BANNER =
   "Official US macro calendar · scheduled release times only";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS and BEA schedule sources list planned release times. A row does not mean the print has been released or observed by GammaDesk — no actual/forecast/surprise is ingested here.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. A row does not mean the print or FOMC decision has been released or observed by GammaDesk — no actual/forecast/surprise or policy text is ingested here.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";

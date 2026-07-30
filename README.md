@@ -4,7 +4,7 @@ AI Market Structure Copilot.
 
 Reasoning chain: **Driver → Catalyst → Structure → Confirmation → Updated View**
 
-Milestone 1 ships a **read-only Macro Desk**: cross-asset regime, evidence, and an interpreted `DominantDriver`. Milestone 2 adds a **Catalyst feed** — synthetic fixtures in public demo; locally, an official US macro **release schedule** from BLS + BEA (scheduled times only). The UI never classifies markets or recomputes confidence — it only renders precomputed payloads.
+Milestone 1 ships a **read-only Macro Desk**: cross-asset regime, evidence, and an interpreted `DominantDriver`. Milestone 2 adds a **Catalyst feed** — synthetic fixtures in public demo; locally, an official US macro **release schedule** from BLS + BEA + Federal Reserve FOMC (scheduled times only). The UI never classifies markets or recomputes confidence — it only renders precomputed payloads.
 
 **Public portfolio demo:** synthetic macro + catalyst fixtures — illustrative, not live or historical market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
 
@@ -31,7 +31,7 @@ npm run daily
   └─ interpret→ data/drivers/<session>.json     (atomic write)
 
 npm run catalyst:fetch       (local only — not public demo)
-  └─ BLS ICS + BEA JSON schedules
+  └─ BLS ICS + BEA JSON + Fed FOMC HTML schedules
         → normalize/dedupe
         → data/catalyst/calendar-latest.json   (atomic, gitignored)
         │
@@ -78,7 +78,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run daily` | Full refresh (`--force` replaces today’s snapshot) |
 | `npm run ingest` | Pull + compute snapshot only |
 | `npm run interpret` | Snapshot → atomic driver write |
-| `npm run catalyst:fetch` | Pull BLS/BEA **schedules** → `data/catalyst/calendar-latest.json` |
+| `npm run catalyst:fetch` | Pull BLS/BEA/FOMC **schedules** → `data/catalyst/calendar-latest.json` |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -91,14 +91,16 @@ Sources (schedule only — not observed prints):
 | --- | --- |
 | BLS | `https://www.bls.gov/schedule/news_release/bls.ics` |
 | BEA | `https://apps.bea.gov/API/signup/release_dates.json` |
+| Federal Reserve | `https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm` |
 
-- Explicit registry maps CPI, Employment Situation, PPI, JOLTS, ECI, GDP, Personal Income and Outlays (incl. PCE via `macroChannels`), International Trade.
+- Explicit registry maps CPI, Employment Situation, PPI, JOLTS, ECI, GDP, Personal Income and Outlays (incl. PCE via `macroChannels`), International Trade, **FOMC policy decision** + **Chair press conference**.
+- FOMC: meeting end date → decision 2:00 p.m. ET / press 2:30 p.m. ET (`America/New_York`); SEP `*` annotates the decision only (not a separate catalyst). No statement/minutes/dot-plot content.
 - Default window: **now − 1 day … now + 45 days** (`now` injectable in tests).
 - Rows stay `status: upcoming`, `direction: unclear`. No actual/forecast/surprise.
 - Missing / stale / partial-failure cache states are **explicit** — local mode does not silently fall back to synthetic.
-- Public demo never calls BLS/BEA and never reads `data/catalyst/`.
+- Public demo never calls BLS/BEA/Federal Reserve and never reads `data/catalyst/`.
 
-BLS may block some automated clients; if fetch fails, BEA-only partial success still writes a usable cache with `partialFailure: true`.
+If any provider fails, successful sources still write a usable cache with `partialFailure: true`. All three failing leaves the prior cache untouched.
 
 ### Desk URLs (local)
 
@@ -153,7 +155,7 @@ This milestone does **not** wire cloud Tiingo. Creating the external host is lef
 1. **ingest** — network pull, write `data/bars/`, write immutable `data/snapshots/<session>.json` (compute).
 2. **interpret** — read snapshot only; build `DominantDriver`; **atomic** write to `data/drivers/<session>.json` (temp + rename).
 3. **status** — `data/pipeline/status.json` records ok/error.
-4. **catalyst:fetch** (optional) — BLS + BEA schedules; atomic write `data/catalyst/calendar-latest.json`. Partial provider failure still writes when at least one source succeeds; both failing leaves the prior file untouched.
+4. **catalyst:fetch** (optional) — BLS + BEA + FOMC schedules; atomic write `data/catalyst/calendar-latest.json`. Partial provider failure still writes when at least one source succeeds; all failing leaves the prior file untouched.
 
 On failure:
 
@@ -191,4 +193,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-2A** (official schedule calendar, local fetch). Cloud Tiingo / live news / actuals on the public host remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-2B** (BLS/BEA/FOMC schedule calendar, local fetch). Cloud Tiingo / live news / actuals / decision parsing on the public host remain out of scope. Market Temperature stays in the backlog.

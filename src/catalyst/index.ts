@@ -18,3 +18,11 @@ export {
   BEA_RELEASE_DATES_URL,
   BEA_SOURCE_NAME,
 } from "./providers/bea";
+export {
+  fetchFomcCalendar,
+  parseFomcCalendarHtml,
+  resolveFomcMeetingDates,
+  easternCalendarYear,
+  FOMC_CALENDAR_URL,
+  FOMC_SOURCE_NAME,
+} from "./providers/fomc";

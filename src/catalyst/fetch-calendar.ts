@@ -4,7 +4,8 @@ import { isPublicDemoMode } from "@/desk/public-demo";
 import { normalizeAndDedupe } from "./dedupe";
 import { fetchBeaCalendar } from "./providers/bea";
 import { fetchBlsCalendar } from "./providers/bls";
-import type { FetchLike } from "./providers/types";
+import { fetchFomcCalendar } from "./providers/fomc";
+import type { FetchLike, ProviderParseResult } from "./providers/types";
 import { buildTimeWindow, isInTimeWindow } from "./window";
 import type { CatalystCalendarCache, CatalystFeedSourceStatus } from "./types";
 
@@ -30,9 +31,20 @@ export interface FetchOfficialCalendarResult {
   readonly path: string | null;
 }
 
+function toSourceStatus(result: ProviderParseResult): CatalystFeedSourceStatus {
+  return {
+    id: result.source.id,
+    name: result.source.name,
+    url: result.source.url,
+    status: result.source.status,
+    error: result.source.error,
+    mappedEventCount: result.source.mappedEventCount,
+  };
+}
+
 /**
- * Fetch BLS + BEA schedules, normalize through the shared pipeline, optionally
- * atomically write `data/catalyst/calendar-latest.json`.
+ * Fetch BLS + BEA + Federal Reserve schedules, normalize through the shared
+ * pipeline, optionally atomically write `data/catalyst/calendar-latest.json`.
  *
  * Never runs under public-demo mode.
  */
@@ -43,13 +55,13 @@ export async function fetchOfficialCalendar(
   if (publicDemo) {
     throw new Error(
       "Official calendar fetch is disabled in public demo (GAMMADESK_PUBLIC_DEMO). " +
-        "Public demo serves synthetic fixtures only and must not call BLS/BEA.",
+        "Public demo serves synthetic fixtures only and must not call BLS/BEA/Federal Reserve.",
     );
   }
 
   const now = options.now ?? new Date();
   const window = buildTimeWindow(now);
-  const [bls, bea] = await Promise.all([
+  const providerResults = await Promise.all([
     fetchBlsCalendar({
       fetchImpl: options.fetchImpl,
       timeoutMs: options.timeoutMs,
@@ -58,36 +70,25 @@ export async function fetchOfficialCalendar(
       fetchImpl: options.fetchImpl,
       timeoutMs: options.timeoutMs,
     }),
+    fetchFomcCalendar({
+      fetchImpl: options.fetchImpl,
+      timeoutMs: options.timeoutMs,
+      now,
+    }),
   ]);
 
-  const combinedRaw = [...bls.rawEvents, ...bea.rawEvents].filter((raw) => {
-    if (!raw.occurredAt) return false;
-    return isInTimeWindow(raw.occurredAt, window);
-  });
+  const combinedRaw = providerResults
+    .flatMap((r) => r.rawEvents)
+    .filter((raw) => {
+      if (!raw.occurredAt) return false;
+      return isInTimeWindow(raw.occurredAt, window);
+    });
 
   const { catalysts, validationErrors } = normalizeAndDedupe(combinedRaw);
 
-  const sources: CatalystFeedSourceStatus[] = [
-    {
-      id: bls.source.id,
-      name: bls.source.name,
-      url: bls.source.url,
-      status: bls.source.status,
-      error: bls.source.error,
-      mappedEventCount: bls.source.mappedEventCount,
-    },
-    {
-      id: bea.source.id,
-      name: bea.source.name,
-      url: bea.source.url,
-      status: bea.source.status,
-      error: bea.source.error,
-      mappedEventCount: bea.source.mappedEventCount,
-    },
-  ];
-
+  const sources = providerResults.map(toSourceStatus);
   const partialFailure = sources.some((s) => s.status === "error");
-  const bothFailed = sources.every((s) => s.status === "error");
+  const allFailed = sources.every((s) => s.status === "error");
 
   const cache: CatalystCalendarCache = {
     kind: "CatalystCalendarCache",
@@ -104,8 +105,8 @@ export async function fetchOfficialCalendar(
     partialFailure,
   };
 
-  // Do not overwrite a prior good cache when both providers fail with zero rows.
-  const shouldWrite = options.write !== false && !bothFailed;
+  // Do not overwrite a prior good cache when every provider fails.
+  const shouldWrite = options.write !== false && !allFailed;
   let path: string | null = null;
   if (shouldWrite) {
     path = calendarLatestPath(options.dataRoot ?? DEFAULT_CATALYST_DATA_ROOT);

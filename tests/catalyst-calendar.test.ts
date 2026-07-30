@@ -56,6 +56,20 @@ function mockResponse(
   });
 }
 
+/** Route mocked fetch to the three official calendar providers. */
+function mockOfficialProviders(url: string): Response {
+  if (url.includes("bls.gov")) {
+    return mockResponse(readFixture("bls-sample.ics"), "text/calendar");
+  }
+  if (url.includes("bea.gov")) {
+    return mockResponse(readFixture("bea-sample.json"), "application/json");
+  }
+  if (url.includes("federalreserve.gov")) {
+    return mockResponse(readFixture("fomc-sample.html"), "text/html");
+  }
+  return mockResponse("unexpected url", "text/plain", 404);
+}
+
 describe("ICS unfold / unescape / DTSTART", () => {
   it("unfolds continuation lines and unescapes text", () => {
     const folded = [
@@ -263,13 +277,11 @@ describe("provider fetch adapters (mocked network)", () => {
             403,
           );
         }
-        return mockResponse(
-          readFixture("bea-sample.json"),
-          "application/json",
-        );
+        return mockOfficialProviders(url);
       },
     });
 
+    expect(result.cache.sources).toHaveLength(3);
     expect(result.cache.partialFailure).toBe(true);
     expect(
       result.cache.sources.find((s) => s.id === "bls")?.status,
@@ -277,12 +289,15 @@ describe("provider fetch adapters (mocked network)", () => {
     expect(
       result.cache.sources.find((s) => s.id === "bea")?.status,
     ).toBe("ok");
+    expect(
+      result.cache.sources.find((s) => s.id === "federal_reserve")?.status,
+    ).toBe("ok");
     expect(result.cache.catalysts.length).toBeGreaterThan(0);
     expect(result.path).toBe(calendarLatestPath(root));
     expect(existsSync(result.path!)).toBe(true);
   });
 
-  it("writes atomically and skips write when both providers fail", async () => {
+  it("writes atomically and skips write when all providers fail", async () => {
     const root = tempDataRoot();
     const path = calendarLatestPath(root);
     mkdirSync(join(root, "catalyst"), { recursive: true });
@@ -300,6 +315,7 @@ describe("provider fetch adapters (mocked network)", () => {
     });
 
     expect(result.path).toBeNull();
+    expect(result.cache.sources).toHaveLength(3);
     expect(result.cache.catalysts).toHaveLength(0);
     expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ keep: true });
   });
@@ -311,7 +327,7 @@ describe("provider fetch adapters (mocked network)", () => {
         publicDemo: true,
         fetchImpl,
       }),
-    ).rejects.toThrow(/public demo/i);
+    ).rejects.toThrow(/public demo|Federal Reserve/i);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
@@ -338,15 +354,7 @@ describe("local cache load + feed modes", () => {
       dataRoot: root,
       write: true,
       publicDemo: false,
-      fetchImpl: async (url) => {
-        if (url.includes("bls")) {
-          return mockResponse(readFixture("bls-sample.ics"), "text/calendar");
-        }
-        return mockResponse(
-          readFixture("bea-sample.json"),
-          "application/json",
-        );
-      },
+      fetchImpl: async (url) => mockOfficialProviders(url),
     });
 
     const fresh = loadCatalystFeed(
@@ -392,15 +400,7 @@ describe("local cache load + feed modes", () => {
       dataRoot: root,
       write: true,
       publicDemo: false,
-      fetchImpl: async (url) => {
-        if (url.includes("bls")) {
-          return mockResponse(readFixture("bls-sample.ics"), "text/calendar");
-        }
-        return mockResponse(
-          readFixture("bea-sample.json"),
-          "application/json",
-        );
-      },
+      fetchImpl: async (url) => mockOfficialProviders(url),
     });
 
     const feed = loadCatalystFeed(
@@ -421,15 +421,7 @@ describe("local cache load + feed modes", () => {
       dataRoot: root,
       write: true,
       publicDemo: false,
-      fetchImpl: async (url) => {
-        if (url.includes("bls")) {
-          return mockResponse(readFixture("bls-sample.ics"), "text/calendar");
-        }
-        return mockResponse(
-          readFixture("bea-sample.json"),
-          "application/json",
-        );
-      },
+      fetchImpl: async (url) => mockOfficialProviders(url),
     });
 
     // PPI on 2026-03-12 is outside Aug window
@@ -444,5 +436,16 @@ describe("local cache load + feed modes", () => {
         c.headline.includes("CPI") && c.occurredAt.startsWith("2026-08-12"),
       ),
     ).toBe(true);
+    // FOMC Aug 12 inside window; Jan 2026 outside
+    expect(
+      result.cache.catalysts.some((c) =>
+        c.dedupeKey.includes("2026-08-12"),
+      ),
+    ).toBe(true);
+    expect(
+      result.cache.catalysts.some((c) =>
+        c.dedupeKey.includes("2026-01-28"),
+      ),
+    ).toBe(false);
   });
 });

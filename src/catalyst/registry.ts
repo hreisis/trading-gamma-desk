@@ -4,7 +4,7 @@ import type {
   CatalystMacroChannel,
 } from "@/contracts";
 
-export type OfficialCalendarSourceId = "bls" | "bea";
+export type OfficialCalendarSourceId = "bls" | "bea" | "federal_reserve";
 
 /**
  * Explicit, reviewable mapping from official calendar titles to Catalyst taxonomy.
@@ -13,7 +13,7 @@ export type OfficialCalendarSourceId = "bls" | "bea";
 export interface OfficialEventMapping {
   readonly id: string;
   readonly source: OfficialCalendarSourceId;
-  /** Exact title after ICS unescape / BEA object key (case-insensitive trim). */
+  /** Exact title after ICS unescape / BEA object key / FOMC event type. */
   readonly titleExact: string;
   readonly category: CatalystCategory;
   readonly importance: CatalystImportance;
@@ -22,6 +22,22 @@ export interface OfficialEventMapping {
   readonly headline: string;
   readonly summary: string;
 }
+
+/** Shared FOMC asset / channel coverage (rates, USD, equities, gold, macro channels). */
+const FOMC_AFFECTED_ASSETS = [
+  "US2Y",
+  "US10Y",
+  "USD",
+  "SPX",
+  "GOLD",
+] as const;
+
+const FOMC_MACRO_CHANNELS: readonly CatalystMacroChannel[] = [
+  "fed_rates",
+  "liquidity",
+  "growth",
+  "inflation",
+];
 
 export const OFFICIAL_EVENT_REGISTRY: readonly OfficialEventMapping[] = [
   {
@@ -121,6 +137,30 @@ export const OFFICIAL_EVENT_REGISTRY: readonly OfficialEventMapping[] = [
     summary:
       "BEA U.S. International Trade in Goods and Services schedule entry. Scheduled time only — not an observed print.",
   },
+  {
+    id: "fomc_policy_decision",
+    source: "federal_reserve",
+    titleExact: "FOMC policy decision",
+    category: "monetary-policy",
+    importance: "critical",
+    affectedAssets: [...FOMC_AFFECTED_ASSETS],
+    macroChannels: [...FOMC_MACRO_CHANNELS],
+    headline: "FOMC policy decision (scheduled)",
+    summary:
+      "Federal Reserve FOMC policy decision schedule entry. Scheduled release time only — not an observed decision, SEP content, or market direction.",
+  },
+  {
+    id: "fomc_press_conference",
+    source: "federal_reserve",
+    titleExact: "Federal Reserve Chair press conference",
+    category: "monetary-policy",
+    importance: "high",
+    affectedAssets: [...FOMC_AFFECTED_ASSETS],
+    macroChannels: [...FOMC_MACRO_CHANNELS],
+    headline: "Federal Reserve Chair press conference (scheduled)",
+    summary:
+      "Federal Reserve Chair press conference schedule entry (typically 2:30 p.m. Eastern). Scheduled time only — not transcript content or market direction.",
+  },
 ];
 
 function normalizeTitle(title: string): string {
@@ -144,4 +184,15 @@ export function matchOfficialEvent(
     );
   }
   return null;
+}
+
+export function requireOfficialEvent(
+  source: OfficialCalendarSourceId,
+  title: string,
+): OfficialEventMapping {
+  const mapped = matchOfficialEvent(source, title);
+  if (!mapped) {
+    throw new Error(`No official registry mapping for ${source}: ${title}`);
+  }
+  return mapped;
 }
