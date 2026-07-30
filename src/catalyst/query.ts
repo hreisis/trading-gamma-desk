@@ -1,10 +1,14 @@
 import type { Catalyst } from "@/contracts";
+import { instantMs } from "./time";
 import type { CatalystQuery } from "./types";
 
 export function filterCatalysts(
   catalysts: readonly Catalyst[],
   query: CatalystQuery = {},
 ): Catalyst[] {
+  const startMs = query.start ? instantMs(query.start) : null;
+  const endMs = query.end ? instantMs(query.end) : null;
+
   return catalysts.filter((c) => {
     if (query.category && c.category !== query.category) return false;
     if (query.status && c.status !== query.status) return false;
@@ -16,8 +20,11 @@ export function filterCatalysts(
       );
       if (!hit) return false;
     }
-    if (query.start && c.occurredAt < query.start) return false;
-    if (query.end && c.occurredAt > query.end) return false;
+    const occurredMs = instantMs(c.occurredAt);
+    if (occurredMs === null) return false;
+    // Inclusive bounds on true instants (mixed offsets OK).
+    if (startMs !== null && occurredMs < startMs) return false;
+    if (endMs !== null && occurredMs > endMs) return false;
     return true;
   });
 }

@@ -11,6 +11,8 @@ import {
   compareCatalystImportance,
   type Catalyst as CatalystType,
 } from "@/contracts";
+import { externalIdentityKey, normalizeExternalIdentity } from "./identity";
+import { compareInstant, toUtcIsoZ, utcDay } from "./time";
 import type { CatalystRawEvent, NormalizeResult } from "./types";
 
 const CONFIDENCE_NOTE =
@@ -121,21 +123,9 @@ function normalizeToken(s: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** Normalize to ISO-8601 with explicit offset or Z. */
+/** @deprecated Prefer `toUtcIsoZ` — kept as alias for call sites/tests. */
 export function normalizeDateTime(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  // Already contract-shaped.
-  if (
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(
-      trimmed,
-    )
-  ) {
-    return trimmed;
-  }
-  const ms = Date.parse(trimmed);
-  if (!Number.isFinite(ms)) return null;
-  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+  return toUtcIsoZ(raw);
 }
 
 export function mapCategory(raw: string | undefined): CatalystCategory | null {
@@ -186,7 +176,8 @@ export function mapChannels(
 }
 
 /**
- * Deterministic importance: max(floor(category), raw hint, keyword bump).
+ * Deterministic importance: max(floor(category), raw hint, severe keyword bump).
+ * Ordinary "surprise" does not auto-promote to critical.
  * Never computed in the UI.
  */
 export function rankImportance(options: {
@@ -203,8 +194,9 @@ export function rankImportance(options: {
     if (compareCatalystImportance(raw, best) > 0) best = raw;
   }
   const text = normalizeToken(options.headline);
+  // Severe crisis language only — not routine "surprise" prints (e.g. CPI).
   if (
-    /\b(emergency|war|attack|halt|crisis|surprise)\b/.test(text) &&
+    /\b(emergency|war|attack|halt|crisis)\b/.test(text) &&
     compareCatalystImportance("critical", best) > 0
   ) {
     best = "critical";
@@ -228,10 +220,9 @@ export function buildDedupeKey(options: {
   readonly occurredAt: string;
   readonly headline: string;
 }): string {
-  if (options.externalId && options.externalId.trim()) {
-    return `ext:${normalizeToken(options.externalId).replace(/\s+/g, "-")}`;
-  }
-  const day = options.occurredAt.slice(0, 10);
+  const ext = externalIdentityKey(options.externalId);
+  if (ext) return ext;
+  const day = utcDay(options.occurredAt) ?? options.occurredAt.slice(0, 10);
   const head = normalizeToken(options.headline).slice(0, 80).replace(/\s+/g, "-");
   const src = normalizeToken(options.sourceName).replace(/\s+/g, "-");
   return `${src}|${options.category}|${day}|${head}`;
@@ -284,11 +275,9 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
       raw,
     };
   }
-  const occurredAt = raw.occurredAt
-    ? normalizeDateTime(raw.occurredAt)
-    : null;
+  const occurredAt = raw.occurredAt ? toUtcIsoZ(raw.occurredAt) : null;
   const observedAt = raw.observedAt
-    ? normalizeDateTime(raw.observedAt)
+    ? toUtcIsoZ(raw.observedAt)
     : occurredAt;
   if (!occurredAt) {
     return {
@@ -328,8 +317,11 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
     (a) => a.trim().length > 0,
   );
   const macroChannels = mapChannels(category, raw.macroChannels);
+  const identity =
+    normalizeExternalIdentity(raw.externalId) ??
+    normalizeExternalIdentity(raw.supersedesExternalId);
   const dedupeKey = buildDedupeKey({
-    externalId: raw.externalId ?? raw.supersedesExternalId,
+    externalId: identity ?? undefined,
     sourceName: raw.sourceName,
     category,
     occurredAt,
@@ -388,14 +380,13 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
   return { ok: true, catalyst: parsed.data };
 }
 
-/** Prefer newer observation; on tie, prefer higher importance then id. */
+/** Prefer newer observation (by instant); on tie, higher importance then id. */
 export function preferCatalyst(
   a: CatalystType,
   b: CatalystType,
 ): CatalystType {
-  if (a.observedAt !== b.observedAt) {
-    return a.observedAt > b.observedAt ? a : b;
-  }
+  const observed = compareInstant(a.observedAt, b.observedAt);
+  if (observed !== 0) return observed > 0 ? a : b;
   const imp = compareCatalystImportance(a.importance, b.importance);
   if (imp !== 0) return imp > 0 ? a : b;
   return a.id >= b.id ? a : b;

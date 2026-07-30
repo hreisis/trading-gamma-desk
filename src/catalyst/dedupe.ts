@@ -1,5 +1,7 @@
 import type { Catalyst } from "@/contracts";
+import { externalIdentityKey } from "./identity";
 import { normalizeCatalystEvent, preferCatalyst } from "./normalize";
+import { compareInstant } from "./time";
 import type { CatalystRawEvent, NormalizeErr } from "./types";
 
 export interface DedupeResult {
@@ -14,7 +16,7 @@ export interface DedupeResult {
 
 /**
  * Normalize a batch, fold duplicates by dedupeKey (and supersedesExternalId),
- * keep the preferred update. Order: newest observedAt first, then importance.
+ * keep the preferred update. Order: newest occurredAt first (by instant).
  */
 export function normalizeAndDedupe(
   rawEvents: readonly CatalystRawEvent[],
@@ -35,10 +37,7 @@ export function normalizeAndDedupe(
       return;
     }
     const { catalyst } = result;
-    // Allow supersession via shared external identity key.
-    const altKey =
-      raw.supersedesExternalId &&
-      `ext:${raw.supersedesExternalId.trim().toLowerCase()}`;
+    const altKey = externalIdentityKey(raw.supersedesExternalId);
     const existing =
       byKey.get(catalyst.dedupeKey) ??
       (altKey ? byKey.get(altKey) : undefined);
@@ -50,19 +49,18 @@ export function normalizeAndDedupe(
       return;
     }
     byKey.set(catalyst.dedupeKey, catalyst);
+    if (altKey) byKey.set(altKey, catalyst);
   });
 
-  // Collapse alt keys that point at the same id.
   const unique = new Map<string, Catalyst>();
   for (const c of byKey.values()) {
     unique.set(c.id, c);
   }
 
   const catalysts = [...unique.values()].sort((a, b) => {
-    if (a.occurredAt !== b.occurredAt) {
-      return a.occurredAt < b.occurredAt ? 1 : -1;
-    }
-    return a.id < b.id ? -1 : 1;
+    const byOccurred = compareInstant(b.occurredAt, a.occurredAt);
+    if (byOccurred !== 0) return byOccurred;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 
   return { catalysts, validationErrors, droppedDuplicates };
