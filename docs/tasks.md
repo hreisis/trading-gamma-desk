@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** Next: **M1-9 Macro desk UI** (read-only over snapshot + interpretation; show `confidence.score` as uncalibrated; no band labels).
+**Milestone 1 — Cross-Asset Macro.** M1-9 Macro desk UI ✅ (read-only driver; live vs fixture labeled; uncalibrated confidence; no band labels). Do not start Milestone 2 until asked.
 
 ### M1-6b calibration status (split)
 
@@ -65,7 +65,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-6b | Calibrate `confidenceParams` | **Reporting infra ✅** (`npm run calibrate`, `fixtures/macro/calibration/report-2026-07-29.json`). **Outcome-linked fit ⏳** — params unchanged, `calibrated: false` until multi-quarter review |
 | M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; year-boundary merge for Treasury; response validation rules enforced; immutable snapshot with versions — ✅ `src/ingest/*`, `npm run ingest`, offline parser tests; live bars in gitignored `data/`; public freeze keeps only Treasury/CBOE + summary (no Tiingo EOD redistribution) |
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template — ✅ `interpretSnapshot` reads compute snapshot only, copies confidence verbatim, template generator + equity-claim/band-label/number guardrails; no LLM on this path |
-| M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
+| M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` — ✅ `loadMacroDesk` + `/api/macro/latest` + desk page (local driver or fixture; no classify in UI) |
 
 **Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists.
 
