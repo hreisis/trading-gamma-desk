@@ -149,7 +149,7 @@ npm run catalyst:update -- --dry-run
 npm run catalyst:update -- --max-events 2
 ```
 
-- **Stages:** `official_facts` → `openai_official_brief` (briefs branch); `market_context_4a` → `reaction_4b` → `openai_reaction_4c` (market branch). Branches are independent — Alpaca failure does not block official AI briefs.
+- **Stages:** `official_facts` → `openai_official_brief`; `official_facts` + `market_context_4a` → `reaction_4b` → `openai_reaction_4c`. Official AI briefs stay independent of Alpaca; 4B/4C require both official facts identity and market context.
 - **Incremental:** reuses each stage’s identity skip (input / rules / prompt / model / dependency versions). `--force` rebuilds.
 - **Safety:** single-instance lock (`update.lock.json`, stale recovery); atomic manifest `data/catalyst/update-latest.json`; provider-wide AI failure preserves prior AI caches; no synthetic fill of live 4A.
 - **Dry-run:** zero provider calls, zero business cache writes — plan + eligibility only.

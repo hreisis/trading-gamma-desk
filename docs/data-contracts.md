@@ -589,7 +589,7 @@ Independent canonical contract `EventMarketReaction` (built offline into `data/c
 
 | Field | Notes |
 | --- | --- |
-| `marketContextId` / `marketContextIdentity` / `reactionRulesVersion` | Cache identity — excludes `generatedAt` |
+| `marketContextId` / `marketContextIdentity` / `officialFactsIdentity` / `reactionRulesVersion` | Cache identity — excludes `generatedAt`. `officialFactsIdentity` covers catalyst event + linked document/brief identity |
 | `status` | `complete` \| `partial` \| `insufficient` |
 | `windows[]` | Per-window instrument directions, equity breadth/leadership, cross-asset signature, coverage |
 | `development` | Path classifications `extended` / `held` / `faded` / `reversed` / `mixed` / `unavailable` |
@@ -597,7 +597,7 @@ Independent canonical contract `EventMarketReaction` (built offline into `data/c
 
 **Rules:** atomic directions use versioned **display deadbands** by proxy class × window (not statistical significance). Equity breadth uses SPY/QQQ/IWM only with an explicit majority rule (a lone QQQ up is never “broadly higher”). Leadership uses QQQ−SPY / IWM−SPY spreads vs an explicit threshold. Cross-asset signatures stay ETF/proxy language (never DXY / yields / risk-on). Development compares cumulative % vs the same baseline; invalid chronology → `unavailable` (no next-day fabrication).
 
-Local: `npm run catalyst:market-reactions:build` (reads `market-context-latest.json` only; offline). Public demo derives reactions from synthetic market-context fixtures via the same rules engine.
+Local: `npm run catalyst:market-reactions:build` (reads market-context + official briefs/calendar for input identity; offline; classification remains 4A-rule-based). Public demo derives reactions from synthetic market-context fixtures via the same rules engine.
 
 ### AI market-reaction narratives (M2-4C)
 
@@ -637,7 +637,7 @@ Sanitized run report `CatalystIntegrationSmokeReport` written to gitignored `dat
 | Field | Notes |
 | --- | --- |
 | `mode` | `dry-run` (plan only) or `live` |
-| `stages[]` | `official_facts` → `openai_official_brief`; `market_context_4a` → `reaction_4b` → `openai_reaction_4c` |
+| `stages[]` | `official_facts` → `openai_official_brief`; `official_facts` + `market_context_4a` → `reaction_4b` → `openai_reaction_4c` |
 | counts | `attemptedCount` / `updatedCount` / `skippedCount` / `failedCount` |
 | `errorCodes` | Safe categories incl. `insufficient_quota`, `awaiting_valid_credentials`, `awaiting_live_smoke` |
 

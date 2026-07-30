@@ -272,6 +272,8 @@ describe("full classification", () => {
     expect(reaction.status).toBe("complete");
     expect(reaction.reactionRulesVersion).toBe(REACTION_RULES_VERSION);
     expect(reaction.marketContextIdentity).toBe(marketContextIdentity(ctx));
+    expect(reaction.officialFactsIdentity.length).toBeGreaterThan(0);
+    expect(reaction.officialFactsIdentity).toContain(ctx.catalystId);
     const w30 = reaction.windows.find((w) => w.window === "30m")!;
     expect(w30.equityBreadth).toBe("broadly_higher");
     expect(w30.crossAssetSignature.longTreasuryEtf).toBe("down");
@@ -415,6 +417,88 @@ describe("build cache", () => {
       "2026-07-29T22:00:00.000Z",
     );
     expect(existsFile(first.path!)).toBe(true);
+  });
+
+  it("rebuilds when officialFactsIdentity changes", () => {
+    const root = tempRoot();
+    const ctx = baseCtx({
+      symbols: [
+        sym("SPY", {
+          plus5m: 0.2,
+          plus30m: 0.25,
+          plus2h: 0.3,
+          sessionClose: 0.2,
+        }),
+        sym("QQQ", {
+          plus5m: 0.22,
+          plus30m: 0.28,
+          plus2h: 0.32,
+          sessionClose: 0.22,
+        }),
+        sym("IWM", {
+          plus5m: 0.18,
+          plus30m: 0.2,
+          plus2h: 0.24,
+          sessionClose: 0.18,
+        }),
+        sym("TLT", {
+          plus5m: -0.1,
+          plus30m: -0.12,
+          plus2h: -0.14,
+          sessionClose: -0.1,
+        }),
+        sym("UUP", {
+          plus5m: 0.05,
+          plus30m: 0.06,
+          plus2h: 0.07,
+          sessionClose: 0.05,
+        }),
+        sym("GLD", {
+          plus5m: 0.01,
+          plus30m: 0.02,
+          plus2h: 0.02,
+          sessionClose: 0.01,
+        }),
+      ],
+    });
+    writeJsonAtomic(marketContextLatestPath(root), {
+      kind: "CatalystMarketContextCache",
+      schemaVersion: "0.1.0",
+      fetchedAt: "2026-07-29T20:00:00.000Z",
+      provider: "fake",
+      feed: "sip",
+      calculationVersion: ctx.calculationVersion,
+      buildStatus: "ok",
+      inputRefs: [],
+      snapshots: [ctx],
+      revisions: [],
+      errors: [],
+      warnings: [],
+    });
+
+    const first = buildMarketReactions({
+      dataRoot: root,
+      marketContextDataRoot: root,
+      write: true,
+      now: new Date("2026-07-29T20:00:00.000Z"),
+      officialFactsIdentityByCatalystId: new Map([
+        [ctx.catalystId, "facts-v1"],
+      ]),
+    });
+    const second = buildMarketReactions({
+      dataRoot: root,
+      marketContextDataRoot: root,
+      write: true,
+      now: new Date("2026-07-29T21:00:00.000Z"),
+      officialFactsIdentityByCatalystId: new Map([
+        [ctx.catalystId, "facts-v2"],
+      ]),
+    });
+    expect(second.cache.reactions[0]?.id).not.toBe(first.cache.reactions[0]?.id);
+    expect(second.cache.reactions[0]?.officialFactsIdentity).toBe("facts-v2");
+    expect(second.cache.revisions.some((r) =>
+      r.reason.includes("official facts identity"),
+    )).toBe(true);
   });
 
   it("fails clearly when market-context cache missing", () => {

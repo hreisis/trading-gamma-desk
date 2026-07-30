@@ -49,6 +49,7 @@ export function marketReactionIdentity(reaction: EventMarketReaction): string {
     reaction.catalystId,
     reaction.marketContextId,
     reaction.marketContextIdentity,
+    reaction.officialFactsIdentity,
     reaction.reactionRulesVersion,
     reaction.status,
   ].join("|");

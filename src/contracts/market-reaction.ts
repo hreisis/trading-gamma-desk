@@ -132,6 +132,11 @@ export const EventMarketReaction = z.object({
   marketContextId: z.string().min(1),
   /** Stable identity string used for cache reuse (excludes generatedAt). */
   marketContextIdentity: z.string().min(1),
+  /**
+   * Official event + linked facts identity (catalyst / documents / briefs).
+   * Part of 4B input identity — excludes generatedAt.
+   */
+  officialFactsIdentity: z.string().min(1),
   reactionRulesVersion: z.string().min(1),
   eventTimestamp: IsoDateTime,
   provider: z.string().min(1),

@@ -73,8 +73,8 @@ const STAGE_DEPS: Record<CatalystUpdateStageId, CatalystUpdateStageId[]> = {
   official_facts: [],
   openai_official_brief: ["official_facts"],
   market_context_4a: [],
-  reaction_4b: ["market_context_4a"],
-  openai_reaction_4c: ["market_context_4a", "reaction_4b"],
+  reaction_4b: ["official_facts", "market_context_4a"],
+  openai_reaction_4c: ["reaction_4b"],
 };
 
 export interface CatalystUpdateOptions {
@@ -790,15 +790,8 @@ export async function runCatalystUpdate(
   let mrxnOk = false;
   {
     const t0 = new Date().toISOString();
-    const mctxStage = stages.find((s) => s.stage === "market_context_4a");
     const mctxUsable = mctxAfter.ok || mctx.ok;
-    if (
-      !mctxUsable ||
-      (mctxStage &&
-        (mctxStage.status === "skipped_dependency_unavailable" ||
-          mctxStage.status === "awaiting_valid_credentials") &&
-        !mctxUsable)
-    ) {
+    if (!factsOk || !mctxUsable) {
       stages.push(
         stageBase("reaction_4b", {
           status: "skipped_dependency_unavailable",
@@ -807,6 +800,16 @@ export async function runCatalystUpdate(
           completedAt: new Date().toISOString(),
         }),
       );
+      if (!factsOk) {
+        notes.push(
+          "4B skipped — official_facts unavailable (required for official event/facts identity).",
+        );
+      }
+      if (!mctxUsable) {
+        notes.push(
+          "4B skipped — market_context_4a unavailable (not filled with synthetic).",
+        );
+      }
     } else if (dryRun) {
       const snaps = mctxUsable
         ? (mctxAfter.ok ? mctxAfter.cache : mctx.ok ? mctx.cache : null)
@@ -895,8 +898,16 @@ export async function runCatalystUpdate(
   {
     const t0 = new Date().toISOString();
     const ctxLoaded = mctxAfter.ok ? mctxAfter : mctx;
+    const rxnStage = stages.find((s) => s.stage === "reaction_4b");
     const rxnLoaded = mrxnAfter.ok ? mrxnAfter : mrxn;
-    if (!ctxLoaded.ok || !rxnLoaded.ok) {
+    const rxnUsable =
+      mrxnOk &&
+      ctxLoaded.ok &&
+      rxnLoaded.ok &&
+      rxnStage?.status !== "skipped_dependency_unavailable" &&
+      rxnStage?.status !== "skipped_no_eligible_input" &&
+      rxnStage?.status !== "failed";
+    if (!rxnUsable) {
       stages.push(
         stageBase("openai_reaction_4c", {
           status: "skipped_dependency_unavailable",
@@ -908,7 +919,7 @@ export async function runCatalystUpdate(
         }),
       );
       notes.push(
-        "4C skipped — missing identity-consistent 4A/4B (not filled with synthetic).",
+        "4C skipped — reaction_4b unavailable (requires official_facts + market_context_4a).",
       );
     } else if (!openaiKey && !options.reactionNarrator && !dryRun) {
       stages.push(

@@ -42,6 +42,7 @@ import { loadMarketContextCache } from "./market-context/cache";
 import { filterMarketContextForFeed } from "./market-context/materialize";
 import { MARKET_CONTEXT_CALCULATION_VERSION } from "./market-context/version";
 import { classifyMarketReaction } from "./market-reactions/classify";
+import { officialEventFactsIdentityForCatalyst } from "./market-reactions/official-identity";
 import { loadMarketReactionsCache } from "./market-reactions/cache";
 import { filterMarketReactionsForFeed } from "./market-reactions/materialize";
 import { REACTION_RULES_VERSION } from "./market-reactions/version";
@@ -290,11 +291,20 @@ function loadSyntheticFeed(
     options.now,
     30,
   );
-  const synReactions = feedMctx.map((s) =>
-    classifyMarketReaction(s, {
-      generatedAt: options.now.toISOString(),
-    }),
+  const briefsByDocumentId = new Map(
+    archiveBriefs.map((b) => [b.documentId, b] as const),
   );
+  const catalystById = new Map(withDocs.catalysts.map((c) => [c.id, c] as const));
+  const synReactions = feedMctx.map((s) => {
+    const catalyst = catalystById.get(s.catalystId);
+    const officialFactsIdentity = catalyst
+      ? officialEventFactsIdentityForCatalyst(catalyst, briefsByDocumentId)
+      : undefined;
+    return classifyMarketReaction(s, {
+      generatedAt: options.now.toISOString(),
+      ...(officialFactsIdentity ? { officialFactsIdentity } : {}),
+    });
+  });
   const feedReactions = filterMarketReactionsForFeed(
     synReactions,
     feedMctx,

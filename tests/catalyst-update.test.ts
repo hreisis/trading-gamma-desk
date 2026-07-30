@@ -137,6 +137,32 @@ function seedReactionCaches(root: string, now = "2026-07-29T20:00:00.000Z"): voi
 }
 
 describe("M2-5B args + error classification", () => {
+  it("wires reaction_4b to official_facts + market_context_4a", async () => {
+    const root = tempRoot();
+    seedDocuments(root);
+    seedBriefs(root);
+    const result = await runCatalystUpdate({
+      dataRoot: root,
+      dryRun: true,
+      now: new Date("2026-07-29T20:00:00.000Z"),
+      env: {
+        OPENAI_API_KEY: "sk-test",
+        APCA_API_KEY_ID: "",
+        APCA_API_SECRET_KEY: "",
+      },
+      skipLock: true,
+      writeManifest: false,
+    });
+    const rxn = result.manifest.stages.find((s) => s.stage === "reaction_4b");
+    expect(rxn?.dependsOn).toEqual(["official_facts", "market_context_4a"]);
+    expect(
+      result.manifest.stages.find((s) => s.stage === "openai_reaction_4c")
+        ?.dependsOn,
+    ).toEqual(["reaction_4b"]);
+    // No 4A cache → 4B dependency unavailable even when facts ok
+    expect(rxn?.status).toBe("skipped_dependency_unavailable");
+  });
+
   it("parses dry-run and caps max-events at 2", () => {
     expect(parseCatalystUpdateArgs(["--dry-run"]).dryRun).toBe(true);
     expect(parseCatalystUpdateArgs(["--max-events", "9"]).maxEvents).toBe(2);

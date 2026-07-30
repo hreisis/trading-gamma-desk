@@ -4,6 +4,7 @@ export interface MarketReactionInputRef {
   readonly catalystId: string;
   readonly marketContextId: string;
   readonly marketContextIdentity: string;
+  readonly officialFactsIdentity: string;
   readonly reactionRulesVersion: string;
   readonly marketContextCalculationVersion?: string;
 }

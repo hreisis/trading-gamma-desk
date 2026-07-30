@@ -6,12 +6,12 @@
   "narratives": [
     {
       "schemaVersion": "0.1.0",
-      "id": "aimrxn_0289fb22af42821b",
+      "id": "aimrxn_b7a4e1109f5e3452",
       "catalystId": "cat_747bd00a15206444",
       "marketContextId": "mctx_7ca4acf6f84f9a0b",
       "marketContextIdentity": "mctx_7ca4acf6f84f9a0b|cat_747bd00a15206444|2026-07-15T12:30:00.000Z|synthetic_fixture|synthetic|0.1.0|complete",
-      "marketReactionId": "mrxn_066cb8854888f722",
-      "marketReactionIdentity": "mrxn_066cb8854888f722|cat_747bd00a15206444|mctx_7ca4acf6f84f9a0b|mctx_7ca4acf6f84f9a0b|cat_747bd00a15206444|2026-07-15T12:30:00.000Z|synthetic_fixture|synthetic|0.1.0|complete|0.1.0|complete",
+      "marketReactionId": "mrxn_848e29e7e286d9e8",
+      "marketReactionIdentity": "mrxn_848e29e7e286d9e8|cat_747bd00a15206444|mctx_7ca4acf6f84f9a0b|mctx_7ca4acf6f84f9a0b|cat_747bd00a15206444|2026-07-15T12:30:00.000Z|synthetic_fixture|synthetic|0.1.0|complete|cat_747bd00a15206444|2026-07-15T12:30:00.000Z|cpi|2026-06|8bfef394dd2d0207|odoc_89da6c00f149582a:705485fce67e1eec6833268a2d0894a0a50926fd04c7f3090b5bc70f8a7743e3|obrief_9ceccde4ae0b8c7c:odoc_89da6c00f149582a:705485fce67e1eec6833268a2d0894a0a50926fd04c7f3090b5bc70f8a7743e3:0.1.1:complete:odoc_89da6c00f149582a_core_cpi_sa_mom,odoc_89da6c00f149582a_core_cpi_sa_yoy,odoc_89da6c00f149582a_headline_cpi_sa_mom,odoc_89da6c00f149582a_headline_cpi_sa_yoy|0.1.0|complete",
       "reactionRulesVersion": "0.1.0",
       "promptVersion": "0.1.0",
       "provider": "synthetic_fixture",

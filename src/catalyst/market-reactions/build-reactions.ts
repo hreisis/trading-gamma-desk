@@ -1,11 +1,26 @@
 import { writeJsonAtomic } from "@/desk/atomic-write";
 import { isPublicDemoMode } from "@/desk/public-demo";
-import type { EventMarketContext, EventMarketReaction } from "@/contracts";
+import type {
+  Catalyst,
+  EventMarketContext,
+  EventMarketReaction,
+  OfficialBrief,
+} from "@/contracts";
+import { loadBriefsCache } from "../briefs/cache";
+import { loadCalendarCache } from "../cache";
+import { loadDocumentsCache } from "../documents/cache";
+import { linkDocumentsToCatalysts } from "../documents/link";
 import { loadMarketContextCache } from "../market-context/cache";
 import { MARKET_CONTEXT_FEED_DAYS } from "../market-context/config";
-import { classifyMarketReaction, marketContextIdentity } from "./classify";
+import { loadResultsCache } from "../results/cache";
+import { materializeResultsFeed } from "../results/link";
 import { loadMarketReactionsCache } from "./cache";
+import { classifyMarketReaction, marketContextIdentity } from "./classify";
 import { MARKET_REACTION_FEED_DAYS } from "./materialize";
+import {
+  officialEventFactsIdentityForCatalyst,
+  officialEventFactsIdentityFromContext,
+} from "./official-identity";
 import {
   DEFAULT_MARKET_REACTIONS_DATA_ROOT,
   marketReactionsLatestPath,
@@ -33,6 +48,8 @@ export interface BuildMarketReactionsOptions {
   readonly force?: boolean;
   /** Test injection. */
   readonly snapshots?: readonly EventMarketContext[];
+  /** Test injection: catalystId → officialFactsIdentity. */
+  readonly officialFactsIdentityByCatalystId?: ReadonlyMap<string, string>;
   readonly maxPerRun?: number;
 }
 
@@ -53,9 +70,70 @@ function isEligibleSnapshot(
   return eventMs >= start && eventMs <= now.getTime();
 }
 
+function loadOfficialFactsIdentityIndex(
+  dataRoot: string,
+  now: Date,
+): {
+  readonly byCatalystId: Map<string, string>;
+  readonly warnings: string[];
+} {
+  const warnings: string[] = [];
+  const briefsLoaded = loadBriefsCache({ dataRoot, now });
+  const briefsByDocumentId = new Map<string, OfficialBrief>();
+  if (briefsLoaded.ok) {
+    for (const b of briefsLoaded.cache.briefs) {
+      briefsByDocumentId.set(b.documentId, b);
+    }
+  } else {
+    warnings.push(
+      "Official briefs cache unavailable — 4B identity uses event fields with facts:none where unlinked.",
+    );
+  }
+
+  const calendar = loadCalendarCache({ dataRoot, now });
+  const results = loadResultsCache({ dataRoot, now });
+  const docs = loadDocumentsCache({ dataRoot, now });
+
+  let catalysts: Catalyst[] = [];
+  if (calendar.ok) {
+    catalysts = [...calendar.cache.catalysts];
+    if (results.ok) {
+      catalysts = materializeResultsFeed({
+        scheduled: catalysts,
+        releases: results.cache.releases,
+        calendarAvailable: true,
+      }).catalysts;
+    }
+    if (docs.ok) {
+      catalysts = linkDocumentsToCatalysts(
+        catalysts,
+        docs.cache.documents,
+      ).catalysts;
+    } else {
+      warnings.push(
+        "Documents cache unavailable — 4B officialFactsIdentity has no document refs.",
+      );
+    }
+  } else {
+    warnings.push(
+      "Calendar unavailable — 4B officialFactsIdentity falls back to market-context event fields.",
+    );
+  }
+
+  const byCatalystId = new Map<string, string>();
+  for (const c of catalysts) {
+    byCatalystId.set(
+      c.id,
+      officialEventFactsIdentityForCatalyst(c, briefsByDocumentId),
+    );
+  }
+  return { byCatalystId, warnings };
+}
+
 /**
- * Build deterministic market reactions from local M2-4A cache only.
- * Never fetches Alpaca or other catalyst workflows.
+ * Build deterministic market reactions from local M2-4A + official facts identity.
+ * Never fetches Alpaca or OpenAI. Classification stays 4A-rule-based; official
+ * event/facts identity is part of the input cache key.
  */
 export function buildMarketReactions(
   options: BuildMarketReactionsOptions = {},
@@ -88,9 +166,7 @@ export function buildMarketReactions(
   }
 
   const eligible = snapshots
-    .filter((s) =>
-      isEligibleSnapshot(s, now, MARKET_CONTEXT_FEED_DAYS),
-    )
+    .filter((s) => isEligibleSnapshot(s, now, MARKET_CONTEXT_FEED_DAYS))
     .slice(0, maxPerRun);
 
   const prior = loadMarketReactionsCache({ dataRoot, now });
@@ -117,16 +193,29 @@ export function buildMarketReactions(
   const errors: MarketReactionBuildError[] = [];
   const warnings: string[] = [];
 
+  let factsIndex: ReadonlyMap<string, string>;
+  if (options.officialFactsIdentityByCatalystId) {
+    factsIndex = options.officialFactsIdentityByCatalystId;
+  } else {
+    const loaded = loadOfficialFactsIdentityIndex(dataRoot, now);
+    factsIndex = loaded.byCatalystId;
+    warnings.push(...loaded.warnings);
+  }
+
   let successCount = 0;
   let failCount = 0;
 
   for (const snap of eligible) {
     const identity = marketContextIdentity(snap);
+    const factsIdentity =
+      factsIndex.get(snap.catalystId) ??
+      officialEventFactsIdentityFromContext(snap);
     const previous = priorByCatalyst.get(snap.catalystId);
     if (
       !options.force &&
       previous &&
       previous.marketContextIdentity === identity &&
+      previous.officialFactsIdentity === factsIdentity &&
       previous.reactionRulesVersion === REACTION_RULES_VERSION &&
       previous.marketContextId === snap.id &&
       (previous.status === "complete" || previous.status === "partial")
@@ -137,12 +226,16 @@ export function buildMarketReactions(
     }
 
     try {
-      const reaction = classifyMarketReaction(snap, { generatedAt });
+      const reaction = classifyMarketReaction(snap, {
+        generatedAt,
+        officialFactsIdentity: factsIdentity,
+      });
       outReactions.push(reaction);
       inputRefs.push({
         catalystId: snap.catalystId,
         marketContextId: snap.id,
         marketContextIdentity: identity,
+        officialFactsIdentity: factsIdentity,
         reactionRulesVersion: REACTION_RULES_VERSION,
         marketContextCalculationVersion: snap.calculationVersion,
       });
@@ -156,7 +249,9 @@ export function buildMarketReactions(
             ? "force rebuild"
             : previous.reactionRulesVersion !== REACTION_RULES_VERSION
               ? "rules version changed"
-              : "market context identity changed",
+              : previous.officialFactsIdentity !== factsIdentity
+                ? "official facts identity changed"
+                : "market context identity changed",
         });
       }
       if (reaction.status === "insufficient") {
@@ -211,19 +306,6 @@ export function buildMarketReactions(
     warnings,
   };
 
-  // Do not wipe a prior good cache when every classification fails hard.
-  const shouldWrite =
-    options.write !== false &&
-    !(allFailed && prior.ok && prior.cache.reactions.length > 0 && failCount === eligible.length && successCount === 0);
-
-  // Actually: if we had successes, write. If all failed but we still produced
-  // insufficient reactions, write those. Only skip write when we threw on all
-  // and kept only prior via exception path with allFailed from zero success
-  // AND we didn't add any new reactions — the shouldWrite above is fine.
-  // Simpler: always write unless input cache missing (already threw) or
-  // public demo. User asked: input missing/corrupt → fail clearly.
-  // Provider-wide N/A. Always write when we have a computed cache unless
-  // allFailed with prior and no new successful classifications.
   let path: string | null = null;
   if (options.write !== false) {
     if (

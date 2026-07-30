@@ -17,6 +17,7 @@ import {
 } from "./development";
 import { classifyEquityLeadership } from "./leadership";
 import { buildObservations } from "./observations";
+import { officialEventFactsIdentityFromContext } from "./official-identity";
 import {
   ALL_REACTION_SYMBOLS,
   deadbandFor,
@@ -25,6 +26,14 @@ import {
   REACTION_WINDOWS,
 } from "./rules";
 import { REACTION_RULES_VERSION } from "./version";
+
+export {
+  briefIdentityLine,
+  officialEventFactsIdentity,
+  officialEventFactsIdentityForCatalyst,
+  officialEventFactsIdentityFromContext,
+  releaseResultFingerprint,
+} from "./official-identity";
 
 const WINDOW_MAP: Record<ReactionWindowId, MarketContextWindowKind> = {
   "5m": "plus5m",
@@ -49,6 +58,7 @@ export function reactionIdFor(parts: {
   readonly catalystId: string;
   readonly marketContextId: string;
   readonly marketContextIdentity: string;
+  readonly officialFactsIdentity: string;
   readonly reactionRulesVersion: string;
 }): string {
   const digest = createHash("sha256")
@@ -57,6 +67,7 @@ export function reactionIdFor(parts: {
         parts.catalystId,
         parts.marketContextId,
         parts.marketContextIdentity,
+        parts.officialFactsIdentity,
         parts.reactionRulesVersion,
       ].join("|"),
       "utf8",
@@ -211,10 +222,17 @@ function sessionCloseChronologyValid(ctx: EventMarketContext): boolean {
  */
 export function classifyMarketReaction(
   ctx: EventMarketContext,
-  options: { readonly generatedAt?: string } = {},
+  options: {
+    readonly generatedAt?: string;
+    /** When omitted, derived from market-context event fields + facts:none. */
+    readonly officialFactsIdentity?: string;
+  } = {},
 ): EventMarketReaction {
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   const identity = marketContextIdentity(ctx);
+  const factsIdentity =
+    options.officialFactsIdentity ??
+    officialEventFactsIdentityFromContext(ctx);
   const limitations: string[] = [];
 
   if (ctx.status === "unavailable") {
@@ -313,11 +331,13 @@ export function classifyMarketReaction(
       catalystId: ctx.catalystId,
       marketContextId: ctx.id,
       marketContextIdentity: identity,
+      officialFactsIdentity: factsIdentity,
       reactionRulesVersion: REACTION_RULES_VERSION,
     }),
     catalystId: ctx.catalystId,
     marketContextId: ctx.id,
     marketContextIdentity: identity,
+    officialFactsIdentity: factsIdentity,
     reactionRulesVersion: REACTION_RULES_VERSION,
     eventTimestamp: ctx.eventTimestamp,
     provider: ctx.provider,
