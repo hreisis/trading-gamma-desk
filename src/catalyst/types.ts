@@ -4,8 +4,11 @@ import type {
   CatalystDirection,
   CatalystImportance,
   CatalystMacroChannel,
+  CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  ReleaseObservation,
+  ReleaseResult,
 } from "@/contracts";
 import type { OfficialCalendarSourceId } from "./registry";
 
@@ -35,6 +38,10 @@ export interface CatalystRawEvent {
   readonly evidenceBasis?: string;
   /** When set, replaces a prior event with the same dedupe/external identity. */
   readonly supersedesExternalId?: string;
+  readonly releaseFamily?: CatalystReleaseFamily;
+  /** YYYY-MM from official schedule metadata when available. */
+  readonly referencePeriod?: string;
+  readonly releaseResult?: ReleaseResult;
 }
 
 export interface NormalizeOk {
@@ -98,6 +105,14 @@ export interface CatalystFeedResponse {
       readonly end: string;
     };
     readonly sources?: readonly CatalystFeedSourceStatus[];
+    readonly results?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly partialFailure?: boolean;
+      readonly status?: "ok" | "error" | "missing" | "synthetic";
+      readonly error?: string;
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -105,6 +120,11 @@ export interface CatalystFeedResponse {
     readonly index: number;
     readonly error: string;
     readonly externalId?: string;
+  }>;
+  readonly linkingWarnings?: Array<{
+    readonly error: string;
+    readonly releaseFamily?: string;
+    readonly referencePeriod?: string;
   }>;
 }
 
@@ -134,6 +154,9 @@ export type {
   CatalystDirection,
   CatalystImportance,
   CatalystMacroChannel,
+  CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  ReleaseObservation,
+  ReleaseResult,
 };

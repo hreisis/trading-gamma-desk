@@ -505,6 +505,18 @@ Local workflow: `npm run catalyst:fetch` → atomic write of gitignored `data/ca
 
 FOMC mapping (schedule only): meeting end date → policy decision at 2:00 p.m. America/New_York (`importance: critical`) and Chair press conference at 2:30 p.m. (`importance: high`). SEP meetings (`*` on the Fed calendar) annotate the policy-decision headline/summary; they are not a separate same-instant catalyst. Evidence basis: `official_fomc_schedule`.
 
+### Official release results (M2-2C1)
+
+Optional Catalyst fields:
+
+| Field | Notes |
+| --- | --- |
+| `releaseFamily` | `cpi` \| `employment_situation` |
+| `referencePeriod` | `YYYY-MM` from official schedule/API metadata — never guessed from release day |
+| `releaseResult` | Official series actuals; `consensus: null`, `surprise: null`, `surpriseStatus: "unavailable"` |
+
+BLS series (explicit registry): `CUSR0000SA0` (headline CPI SA), `CUSR0000SA0L1E` (core CPI SA — all items less food and energy), `CES0000000001` (payrolls), `LNS14000000` (unemployment rate). CPI emits MoM + YoY percent changes; payrolls emit monthly change in thousands; unemployment is the official level. Local: `npm run catalyst:results:fetch` → gitignored `data/catalyst/results-latest.json`. An event becomes `released` only when official series data for its `referencePeriod` is linked — not merely because the schedule time has passed.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

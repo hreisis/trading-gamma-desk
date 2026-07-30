@@ -1,4 +1,4 @@
-import type { CatalystFeedResponse } from "@/catalyst";
+import type { Catalyst, CatalystFeedResponse, ReleaseResult } from "@/catalyst";
 
 function formatWhen(iso: string): string {
   // Display the contract timestamp as-is (already normalized); keep short.
@@ -18,8 +18,91 @@ function sourceLabel(feed: CatalystFeedResponse, synthetic: boolean): string {
   return `official calendar · ${freshness}${partial}`;
 }
 
+function formatObservation(o: ReleaseResult["observations"][number]): string {
+  const prelim = o.preliminary ? " · preliminary" : "";
+  const revised = ""; // revision flag is at feed/cache level; per-obs uses preliminary
+  return `${o.metric}: ${o.actual} ${o.unit} (${o.transformation}${prelim}${revised})`;
+}
+
+function ReleaseResultBlock({
+  result,
+  synthetic,
+}: {
+  result: ReleaseResult;
+  synthetic: boolean;
+}) {
+  return (
+    <div className="catalyst-release" data-testid="catalyst-release-result">
+      <p className="catalyst-release-period">
+        Reference period: {result.referencePeriod}
+      </p>
+      <ul className="catalyst-release-obs">
+        {result.observations.map((o) => (
+          <li key={`${o.metric}-${o.sourcePeriod}`}>
+            {formatObservation(o)}
+            {o.preliminary ? (
+              <span className="catalyst-release-flag"> preliminary</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <p className="catalyst-release-meta">Consensus unavailable</p>
+      <p className="catalyst-release-meta">Surprise unavailable</p>
+      <p className="catalyst-release-meta">
+        {synthetic ? "synthetic BLS-shaped source" : "official BLS source"} ·{" "}
+        {result.sourceName}
+      </p>
+    </div>
+  );
+}
+
+function CatalystRow({ c }: { c: Catalyst }) {
+  return (
+    <li key={c.id} className="catalyst-row">
+      <div className="catalyst-when">{formatWhen(c.occurredAt)}</div>
+      <div className="catalyst-main">
+        <p className="catalyst-headline">{c.headline}</p>
+        <p className="catalyst-meta">
+          <span>{c.category}</span>
+          <span>{c.importance}</span>
+          <span>{c.direction}</span>
+          <span>{c.status}</span>
+          {c.referencePeriod ? (
+            <span>ref {c.referencePeriod}</span>
+          ) : null}
+        </p>
+        <p className="catalyst-assets">
+          {c.affectedAssets.length > 0 ? c.affectedAssets.join(", ") : "—"}
+        </p>
+        {c.releaseResult ? (
+          <ReleaseResultBlock
+            result={c.releaseResult}
+            synthetic={c.synthetic}
+          />
+        ) : null}
+      </div>
+      <div className="catalyst-source">
+        <span
+          className={
+            c.synthetic
+              ? "desk-source desk-source-fixture"
+              : "desk-source desk-source-live"
+          }
+        >
+          {c.synthetic
+            ? `synthetic · ${c.sourceName}`
+            : c.releaseResult
+              ? `released · ${c.sourceName}`
+              : `schedule · ${c.sourceName}`}
+        </span>
+      </div>
+    </li>
+  );
+}
+
 /**
  * Read-only catalyst list. Does not classify, score regimes, or advise trades.
+ * Does not invent beat/miss, hot/cold, or market direction from prints.
  */
 export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
   const bannerClass =
@@ -41,6 +124,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       <p className="desk-section-note" data-testid="catalyst-source-meta">
         Mode: {feed.mode}
         {feed.source.fetchedAt ? ` · cache ${feed.source.fetchedAt}` : ""}
+        {feed.source.results
+          ? ` · results:${feed.source.results.status ?? (feed.source.results.available ? "ok" : "missing")}`
+          : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
               .map(
@@ -53,14 +139,15 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       <p className="desk-section-note">
         Events that may change the market&apos;s driver — independent of the
         regime score above. Classification confidence is uncalibrated and is not
-        a market-up probability. Calendar rows are scheduled release times only.
+        a market-up probability. Calendar rows are scheduled release times;
+        linked BLS series show actuals only (no consensus/surprise).
       </p>
 
       {feed.mode === "live_unavailable" ? (
         <p className="desk-section-note" data-testid="catalyst-empty">
           No official calendar cache. Run{" "}
           <code>npm run catalyst:fetch</code> locally (not available in public
-          demo).
+          demo). Optional results: <code>npm run catalyst:results:fetch</code>.
         </p>
       ) : feed.catalysts.length === 0 ? (
         <p className="desk-section-note" data-testid="catalyst-empty">
@@ -69,36 +156,7 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       ) : (
         <ul className="catalyst-list" data-testid="catalyst-list">
           {feed.catalysts.map((c) => (
-            <li key={c.id} className="catalyst-row">
-              <div className="catalyst-when">{formatWhen(c.occurredAt)}</div>
-              <div className="catalyst-main">
-                <p className="catalyst-headline">{c.headline}</p>
-                <p className="catalyst-meta">
-                  <span>{c.category}</span>
-                  <span>{c.importance}</span>
-                  <span>{c.direction}</span>
-                  <span>{c.status}</span>
-                </p>
-                <p className="catalyst-assets">
-                  {c.affectedAssets.length > 0
-                    ? c.affectedAssets.join(", ")
-                    : "—"}
-                </p>
-              </div>
-              <div className="catalyst-source">
-                <span
-                  className={
-                    c.synthetic
-                      ? "desk-source desk-source-fixture"
-                      : "desk-source desk-source-live"
-                  }
-                >
-                  {c.synthetic
-                    ? `synthetic · ${c.sourceName}`
-                    : `schedule · ${c.sourceName}`}
-                </span>
-              </div>
-            </li>
+            <CatalystRow key={c.id} c={c} />
           ))}
         </ul>
       )}
@@ -106,6 +164,13 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       {feed.mode !== "live_unavailable" ? (
         <p className="desk-section-note" data-testid="catalyst-feed-source">
           Feed source: {sourceLabel(feed, feed.source.synthetic)}
+        </p>
+      ) : null}
+
+      {feed.linkingWarnings && feed.linkingWarnings.length > 0 ? (
+        <p className="desk-section-note" data-testid="catalyst-linking">
+          Linking: {feed.linkingWarnings.length} warning(s) (unmatched
+          observations kept separate — no weak supersede).
         </p>
       ) : null}
 

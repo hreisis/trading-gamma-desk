@@ -2,6 +2,7 @@ import { IngestError } from "@/ingest/types";
 import { fetchValidated, type FetchLike } from "@/ingest/http";
 import { parseIcsEvents } from "../ics";
 import { matchOfficialEvent } from "../registry";
+import { parseReferencePeriodFromScheduleText } from "../results/period";
 import { utcDay } from "../time";
 import type { CatalystRawEvent } from "../types";
 import type { ProviderParseResult } from "./types";
@@ -57,6 +58,12 @@ export function parseBlsIcs(body: string): {
     const mapping = matchOfficialEvent("bls", ev.summary);
     if (!mapping) continue;
     const externalId = buildExternalId(ev.uid, ev.summary, ev.occurredAtUtc);
+    const referencePeriod =
+      parseReferencePeriodFromScheduleText(ev.description) ??
+      parseReferencePeriodFromScheduleText(ev.summary);
+    const periodNote = referencePeriod
+      ? ` Reference period ${referencePeriod} from official schedule text.`
+      : " Reference period not stated in schedule text — will not auto-release from clock.";
     rawEvents.push({
       synthetic: false,
       externalId,
@@ -66,7 +73,7 @@ export function parseBlsIcs(body: string): {
       sourceName: BLS_SOURCE_NAME,
       sourceUrl: ev.url ?? BLS_OFFICIAL_PAGE,
       headline: mapping.headline,
-      summary: mapping.summary,
+      summary: mapping.summary + periodNote,
       rawCategory: mapping.category,
       rawStatus: "upcoming",
       rawImportance: mapping.importance,
@@ -74,9 +81,13 @@ export function parseBlsIcs(body: string): {
       affectedAssets: [...mapping.affectedAssets],
       macroChannels: [...mapping.macroChannels],
       evidenceStatements: [
-        `Official BLS schedule: "${ev.summary}" at ${ev.occurredAtUtc} (scheduled release time only — not an observed print).`,
+        `Official BLS schedule: "${ev.summary}" at ${ev.occurredAtUtc} (scheduled release time only — not an observed print).${periodNote}`,
       ],
       evidenceBasis: "official_release_schedule",
+      ...(mapping.releaseFamily
+        ? { releaseFamily: mapping.releaseFamily }
+        : {}),
+      ...(referencePeriod ? { referencePeriod } : {}),
     });
   }
 

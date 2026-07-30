@@ -398,6 +398,36 @@ code {
   text-align: right;
 }
 
+.catalyst-release {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(42, 51, 64, 0.45);
+}
+
+.catalyst-release-period {
+  margin: 0 0 4px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
+.catalyst-release-obs {
+  margin: 0 0 6px;
+  padding-left: 1.1rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.catalyst-release-meta {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.catalyst-release-flag {
+  color: var(--warn);
+}
+
 @media (max-width: 640px) {
   .desk {
     padding: 28px 16px 56px;

@@ -40,6 +40,8 @@
       "rawDirection": "inflationary",
       "affectedAssets": ["US10Y", "GOLD", "USD"],
       "macroChannels": ["inflation"],
+      "releaseFamily": "cpi",
+      "referencePeriod": "2026-06",
       "evidenceStatements": [
         "Synthetic CPI surprise flag in fixture batch"
       ]
@@ -60,6 +62,8 @@
       "rawDirection": "growth-negative",
       "affectedAssets": ["US2Y", "SPX"],
       "macroChannels": ["growth", "fed_rates"],
+      "releaseFamily": "employment_situation",
+      "referencePeriod": "2026-06",
       "evidenceStatements": [
         "Synthetic payrolls miss label"
       ]
@@ -121,6 +125,8 @@
       "rawDirection": "inflationary",
       "affectedAssets": ["US10Y", "GOLD", "USD", "OIL"],
       "macroChannels": ["inflation"],
+      "releaseFamily": "cpi",
+      "referencePeriod": "2026-06",
       "evidenceStatements": [
         "Synthetic CPI update superseding prior fixture row"
       ]

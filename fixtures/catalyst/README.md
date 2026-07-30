@@ -9,6 +9,13 @@
 - Loaded via static import in `src/catalyst/load.ts` (serverless-safe) when `GAMMADESK_PUBLIC_DEMO=1`.
 - Includes an intentional malformed row and a duplicate/update pair for tests.
 
-## Official provider samples (M2-2A)
+## Official provider samples (M2-2A / M2-2B / M2-2C1)
 
-See `providers/` for recorded BLS ICS and BEA JSON used by offline tests. CI must not hit live BLS/BEA. Generated local cache lives at gitignored `data/catalyst/calendar-latest.json` via `npm run catalyst:fetch`.
+See `providers/` for recorded BLS ICS, BEA JSON, FOMC HTML, and BLS API JSON used by offline tests. CI must not hit live networks.
+
+| Generated (gitignored) | Command |
+| --- | --- |
+| `data/catalyst/calendar-latest.json` | `npm run catalyst:fetch` |
+| `data/catalyst/results-latest.json` | `npm run catalyst:results:fetch` |
+
+`synthetic-results.json` is a labelled synthetic results fixture for public demo only.

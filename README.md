@@ -79,6 +79,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run ingest` | Pull + compute snapshot only |
 | `npm run interpret` | Snapshot → atomic driver write |
 | `npm run catalyst:fetch` | Pull BLS/BEA/FOMC **schedules** → `data/catalyst/calendar-latest.json` |
+| `npm run catalyst:results:fetch` | Pull BLS CPI/Employment **actuals** → `data/catalyst/results-latest.json` |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -100,7 +101,9 @@ Sources (schedule only — not observed prints):
 - Missing / stale / partial-failure cache states are **explicit** — local mode does not silently fall back to synthetic.
 - Public demo never calls BLS/BEA/Federal Reserve and never reads `data/catalyst/`.
 
-If any provider fails, successful sources still write a usable cache with `partialFailure: true`. All three failing leaves the prior cache untouched.
+If any calendar provider fails, successful sources still write a usable cache with `partialFailure: true`. All three failing leaves the prior cache untouched.
+
+**BLS release results (M2-2C1):** `npm run catalyst:results:fetch` writes `data/catalyst/results-latest.json` (separate from the calendar cache). CPI + Employment Situation actuals only — Consensus unavailable · Surprise unavailable. Events become `released` only via strict `releaseFamily` + `referencePeriod` match to official series data. Public demo uses a labelled synthetic results fixture and never calls the BLS API.
 
 ### Desk URLs (local)
 
@@ -193,4 +196,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-2B** (BLS/BEA/FOMC schedule calendar, local fetch). Cloud Tiingo / live news / actuals / decision parsing on the public host remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-2C1** (schedules + BLS CPI/Employment actuals, local fetch). Consensus/surprise, BEA results, and decision parsing remain out of scope. Market Temperature stays in the backlog.

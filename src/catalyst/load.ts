@@ -1,8 +1,13 @@
 import syntheticBatch from "../../fixtures/catalyst/synthetic-events.json";
+import syntheticResults from "../../fixtures/catalyst/synthetic-results.json";
 import { isPublicDemoMode } from "@/desk/public-demo";
+import type { Catalyst, ReleaseResult } from "@/contracts";
 import { loadCalendarCache } from "./cache";
 import { normalizeAndDedupe } from "./dedupe";
 import { filterCatalysts } from "./query";
+import { linkReleasesToCatalysts } from "./results/link";
+import { loadResultsCache } from "./results/cache";
+import type { BuiltRelease } from "./results/types";
 import type {
   CatalystFeedResponse,
   CatalystQuery,
@@ -13,13 +18,13 @@ export const CATALYST_DEMO_BANNER =
   "Illustrative catalyst demo · synthetic events";
 
 export const CATALYST_DEMO_DISCLAIMER =
-  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations.";
+  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results (when shown) are illustrative — Consensus unavailable · Surprise unavailable.";
 
 export const CATALYST_OFFICIAL_BANNER =
-  "Official US macro calendar · scheduled release times only";
+  "Official US macro calendar · schedules + BLS series results when linked";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS, BEA, and Federal Reserve schedule sources list planned release times. A row does not mean the print or FOMC decision has been released or observed by GammaDesk — no actual/forecast/surprise or policy text is ingested here.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. A past schedule time alone does not mark an event released.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";
@@ -30,13 +35,42 @@ export const CATALYST_UNAVAILABLE_BANNER =
 export const SYNTHETIC_FIXTURE_NAME =
   "fixtures/catalyst/synthetic-events.json";
 
+export const SYNTHETIC_RESULTS_FIXTURE_NAME =
+  "fixtures/catalyst/synthetic-results.json";
+
 export const OFFICIAL_CALENDAR_CACHE_NAME =
   "data/catalyst/calendar-latest.json";
+
+export const OFFICIAL_RESULTS_CACHE_NAME =
+  "data/catalyst/results-latest.json";
 
 function rawEventsFromBatch(): CatalystRawEvent[] {
   const events = (syntheticBatch as { events?: CatalystRawEvent[] }).events;
   if (!Array.isArray(events)) return [];
   return events;
+}
+
+function syntheticBuiltReleases(): BuiltRelease[] {
+  const releases = (
+    syntheticResults as {
+      releases?: Array<{
+        releaseFamily: "cpi" | "employment_situation";
+        referencePeriod: string;
+        observedAt: string;
+        fingerprint: string;
+        releaseResult: ReleaseResult;
+      }>;
+    }
+  ).releases;
+  if (!Array.isArray(releases)) return [];
+  return releases.map((r) => ({
+    releaseFamily: r.releaseFamily,
+    referencePeriod: r.referencePeriod,
+    observedAt: r.observedAt,
+    fingerprint: r.fingerprint,
+    observations: r.releaseResult.observations,
+    releaseResult: r.releaseResult,
+  }));
 }
 
 function loadSyntheticFeed(
@@ -46,7 +80,8 @@ function loadSyntheticFeed(
   const { catalysts, validationErrors } = normalizeAndDedupe(
     rawEventsFromBatch(),
   );
-  const filtered = filterCatalysts(catalysts, query);
+  const linked = linkReleasesToCatalysts(catalysts, syntheticBuiltReleases());
+  const filtered = filterCatalysts(linked.catalysts, query);
   return {
     kind: "CatalystFeed",
     schemaVersion: "0.1.0",
@@ -59,20 +94,71 @@ function loadSyntheticFeed(
       type: "fixture",
       name: SYNTHETIC_FIXTURE_NAME,
       synthetic: true,
+      results: {
+        available: true,
+        status: "synthetic",
+        fetchedAt: options.now.toISOString(),
+        stale: false,
+        partialFailure: false,
+      },
     },
     count: filtered.length,
     catalysts: filtered,
     validationErrors,
+    linkingWarnings: linked.linkingWarnings,
+  };
+}
+
+function mergeOfficialResults(
+  catalysts: readonly Catalyst[],
+  options: { readonly dataRoot?: string; readonly now: Date },
+): {
+  catalysts: Catalyst[];
+  linkingWarnings: CatalystFeedResponse["linkingWarnings"];
+  resultsMeta: NonNullable<CatalystFeedResponse["source"]["results"]>;
+} {
+  const loaded = loadResultsCache({
+    dataRoot: options.dataRoot,
+    now: options.now,
+  });
+  if (!loaded.ok) {
+    return {
+      catalysts: [...catalysts],
+      linkingWarnings: [],
+      resultsMeta: {
+        available: false,
+        status: "missing",
+        error: loaded.error,
+        stale: false,
+        partialFailure: false,
+      },
+    };
+  }
+  const linked = linkReleasesToCatalysts(catalysts, loaded.cache.releases);
+  return {
+    catalysts: linked.catalysts,
+    linkingWarnings: [
+      ...loaded.cache.linkingWarnings,
+      ...linked.linkingWarnings,
+    ],
+    resultsMeta: {
+      available: true,
+      status: loaded.cache.sources.some((s) => s.status === "error")
+        ? "error"
+        : "ok",
+      fetchedAt: loaded.cache.fetchedAt,
+      stale: loaded.stale,
+      partialFailure: loaded.cache.partialFailure,
+    },
   };
 }
 
 /**
  * Catalyst feed loader.
  *
- * - Public demo: always synthetic fixtures; never reads calendar cache; never network.
- * - Local: official calendar cache when present; missing/malformed → explicit
- *   `live_unavailable` (no silent synthetic fallback). Stale cache → `stale_calendar`
- *   with data + warning. Partial provider failure is surfaced via source statuses.
+ * - Public demo: synthetic fixtures + synthetic results; never network.
+ * - Local: official calendar cache + optional results cache linked strictly
+ *   by releaseFamily + referencePeriod.
  */
 export function loadCatalystFeed(
   query: CatalystQuery = {},
@@ -111,6 +197,7 @@ export function loadCatalystFeed(
         synthetic: false,
         stale: false,
         partialFailure: false,
+        results: { available: false, status: "missing" },
       },
       count: 0,
       catalysts: [],
@@ -124,7 +211,11 @@ export function loadCatalystFeed(
   }
 
   const { cache, stale } = loaded;
-  const filtered = filterCatalysts(cache.catalysts, query);
+  const merged = mergeOfficialResults(cache.catalysts, {
+    dataRoot: options.dataRoot,
+    now,
+  });
+  const filtered = filterCatalysts(merged.catalysts, query);
   const partialFailure = cache.partialFailure;
 
   let banner = CATALYST_OFFICIAL_BANNER;
@@ -133,6 +224,9 @@ export function loadCatalystFeed(
     banner = stale
       ? `${CATALYST_STALE_BANNER} · partial source failure`
       : `${CATALYST_OFFICIAL_BANNER} · partial source failure`;
+  }
+  if (merged.resultsMeta.stale) {
+    banner = `${banner} · stale results`;
   }
 
   return {
@@ -152,9 +246,11 @@ export function loadCatalystFeed(
       partialFailure,
       window: cache.requestedWindow,
       sources: cache.sources,
+      results: merged.resultsMeta,
     },
     count: filtered.length,
     catalysts: filtered,
     validationErrors: cache.validationErrors,
+    linkingWarnings: merged.linkingWarnings,
   };
 }

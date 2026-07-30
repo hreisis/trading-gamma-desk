@@ -387,6 +387,9 @@ export function normalizeCatalystEvent(raw: CatalystRawEvent): NormalizeResult {
     evidence,
     dedupeKey,
     synthetic: isSynthetic,
+    ...(raw.releaseFamily ? { releaseFamily: raw.releaseFamily } : {}),
+    ...(raw.referencePeriod ? { referencePeriod: raw.referencePeriod } : {}),
+    ...(raw.releaseResult ? { releaseResult: raw.releaseResult } : {}),
   };
 
   const parsed = Catalyst.safeParse(candidate);

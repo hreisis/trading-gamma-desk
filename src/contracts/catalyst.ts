@@ -85,6 +85,41 @@ export const CatalystAffectedAsset = z.union([
   z.string().min(1).max(32),
 ]);
 
+/** Release families with official series result support (M2-2C1). */
+export const CatalystReleaseFamily = z.enum(["cpi", "employment_situation"]);
+
+export const ReleaseObservationTransformation = z.enum([
+  "level",
+  "mom-change",
+  "yoy-change",
+]);
+
+export const ReleaseObservation = z.object({
+  metric: z.string().min(1),
+  actual: z.number(),
+  unit: z.string().min(1),
+  sourceSeriesId: z.string().min(1),
+  /** Official BLS period token, e.g. 2026-M06 (never M13 annual). */
+  sourcePeriod: z.string().min(1),
+  transformation: ReleaseObservationTransformation,
+  preliminary: z.boolean().optional(),
+});
+
+/**
+ * Official print observations. Consensus/surprise stay null until a later
+ * milestone — never invent forecast=0 or previous-as-consensus.
+ */
+export const ReleaseResult = z.object({
+  referencePeriod: z.string().min(1),
+  observedAt: IsoDateTime,
+  sourceName: z.string().min(1),
+  sourceUrl: z.string().url(),
+  observations: z.array(ReleaseObservation).nonempty(),
+  consensus: z.null(),
+  surprise: z.null(),
+  surpriseStatus: z.literal("unavailable"),
+});
+
 export const Catalyst = z.object({
   schemaVersion: z.literal(CATALYST_SCHEMA_VERSION),
   id: z.string().min(1),
@@ -109,6 +144,11 @@ export const Catalyst = z.object({
    * (scheduled release time only — not an observed print).
    */
   synthetic: z.boolean(),
+  /** Present when the row is a known BLS release family (schedule or result). */
+  releaseFamily: CatalystReleaseFamily.optional(),
+  /** YYYY-MM from official schedule/API metadata — never guessed from release day. */
+  referencePeriod: z.string().optional(),
+  releaseResult: ReleaseResult.optional(),
 });
 
 export type Catalyst = z.infer<typeof Catalyst>;
@@ -120,6 +160,12 @@ export type CatalystSourceType = z.infer<typeof CatalystSourceType>;
 export type CatalystMacroChannel = z.infer<typeof CatalystMacroChannel>;
 export type CatalystConfidence = z.infer<typeof CatalystConfidence>;
 export type CatalystEvidence = z.infer<typeof CatalystEvidence>;
+export type CatalystReleaseFamily = z.infer<typeof CatalystReleaseFamily>;
+export type ReleaseObservation = z.infer<typeof ReleaseObservation>;
+export type ReleaseResult = z.infer<typeof ReleaseResult>;
+export type ReleaseObservationTransformation = z.infer<
+  typeof ReleaseObservationTransformation
+>;
 
 export const IMPORTANCE_RANK: Record<CatalystImportance, number> = {
   low: 1,

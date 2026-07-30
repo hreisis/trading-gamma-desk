@@ -1,0 +1,90 @@
+{
+  "kind": "CatalystSyntheticResultsFixture",
+  "schemaVersion": "0.1.0",
+  "disclaimer": "Synthetic BLS-shaped release results for public demo — not official observations. Consensus unavailable. Surprise unavailable.",
+  "releases": [
+    {
+      "releaseFamily": "cpi",
+      "referencePeriod": "2026-06",
+      "observedAt": "2026-07-15T12:05:00.000Z",
+      "fingerprint": "synthetic-cpi-2026-06",
+      "releaseResult": {
+        "referencePeriod": "2026-06",
+        "observedAt": "2026-07-15T12:05:00.000Z",
+        "sourceName": "Synthetic BLS Public Data API",
+        "sourceUrl": "https://example.invalid/synthetic/bls-api",
+        "observations": [
+          {
+            "metric": "headline_cpi_sa_mom",
+            "actual": 0.1,
+            "unit": "percent",
+            "sourceSeriesId": "CUSR0000SA0",
+            "sourcePeriod": "2026-M06",
+            "transformation": "mom-change"
+          },
+          {
+            "metric": "headline_cpi_sa_yoy",
+            "actual": 2.7,
+            "unit": "percent",
+            "sourceSeriesId": "CUSR0000SA0",
+            "sourcePeriod": "2026-M06",
+            "transformation": "yoy-change"
+          },
+          {
+            "metric": "core_cpi_sa_mom",
+            "actual": 0.2,
+            "unit": "percent",
+            "sourceSeriesId": "CUSR0000SA0L1E",
+            "sourcePeriod": "2026-M06",
+            "transformation": "mom-change"
+          },
+          {
+            "metric": "core_cpi_sa_yoy",
+            "actual": 2.9,
+            "unit": "percent",
+            "sourceSeriesId": "CUSR0000SA0L1E",
+            "sourcePeriod": "2026-M06",
+            "transformation": "yoy-change"
+          }
+        ],
+        "consensus": null,
+        "surprise": null,
+        "surpriseStatus": "unavailable"
+      }
+    },
+    {
+      "releaseFamily": "employment_situation",
+      "referencePeriod": "2026-06",
+      "observedAt": "2026-07-03T12:05:00.000Z",
+      "fingerprint": "synthetic-empsit-2026-06",
+      "releaseResult": {
+        "referencePeriod": "2026-06",
+        "observedAt": "2026-07-03T12:05:00.000Z",
+        "sourceName": "Synthetic BLS Public Data API",
+        "sourceUrl": "https://example.invalid/synthetic/bls-api",
+        "observations": [
+          {
+            "metric": "total_nonfarm_payrolls_mom",
+            "actual": 147,
+            "unit": "thousands",
+            "sourceSeriesId": "CES0000000001",
+            "sourcePeriod": "2026-M06",
+            "transformation": "mom-change",
+            "preliminary": true
+          },
+          {
+            "metric": "unemployment_rate",
+            "actual": 4.1,
+            "unit": "percent",
+            "sourceSeriesId": "LNS14000000",
+            "sourcePeriod": "2026-M06",
+            "transformation": "level"
+          }
+        ],
+        "consensus": null,
+        "surprise": null,
+        "surpriseStatus": "unavailable"
+      }
+    }
+  ]
+}

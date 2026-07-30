@@ -14,6 +14,8 @@ export async function fetchValidated(
     readonly fetchImpl?: FetchLike;
     /** Abort after this many ms (descriptive timeout error). */
     readonly timeoutMs?: number;
+    readonly method?: string;
+    readonly body?: string;
   } = {},
 ): Promise<ValidatedResponse> {
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -27,7 +29,9 @@ export async function fetchValidated(
 
   try {
     const response = await fetchImpl(url, {
+      method: options.method,
       headers: options.headers,
+      body: options.body,
       signal: controller?.signal,
     });
 

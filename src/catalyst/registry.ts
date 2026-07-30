@@ -2,6 +2,7 @@ import type {
   CatalystCategory,
   CatalystImportance,
   CatalystMacroChannel,
+  CatalystReleaseFamily,
 } from "@/contracts";
 
 export type OfficialCalendarSourceId = "bls" | "bea" | "federal_reserve";
@@ -21,6 +22,8 @@ export interface OfficialEventMapping {
   readonly macroChannels: readonly CatalystMacroChannel[];
   readonly headline: string;
   readonly summary: string;
+  /** When set, enables official series result linking (M2-2C1). */
+  readonly releaseFamily?: CatalystReleaseFamily;
 }
 
 /** Shared FOMC asset / channel coverage (rates, USD, equities, gold, macro channels). */
@@ -51,6 +54,7 @@ export const OFFICIAL_EVENT_REGISTRY: readonly OfficialEventMapping[] = [
     headline: "Consumer Price Index (CPI) scheduled release",
     summary:
       "BLS Consumer Price Index release schedule entry. Scheduled time only — not an observed print.",
+    releaseFamily: "cpi",
   },
   {
     id: "bls_employment_situation",
@@ -63,6 +67,7 @@ export const OFFICIAL_EVENT_REGISTRY: readonly OfficialEventMapping[] = [
     headline: "Employment Situation scheduled release",
     summary:
       "BLS Employment Situation (payrolls / unemployment) schedule entry. Scheduled time only — not an observed print.",
+    releaseFamily: "employment_situation",
   },
   {
     id: "bls_ppi",

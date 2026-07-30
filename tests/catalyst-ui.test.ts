@@ -12,6 +12,9 @@ describe("catalyst UI payload", () => {
     const feed = loadCatalystFeed({}, { publicDemo: true });
     expect(feed.banner).toBe("Illustrative catalyst demo · synthetic events");
     expect(feed.disclaimer).toMatch(/not actual news/i);
+    expect(feed.disclaimer).toMatch(/Consensus unavailable/i);
+    const withResult = feed.catalysts.find((c) => c.releaseResult);
+    expect(withResult?.releaseResult?.surpriseStatus).toBe("unavailable");
     for (const c of feed.catalysts) {
       expect(c.headline.length).toBeGreaterThan(0);
       expect(c.category.length).toBeGreaterThan(0);
