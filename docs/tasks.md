@@ -4,9 +4,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-4 done; next is M1-5 (property tests) or M1-6 (scenario fixtures).
+**Milestone 1 — Cross-Asset Macro.** M1-5/M1-6 checkpoint done; next is **M1-7** (ingest + snapshot writer).
 
-> **M1-1 is complete.** All five Tiingo symbols verified against real responses on `2026-07-29`; reproduce with `npm run verify:tiingo`. Two date traps were found and are recorded in `architecture.md`: the `date` field must be sliced as a string rather than parsed through a local `Date`, and `btcusd` bars are UTC-dated so the newest bar can be an in-progress day. M1-7 is unblocked.
+> **M1-6b is deferred.** Do not calibrate `marginRef`, `ambiguityFloor`, `λ` or confidence bands against hand-tuned scenarios alone — that overfits placeholders. After M1-7 freezes a batch of real historical samples, calibrate jointly against scenario fixtures **and** the live distribution. Until then `confidenceParams.calibrated` stays `false` and no surface may render band labels.
 
 ---
 
@@ -53,9 +53,9 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-2 | Zod contracts from `data-contracts.md` 0.2.1 | Fixtures validate; `RegimeSignatureConfig` has its own schema — ✅ 30 contract tests green, `tsc` and `next build` clean |
 | M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` — ✅ session calendar, simple returns, floor boundary and eight counterexample classes covered by 33 tests |
 | M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented — ✅ `classifyDriver` + 16 scoring tests; placeholders `highBandFloor=70` / `zNoiseFloor=0.5` documented as uncalibrated |
-| M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move |
-| M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data |
-| M1-6b | Calibrate `confidenceParams` | `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs set from fixtures; `calibrated: true` |
+| M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move — ✅ 10 property tests; sign-flip keeps confirming membership (does not swap roles); scaling requires unsaturated strength |
+| M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data — ✅ `fixtures/macro/scenarios.m1.json` + 8 scenario acceptance tests against `classifyDriver` |
+| M1-6b | Calibrate `confidenceParams` | Deferred until M1-7 freezes real historical samples; then jointly fit `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs against scenarios **and** the live distribution; only then `calibrated: true` |
 | M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; year-boundary merge for Treasury; response validation rules enforced; immutable snapshot with versions |
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template |
 | M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
