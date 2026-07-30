@@ -41,3 +41,23 @@ export {
 export * from "./results/cache";
 export * from "./results/fetch-results";
 export type { CatalystResultsCache, BuiltRelease } from "./results/types";
+export * from "./documents/rss";
+export * from "./documents/html-text";
+export * from "./documents/period";
+export * from "./documents/url";
+export * from "./documents/hash";
+export * from "./documents/build";
+export * from "./documents/registry";
+export * from "./documents/link";
+export * from "./documents/cache";
+export * from "./documents/fetch-documents";
+export {
+  fetchFedDocuments,
+  fetchBlsDocuments,
+  fetchBeaDocuments,
+} from "./documents/providers";
+export type {
+  CatalystDocumentsCache,
+  DocumentRevisionRecord,
+  DocumentLinkingWarning,
+} from "./documents/types";

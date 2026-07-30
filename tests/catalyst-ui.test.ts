@@ -22,6 +22,12 @@ describe("catalyst UI payload", () => {
       expect(c.direction.length).toBeGreaterThan(0);
       expect(c.synthetic).toBe(true);
     }
+    expect(feed.documents?.length).toBeGreaterThan(0);
+    expect(feed.source.documents?.status).toBe("synthetic");
+    const withOfficial = feed.catalysts.find(
+      (c) => c.officialDocuments && c.officialDocuments.length > 0,
+    );
+    expect(withOfficial?.officialDocuments?.[0]?.canonicalUrl).toMatch(/^https:/);
   });
 
   it("keeps catalyst demo copy distinct from macro illustrative banner", () => {

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>BLS Consumer Price Index</title>
+    <link>https://www.bls.gov/cpi/</link>
+    <description>Consumer Price Index news releases</description>
+    <item>
+      <title><![CDATA[Consumer Price Index - June 2026]]></title>
+      <link>https://www.bls.gov/news.release/cpi.nr0.htm</link>
+      <guid isPermaLink="true">https://www.bls.gov/news.release/cpi.nr0.htm</guid>
+      <description><![CDATA[The Consumer Price Index for All Urban Consumers (CPI-U) increased 0.1 percent in June on a seasonally adjusted basis.]]></description>
+      <pubDate>Tue, 15 Jul 2026 12:30:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Consumer Price Index - May 2026</title>
+      <link>https://www.bls.gov/news.release/archives/cpi_06112026.htm</link>
+      <guid>https://www.bls.gov/news.release/archives/cpi_06112026.htm</guid>
+      <description>Archived CPI release for May 2026 &amp; prior month.</description>
+      <pubDate>Wed, 11 Jun 2026 12:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

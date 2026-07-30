@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { IsoDateTime, MacroSymbol, SemVer } from "./common";
+import { OfficialDocumentRef } from "./official-document";
 
 export const CATALYST_SCHEMA_VERSION = "0.1.0";
 
@@ -171,6 +172,11 @@ export const Catalyst = z.object({
   /** YYYY-MM from official schedule/API metadata — never guessed from release day. */
   referencePeriod: z.string().optional(),
   releaseResult: ReleaseResult.optional(),
+  /**
+   * Linked official release documents (M2-3A). References only — full archive
+   * lives in documents-latest.json. Does not change direction/importance.
+   */
+  officialDocuments: z.array(OfficialDocumentRef).optional(),
 });
 
 export type Catalyst = z.infer<typeof Catalyst>;

@@ -1,4 +1,9 @@
-import type { Catalyst, CatalystFeedResponse, ReleaseResult } from "@/catalyst";
+import type {
+  Catalyst,
+  CatalystFeedResponse,
+  OfficialDocument,
+  ReleaseResult,
+} from "@/catalyst";
 
 function formatWhen(iso: string): string {
   // Display the contract timestamp as-is (already normalized); keep short.
@@ -56,6 +61,82 @@ function ReleaseResultBlock({
   );
 }
 
+function OfficialDocumentBlock({
+  docs,
+}: {
+  docs: NonNullable<Catalyst["officialDocuments"]>;
+}) {
+  return (
+    <div className="catalyst-official-doc" data-testid="catalyst-official-doc">
+      {docs.map((d) => (
+        <div key={d.id} className="catalyst-official-doc-item">
+          <p className="catalyst-release-meta">Official release · {d.provider}</p>
+          <p className="catalyst-release-meta">
+            Published {formatWhen(d.publishedAt)}
+          </p>
+          {d.summaryFromSource ? (
+            <p className="catalyst-release-meta">{d.summaryFromSource}</p>
+          ) : null}
+          <p className="catalyst-release-meta">
+            <a
+              href={d.canonicalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="catalyst-official-doc-link"
+            >
+              View official document
+            </a>
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OfficialUpdates({
+  documents,
+}: {
+  documents: readonly OfficialDocument[];
+}) {
+  if (documents.length === 0) return null;
+  return (
+    <div className="catalyst-official-updates" data-testid="catalyst-official-updates">
+      <h3>Official Updates</h3>
+      <p className="desk-section-note">
+        Source release documents from the last 30 days — evidence only, not
+        additional macro catalysts. No AI summaries.
+      </p>
+      <ul className="catalyst-list">
+        {documents.map((d) => (
+          <li key={d.id} className="catalyst-row">
+            <div className="catalyst-when">{formatWhen(d.publishedAt)}</div>
+            <div className="catalyst-main">
+              <p className="catalyst-headline">{d.title}</p>
+              <p className="catalyst-meta">
+                <span>{d.provider}</span>
+                <span>{d.documentType}</span>
+                {d.referencePeriod ? <span>ref {d.referencePeriod}</span> : null}
+              </p>
+              {d.summaryFromSource ? (
+                <p className="catalyst-release-meta">{d.summaryFromSource}</p>
+              ) : null}
+              <p className="catalyst-release-meta">
+                <a
+                  href={d.canonicalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View official document
+                </a>
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function CatalystRow({ c }: { c: Catalyst }) {
   return (
     <li key={c.id} className="catalyst-row">
@@ -79,6 +160,9 @@ function CatalystRow({ c }: { c: Catalyst }) {
             result={c.releaseResult}
             synthetic={c.synthetic}
           />
+        ) : null}
+        {c.officialDocuments && c.officialDocuments.length > 0 ? (
+          <OfficialDocumentBlock docs={c.officialDocuments} />
         ) : null}
       </div>
       <div className="catalyst-source">
@@ -127,6 +211,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
         {feed.source.results
           ? ` · results:${feed.source.results.status ?? (feed.source.results.available ? "ok" : "missing")}`
           : ""}
+        {feed.source.documents
+          ? ` · documents:${feed.source.documents.status ?? (feed.source.documents.available ? "ok" : "missing")}`
+          : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
               .map(
@@ -140,14 +227,16 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
         Events that may change the market&apos;s driver — independent of the
         regime score above. Classification confidence is uncalibrated and is not
         a market-up probability. Calendar rows are scheduled release times;
-        linked BLS series show actuals only (no consensus/surprise).
+        linked BLS series show actuals only (no consensus/surprise). Official
+        release documents are source evidence only.
       </p>
 
       {feed.mode === "live_unavailable" ? (
         <p className="desk-section-note" data-testid="catalyst-empty">
           No official calendar cache. Run{" "}
           <code>npm run catalyst:fetch</code> locally (not available in public
-          demo). Optional results: <code>npm run catalyst:results:fetch</code>.
+          demo). Optional: <code>npm run catalyst:results:fetch</code>,{" "}
+          <code>npm run catalyst:documents:fetch</code>.
         </p>
       ) : feed.catalysts.length === 0 ? (
         <p className="desk-section-note" data-testid="catalyst-empty">
@@ -160,6 +249,10 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           ))}
         </ul>
       )}
+
+      {feed.documents && feed.documents.length > 0 ? (
+        <OfficialUpdates documents={feed.documents} />
+      ) : null}
 
       {feed.mode !== "live_unavailable" ? (
         <p className="desk-section-note" data-testid="catalyst-feed-source">
@@ -186,6 +279,13 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           {feed.source.results.materializedStandaloneCount ?? 0}; linked:{" "}
           {feed.source.results.linkedCount ?? 0}. Consensus unavailable ·
           Surprise unavailable.
+        </p>
+      ) : null}
+      {feed.source.documents?.archiveDocumentCount !== undefined ? (
+        <p className="desk-section-note" data-testid="catalyst-documents-archive">
+          Documents archive: {feed.source.documents.archiveDocumentCount}; feed
+          window: {feed.source.documents.feedDocumentCount ?? 0}; linked:{" "}
+          {feed.source.documents.linkedCount ?? 0}. No AI summaries.
         </p>
       ) : null}
 

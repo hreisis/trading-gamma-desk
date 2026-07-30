@@ -517,6 +517,21 @@ Optional Catalyst fields:
 
 BLS series (explicit registry): `CUSR0000SA0` (headline CPI SA), `CUSR0000SA0L1E` (core CPI SA — all items less food and energy), `CES0000000001` (payrolls), `LNS14000000` (unemployment rate). CPI emits MoM + YoY percent changes; payrolls emit monthly change in thousands; unemployment is the official level. Observations may include optional `inputs` (current / previous / year-ago source periods and raw values) for audit. Local: `npm run catalyst:results:fetch` → gitignored `data/catalyst/results-latest.json` (full period archive). The default Catalyst feed materializes scheduled events (strictly linked when possible) plus **at most one** latest independent observation per `releaseFamily` — historical archive rows are not expanded into dozens of top-level catalysts. An event becomes `released` only when official series data for its `referencePeriod` is linked — not merely because the schedule time has passed.
 
+### Official release documents (M2-3A)
+
+Independent canonical contract `OfficialDocument` (stored in `data/catalyst/documents-latest.json`, not as extra catalysts):
+
+| Field | Notes |
+| --- | --- |
+| `provider` | `federal_reserve` \| `bls` \| `bea` |
+| `documentType` | `fomc_statement` \| `cpi_release` \| `employment_release` \| `gdp_release` \| `personal_income_outlays_release` \| `international_trade_release` |
+| `releaseFamily` | Document linking key (`cpi`, `employment_situation`, `fomc_policy`, `gdp`, `personal_income_outlays`, `international_trade`) |
+| `summaryFromSource` | Feed/page description only — never program-generated prose labelled as source summary |
+| `contentText` / `contentHash` | Normalized body (boilerplate stripped) + stable hash; raw HTTP responses are not committed |
+| `publishedAt` / `observedAt` | Official publish time vs successful fetch observation time |
+
+Sources (explicit registry only — no search/aggregators): Fed `press_monetary.xml`; BLS `cpi.rss` + `empsit.rss`; BEA `apps.bea.gov/rss/rss.xml` filtered by item `name`. Link to catalysts by `releaseFamily` + `referencePeriod` (or same Eastern calendar day + schedule identity). Documents never create a second catalyst; optional `Catalyst.officialDocuments[]` holds slim refs. Default UI/API materializes the last **30 days**; archive may be longer. No LLM summaries; FOMC statement linking does **not** parse rates, votes, dissent, hawkish/dovish, or SEP. Local: `npm run catalyst:documents:fetch`. Public demo uses labelled synthetic document fixtures only.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

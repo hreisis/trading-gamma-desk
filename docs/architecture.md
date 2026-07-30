@@ -84,7 +84,7 @@ Status: **stack locked for Milestone 1** (single TypeScript runtime). Data flow 
 | --- | --- | --- |
 | `data/` | Source clients, rate limits, raw bar cache | Idempotent pulls keyed by `sessionDate` |
 | `macro/` | Transforms, z-scores, signature scoring, driver assembly | Pure functions, no IO, unit + property tested |
-| `catalyst/` | Raw event → canonical Catalyst; dedupe; feed query; official calendar + BLS results | Normalize is pure; `catalyst:fetch` / `catalyst:results:fetch` are local-only; public demo never networks |
+| `catalyst/` | Raw event → canonical Catalyst; dedupe; feed query; official calendar + BLS results + official documents | Normalize is pure; `catalyst:fetch` / `catalyst:results:fetch` / `catalyst:documents:fetch` are local-only and independent; public demo never networks |
 | `interpret/` | Template generator, optional LLM + guardrails | Emits contract-shaped JSON only |
 | `contracts/` | Zod schemas | Mirrors `docs/data-contracts.md` |
 | `app/api/` | Serve latest snapshot + catalyst feed | Versioned payloads |

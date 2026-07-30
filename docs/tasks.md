@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 2 — Catalyst.** **M2-2C1** official BLS release results (CPI + Employment Situation actuals). No consensus/surprise, news, LLM, Market Temperature, or catalyst→regime linkage.
+**Milestone 2 — Catalyst.** **M2-3A** official release document ingestion (Fed / BLS / BEA). No LLM summarization, consensus/surprise, news aggregation, Market Temperature, or catalyst→regime linkage.
 
 ### Queued (not started)
 
@@ -88,7 +88,8 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M2-2A | Official US macro calendar ingestion | BLS ICS + BEA JSON adapters; explicit event registry; injectable window (now−1d…now+45d); `npm run catalyst:fetch` → gitignored `data/catalyst/calendar-latest.json`; local loader surfaces missing/stale/partial; public demo stays synthetic-only (no BLS/BEA network); schedule ≠ observed print — ✅ |
 | M2-2B | Official FOMC calendar ingestion | Federal Reserve HTML adapter (`fomccalendars.htm`); policy decision 2:00 p.m. ET + Chair press conference 2:30 p.m. ET; SEP flagged on decision only; EST/EDT via America/New_York; three-provider partial/all-fail; no minutes auto-schedule, no decision text — ✅ |
 | M2-2C1 | Official BLS release results | CPI + Employment Situation via BLS Public Data API; optional `releaseResult` + calculation `inputs` provenance; archive vs feed materialization (latest per family + linked window only); deterministic BLS period ordering; linking diagnostics by family+period; consensus/surprise unavailable; public-demo synthetic results only — ✅ |
-| M2-2C | Consensus / surprise / BEA / more series | Deferred — PPI/JOLTS/ECI, BEA results, consensus, surprise, FOMC decision text |
+| M2-3A | Official release document ingestion | Fed monetary-policy press RSS + BLS CPI/Employment RSS + BEA news RSS (GDP/PI/Trade); canonical `OfficialDocument`; strict document↔catalyst linking; content-hash revisions; `catalyst:documents:fetch` → `documents-latest.json`; 30-day feed vs archive; no LLM / no rate-decision parsing; public-demo synthetic documents only — ✅ |
+| M2-2C | Consensus / surprise / BEA / more series | Deferred — PPI/JOLTS/ECI, BEA results, consensus, surprise, FOMC decision text parsing |
 | M2-2+ | News / X / LLM | Deferred |
 
 ### Deferred out of Milestone 1

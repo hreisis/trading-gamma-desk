@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+  <channel>
+    <title>BLS Employment Situation</title>
+    <link>https://www.bls.gov/ces/</link>
+    <item>
+      <title>THE EMPLOYMENT SITUATION -- JUNE 2026</title>
+      <link>https://www.bls.gov/news.release/empsit.nr0.htm</link>
+      <guid>https://www.bls.gov/news.release/empsit.nr0.htm</guid>
+      <description><![CDATA[Both total nonfarm payroll employment and the unemployment rate changed little in June.]]></description>
+      <pubDate>Thu, 02 Jul 2026 12:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

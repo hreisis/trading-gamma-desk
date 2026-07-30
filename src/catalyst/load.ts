@@ -1,10 +1,17 @@
 import syntheticBatch from "../../fixtures/catalyst/synthetic-events.json";
 import syntheticResults from "../../fixtures/catalyst/synthetic-results.json";
+import syntheticDocuments from "../../fixtures/catalyst/synthetic-documents.json";
 import { isPublicDemoMode } from "@/desk/public-demo";
-import type { Catalyst, ReleaseResult } from "@/contracts";
+import type { Catalyst, OfficialDocument, ReleaseResult } from "@/contracts";
+import { OfficialDocument as OfficialDocumentSchema } from "@/contracts";
 import { loadCalendarCache } from "./cache";
 import { normalizeAndDedupe } from "./dedupe";
 import { filterCatalysts } from "./query";
+import { loadDocumentsCache } from "./documents/cache";
+import {
+  filterDocumentsForFeed,
+  linkDocumentsToCatalysts,
+} from "./documents/link";
 import { materializeResultsFeed } from "./results/link";
 import { loadResultsCache } from "./results/cache";
 import type { BuiltRelease } from "./results/types";
@@ -18,13 +25,13 @@ export const CATALYST_DEMO_BANNER =
   "Illustrative catalyst demo · synthetic events";
 
 export const CATALYST_DEMO_DISCLAIMER =
-  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results (when shown) are illustrative — Consensus unavailable · Surprise unavailable.";
+  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results and official-document fixtures (when shown) are illustrative — Consensus unavailable · Surprise unavailable. No AI document summaries.";
 
 export const CATALYST_OFFICIAL_BANNER =
   "Official US macro calendar · schedules + BLS series results when linked";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. A past schedule time alone does not mark an event released. Default feed shows scheduled events plus at most the latest observation per release family.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Official release documents (when linked) are source text/evidence only — no AI summaries. A past schedule time alone does not mark an event released. Default feed shows scheduled events plus at most the latest observation per release family.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";
@@ -46,6 +53,17 @@ export const OFFICIAL_CALENDAR_CACHE_NAME =
 
 export const OFFICIAL_RESULTS_CACHE_NAME =
   "data/catalyst/results-latest.json";
+
+export const OFFICIAL_DOCUMENTS_CACHE_NAME =
+  "data/catalyst/documents-latest.json";
+
+export const SYNTHETIC_DOCUMENTS_FIXTURE_NAME =
+  "fixtures/catalyst/synthetic-documents.json";
+
+function slimDocumentForFeed(doc: OfficialDocument): OfficialDocument {
+  const { contentText: _body, ...rest } = doc;
+  return rest;
+}
 
 function rawEventsFromBatch(): CatalystRawEvent[] {
   const events = (syntheticBatch as { events?: CatalystRawEvent[] }).events;
@@ -76,6 +94,41 @@ function syntheticBuiltReleases(): BuiltRelease[] {
   }));
 }
 
+function syntheticOfficialDocuments(): OfficialDocument[] {
+  const docs = (syntheticDocuments as { documents?: unknown[] }).documents;
+  if (!Array.isArray(docs)) return [];
+  const out: OfficialDocument[] = [];
+  for (const d of docs) {
+    const parsed = OfficialDocumentSchema.safeParse(d);
+    if (parsed.success) out.push(parsed.data);
+  }
+  return out;
+}
+
+function applyDocuments(
+  catalysts: Catalyst[],
+  archive: readonly OfficialDocument[],
+  now: Date,
+): {
+  catalysts: Catalyst[];
+  documents: OfficialDocument[];
+  documentLinkingWarnings: NonNullable<
+    CatalystFeedResponse["documentLinkingWarnings"]
+  >;
+  linkedCount: number;
+  archiveDocumentCount: number;
+} {
+  const feedDocs = filterDocumentsForFeed(archive, now, 30);
+  const linked = linkDocumentsToCatalysts(catalysts, feedDocs);
+  return {
+    catalysts: linked.catalysts,
+    documents: feedDocs.map(slimDocumentForFeed),
+    documentLinkingWarnings: linked.linkingWarnings,
+    linkedCount: linked.linkedCount,
+    archiveDocumentCount: archive.length,
+  };
+}
+
 function loadSyntheticFeed(
   query: CatalystQuery,
   options: { readonly publicDemo: boolean; readonly now: Date },
@@ -88,7 +141,12 @@ function loadSyntheticFeed(
     releases: syntheticBuiltReleases(),
     calendarAvailable: true,
   });
-  const filtered = filterCatalysts(linked.catalysts, query);
+  const withDocs = applyDocuments(
+    linked.catalysts,
+    syntheticOfficialDocuments(),
+    options.now,
+  );
+  const filtered = filterCatalysts(withDocs.catalysts, query);
   return {
     kind: "CatalystFeed",
     schemaVersion: "0.1.0",
@@ -111,11 +169,23 @@ function loadSyntheticFeed(
         materializedStandaloneCount: linked.materializedStandaloneCount,
         linkedCount: linked.linkedCount,
       },
+      documents: {
+        available: true,
+        status: "synthetic",
+        fetchedAt: options.now.toISOString(),
+        stale: false,
+        partialFailure: false,
+        archiveDocumentCount: withDocs.archiveDocumentCount,
+        feedDocumentCount: withDocs.documents.length,
+        linkedCount: withDocs.linkedCount,
+      },
     },
     count: filtered.length,
     catalysts: filtered,
+    documents: withDocs.documents,
     validationErrors,
     linkingWarnings: linked.linkingWarnings,
+    documentLinkingWarnings: withDocs.documentLinkingWarnings,
   };
 }
 
@@ -169,6 +239,10 @@ export function loadCatalystFeed(
     dataRoot: options.dataRoot,
     now,
   });
+  const documentsLoaded = loadDocumentsCache({
+    dataRoot: options.dataRoot,
+    now,
+  });
 
   if (!loaded.ok) {
     // Calendar unavailable: still surface latest CPI/Employment observations.
@@ -179,7 +253,11 @@ export function loadCatalystFeed(
         calendarAvailable: false,
         calendarUnavailableReason: loaded.error,
       });
-      const filtered = filterCatalysts(linked.catalysts, query);
+      const withDocs = documentsLoaded.ok
+        ? applyDocuments(linked.catalysts, documentsLoaded.cache.documents, now)
+        : null;
+      const catalysts = withDocs?.catalysts ?? linked.catalysts;
+      const filtered = filterCatalysts(catalysts, query);
       return {
         kind: "CatalystFeed",
         schemaVersion: "0.1.0",
@@ -195,13 +273,28 @@ export function loadCatalystFeed(
           stale: resultsLoaded.stale,
           partialFailure: resultsLoaded.cache.partialFailure,
           results: resultsMetaFromMaterialize(resultsLoaded, linked),
+          documents: documentsLoaded.ok
+            ? {
+                available: true,
+                status: "ok",
+                fetchedAt: documentsLoaded.cache.fetchedAt,
+                stale: documentsLoaded.stale,
+                partialFailure: documentsLoaded.cache.partialFailure,
+                archiveDocumentCount: withDocs?.archiveDocumentCount,
+                feedDocumentCount: withDocs?.documents.length,
+                linkedCount: withDocs?.linkedCount,
+                sources: documentsLoaded.cache.sources,
+              }
+            : { available: false, status: "missing", error: documentsLoaded.error },
         },
         count: filtered.length,
         catalysts: filtered,
+        documents: withDocs?.documents,
         validationErrors: [
           { index: -1, error: loaded.error },
         ],
         linkingWarnings: linked.linkingWarnings,
+        documentLinkingWarnings: withDocs?.documentLinkingWarnings,
       };
     }
 
@@ -220,9 +313,30 @@ export function loadCatalystFeed(
         stale: false,
         partialFailure: false,
         results: { available: false, status: "missing" },
+        documents: documentsLoaded.ok
+          ? {
+              available: true,
+              status: "ok",
+              fetchedAt: documentsLoaded.cache.fetchedAt,
+              stale: documentsLoaded.stale,
+              partialFailure: documentsLoaded.cache.partialFailure,
+              archiveDocumentCount: documentsLoaded.cache.documents.length,
+              feedDocumentCount: filterDocumentsForFeed(
+                documentsLoaded.cache.documents,
+                now,
+                30,
+              ).length,
+              sources: documentsLoaded.cache.sources,
+            }
+          : { available: false, status: "missing", error: documentsLoaded.error },
       },
       count: 0,
       catalysts: [],
+      documents: documentsLoaded.ok
+        ? filterDocumentsForFeed(documentsLoaded.cache.documents, now, 30).map(
+            slimDocumentForFeed,
+          )
+        : undefined,
       validationErrors: [
         {
           index: -1,
@@ -251,6 +365,43 @@ export function loadCatalystFeed(
     resultsMeta = resultsMetaFromMaterialize(resultsLoaded, linked);
   }
 
+  let documentsMeta: NonNullable<CatalystFeedResponse["source"]["documents"]> = {
+    available: false,
+    status: "missing",
+  };
+  let feedDocuments: OfficialDocument[] | undefined;
+  let documentLinkingWarnings: CatalystFeedResponse["documentLinkingWarnings"];
+
+  if (documentsLoaded.ok) {
+    const withDocs = applyDocuments(
+      catalysts,
+      documentsLoaded.cache.documents,
+      now,
+    );
+    catalysts = withDocs.catalysts;
+    feedDocuments = withDocs.documents;
+    documentLinkingWarnings = withDocs.documentLinkingWarnings;
+    documentsMeta = {
+      available: true,
+      status: documentsLoaded.cache.sources.some((s) => s.status === "error")
+        ? "error"
+        : "ok",
+      fetchedAt: documentsLoaded.cache.fetchedAt,
+      stale: documentsLoaded.stale,
+      partialFailure: documentsLoaded.cache.partialFailure,
+      archiveDocumentCount: withDocs.archiveDocumentCount,
+      feedDocumentCount: withDocs.documents.length,
+      linkedCount: withDocs.linkedCount,
+      sources: documentsLoaded.cache.sources,
+    };
+  } else {
+    documentsMeta = {
+      available: false,
+      status: "missing",
+      error: documentsLoaded.error,
+    };
+  }
+
   const filtered = filterCatalysts(catalysts, query);
   const partialFailure = cache.partialFailure;
 
@@ -263,6 +414,9 @@ export function loadCatalystFeed(
   }
   if (resultsMeta.stale) {
     banner = `${banner} · stale results`;
+  }
+  if (documentsMeta.stale) {
+    banner = `${banner} · stale documents`;
   }
 
   return {
@@ -283,10 +437,13 @@ export function loadCatalystFeed(
       window: cache.requestedWindow,
       sources: cache.sources,
       results: resultsMeta,
+      documents: documentsMeta,
     },
     count: filtered.length,
     catalysts: filtered,
+    documents: feedDocuments,
     validationErrors: cache.validationErrors,
     linkingWarnings,
+    documentLinkingWarnings,
   };
 }

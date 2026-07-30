@@ -7,10 +7,12 @@ import type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  OfficialDocument,
   ReleaseObservation,
   ReleaseResult,
 } from "@/contracts";
 import type { OfficialCalendarSourceId } from "./registry";
+import type { DocumentProviderStatus } from "./documents/types";
 
 /**
  * Raw upstream-shaped event before canonicalization.
@@ -120,9 +122,26 @@ export interface CatalystFeedResponse {
       readonly materializedStandaloneCount?: number;
       readonly linkedCount?: number;
     };
+    readonly documents?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly partialFailure?: boolean;
+      readonly status?: "ok" | "error" | "missing" | "synthetic";
+      readonly error?: string;
+      readonly archiveDocumentCount?: number;
+      readonly feedDocumentCount?: number;
+      readonly linkedCount?: number;
+      readonly sources?: readonly DocumentProviderStatus[];
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
+  /**
+   * Default Official Updates window (≈30d). Archive may be larger in cache;
+   * these rows are never expanded into additional catalysts.
+   */
+  readonly documents?: OfficialDocument[];
   readonly validationErrors: Array<{
     readonly index: number;
     readonly error: string;
@@ -130,6 +149,13 @@ export interface CatalystFeedResponse {
   }>;
   readonly linkingWarnings?: Array<{
     readonly error: string;
+    readonly releaseFamily?: string;
+    readonly referencePeriod?: string;
+    readonly reason?: string;
+  }>;
+  readonly documentLinkingWarnings?: Array<{
+    readonly error: string;
+    readonly documentId?: string;
     readonly releaseFamily?: string;
     readonly referencePeriod?: string;
     readonly reason?: string;
@@ -165,6 +191,7 @@ export type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  OfficialDocument,
   ReleaseObservation,
   ReleaseResult,
 };
