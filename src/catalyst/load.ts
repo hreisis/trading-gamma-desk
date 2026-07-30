@@ -2,8 +2,21 @@ import syntheticBatch from "../../fixtures/catalyst/synthetic-events.json";
 import syntheticResults from "../../fixtures/catalyst/synthetic-results.json";
 import syntheticDocuments from "../../fixtures/catalyst/synthetic-documents.json";
 import { isPublicDemoMode } from "@/desk/public-demo";
-import type { Catalyst, OfficialDocument, ReleaseResult } from "@/contracts";
+import type {
+  Catalyst,
+  OfficialBrief,
+  OfficialDocument,
+  ReleaseResult,
+} from "@/contracts";
 import { OfficialDocument as OfficialDocumentSchema } from "@/contracts";
+import { applyStructuredCrossCheck, indexStructuredReleases } from "./briefs/cross-check";
+import { extractBriefFromDocument } from "./briefs/extract";
+import { loadBriefsCache } from "./briefs/cache";
+import {
+  filterBriefsForFeed,
+  publishedAtMapFromDocuments,
+} from "./briefs/materialize";
+import { BRIEF_EXTRACTOR_VERSION } from "./briefs/version";
 import { loadCalendarCache } from "./cache";
 import { normalizeAndDedupe } from "./dedupe";
 import { filterCatalysts } from "./query";
@@ -25,13 +38,13 @@ export const CATALYST_DEMO_BANNER =
   "Illustrative catalyst demo · synthetic events";
 
 export const CATALYST_DEMO_DISCLAIMER =
-  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results and official-document fixtures (when shown) are illustrative — Consensus unavailable · Surprise unavailable. No AI document summaries.";
+  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results, official-document fixtures, and rule-based briefs (when shown) are illustrative — Consensus unavailable · Surprise unavailable. Briefs are rule-based fact extracts, not AI interpretation.";
 
 export const CATALYST_OFFICIAL_BANNER =
   "Official US macro calendar · schedules + BLS series results when linked";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Official release documents (when linked) are source text/evidence only — no AI summaries. A past schedule time alone does not mark an event released. Default feed shows scheduled events plus at most the latest observation per release family.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Official release documents and rule-based briefs are source evidence / fact extracts — not AI interpretation and not a substitute for the full official document. Unextracted facts mean the extractor lacked reliable evidence, not that the agency did not report them. A past schedule time alone does not mark an event released.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";
@@ -57,12 +70,29 @@ export const OFFICIAL_RESULTS_CACHE_NAME =
 export const OFFICIAL_DOCUMENTS_CACHE_NAME =
   "data/catalyst/documents-latest.json";
 
+export const OFFICIAL_BRIEFS_CACHE_NAME = "data/catalyst/briefs-latest.json";
+
 export const SYNTHETIC_DOCUMENTS_FIXTURE_NAME =
   "fixtures/catalyst/synthetic-documents.json";
 
 function slimDocumentForFeed(doc: OfficialDocument): OfficialDocument {
   const { contentText: _body, ...rest } = doc;
   return rest;
+}
+
+function buildBriefsFromDocuments(
+  documents: readonly OfficialDocument[],
+  structured: readonly BuiltRelease[],
+  now: Date,
+): OfficialBrief[] {
+  const index = indexStructuredReleases(structured);
+  const generatedAt = now.toISOString();
+  return documents.map((doc) =>
+    applyStructuredCrossCheck(
+      extractBriefFromDocument(doc, generatedAt),
+      index,
+    ),
+  );
 }
 
 function rawEventsFromBatch(): CatalystRawEvent[] {
@@ -141,10 +171,18 @@ function loadSyntheticFeed(
     releases: syntheticBuiltReleases(),
     calendarAvailable: true,
   });
-  const withDocs = applyDocuments(
-    linked.catalysts,
-    syntheticOfficialDocuments(),
+  const synDocs = syntheticOfficialDocuments();
+  const withDocs = applyDocuments(linked.catalysts, synDocs, options.now);
+  const archiveBriefs = buildBriefsFromDocuments(
+    synDocs,
+    syntheticBuiltReleases(),
     options.now,
+  );
+  const feedBriefs = filterBriefsForFeed(
+    archiveBriefs,
+    publishedAtMapFromDocuments(synDocs),
+    options.now,
+    30,
   );
   const filtered = filterCatalysts(withDocs.catalysts, query);
   return {
@@ -179,10 +217,20 @@ function loadSyntheticFeed(
         feedDocumentCount: withDocs.documents.length,
         linkedCount: withDocs.linkedCount,
       },
+      briefs: {
+        available: true,
+        status: "synthetic",
+        fetchedAt: options.now.toISOString(),
+        stale: false,
+        archiveBriefCount: archiveBriefs.length,
+        feedBriefCount: feedBriefs.length,
+        extractorVersion: BRIEF_EXTRACTOR_VERSION,
+      },
     },
     count: filtered.length,
     catalysts: filtered,
     documents: withDocs.documents,
+    briefs: feedBriefs,
     validationErrors,
     linkingWarnings: linked.linkingWarnings,
     documentLinkingWarnings: withDocs.documentLinkingWarnings,
@@ -243,6 +291,54 @@ export function loadCatalystFeed(
     dataRoot: options.dataRoot,
     now,
   });
+  const briefsLoaded = loadBriefsCache({
+    dataRoot: options.dataRoot,
+    now,
+  });
+
+  function resolveFeedBriefs(
+    archiveDocs: readonly OfficialDocument[] | undefined,
+  ): {
+    briefs: OfficialBrief[] | undefined;
+    meta: NonNullable<CatalystFeedResponse["source"]["briefs"]>;
+  } {
+    if (!briefsLoaded.ok) {
+      return {
+        briefs: undefined,
+        meta: {
+          available: false,
+          status: "missing",
+          error: briefsLoaded.error,
+        },
+      };
+    }
+    const published = archiveDocs?.length
+      ? publishedAtMapFromDocuments(archiveDocs)
+      : new Map(
+          briefsLoaded.cache.inputDocuments.map((d) => [
+            d.documentId,
+            d.publishedAt,
+          ]),
+        );
+    const feed = filterBriefsForFeed(
+      briefsLoaded.cache.briefs,
+      published,
+      now,
+      30,
+    );
+    return {
+      briefs: feed,
+      meta: {
+        available: true,
+        status: briefsLoaded.cache.buildStatus,
+        fetchedAt: briefsLoaded.cache.generatedAt,
+        stale: briefsLoaded.stale,
+        archiveBriefCount: briefsLoaded.cache.briefs.length,
+        feedBriefCount: feed.length,
+        extractorVersion: briefsLoaded.cache.extractorVersion,
+      },
+    };
+  }
 
   if (!loaded.ok) {
     // Calendar unavailable: still surface latest CPI/Employment observations.
@@ -258,6 +354,9 @@ export function loadCatalystFeed(
         : null;
       const catalysts = withDocs?.catalysts ?? linked.catalysts;
       const filtered = filterCatalysts(catalysts, query);
+      const briefPack = resolveFeedBriefs(
+        documentsLoaded.ok ? documentsLoaded.cache.documents : undefined,
+      );
       return {
         kind: "CatalystFeed",
         schemaVersion: "0.1.0",
@@ -286,10 +385,12 @@ export function loadCatalystFeed(
                 sources: documentsLoaded.cache.sources,
               }
             : { available: false, status: "missing", error: documentsLoaded.error },
+          briefs: briefPack.meta,
         },
         count: filtered.length,
         catalysts: filtered,
         documents: withDocs?.documents,
+        briefs: briefPack.briefs,
         validationErrors: [
           { index: -1, error: loaded.error },
         ],
@@ -402,6 +503,10 @@ export function loadCatalystFeed(
     };
   }
 
+  const briefPack = resolveFeedBriefs(
+    documentsLoaded.ok ? documentsLoaded.cache.documents : undefined,
+  );
+
   const filtered = filterCatalysts(catalysts, query);
   const partialFailure = cache.partialFailure;
 
@@ -417,6 +522,9 @@ export function loadCatalystFeed(
   }
   if (documentsMeta.stale) {
     banner = `${banner} · stale documents`;
+  }
+  if (briefPack.meta.stale) {
+    banner = `${banner} · stale briefs`;
   }
 
   return {
@@ -438,10 +546,12 @@ export function loadCatalystFeed(
       sources: cache.sources,
       results: resultsMeta,
       documents: documentsMeta,
+      briefs: briefPack.meta,
     },
     count: filtered.length,
     catalysts: filtered,
     documents: feedDocuments,
+    briefs: briefPack.briefs,
     validationErrors: cache.validationErrors,
     linkingWarnings,
     documentLinkingWarnings,

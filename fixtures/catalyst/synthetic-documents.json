@@ -15,8 +15,8 @@
       "documentType": "fomc_statement",
       "releaseFamily": "fomc_policy",
       "summaryFromSource": "Federal Reserve issues FOMC statement",
-      "contentText": "The Federal Open Market Committee decided to maintain the target range. Synthetic fixture body for demo only.",
-      "contentHash": "7346ea61624a83823e3c794bde0056ae2c40d07791521c379aeb0e8f22ef9f4c",
+      "contentText": "The Federal Open Market Committee approved the following statement for release by a 9-3 vote. The Committee decided to maintain the target range for the federal funds rate at 4.25 to 4.50 percent. Voting against this monetary policy action were Governor A and Governor B.",
+      "contentHash": "93d676577060160de90e155cfe8b615d9003a4176937976951ea315e2522ddaa",
       "synthetic": true
     },
     {
@@ -32,8 +32,8 @@
       "releaseFamily": "cpi",
       "referencePeriod": "2026-06",
       "summaryFromSource": "The Consumer Price Index for All Urban Consumers increased in June (synthetic).",
-      "contentText": "THE CONSUMER PRICE INDEX -- JUNE 2026 Synthetic CPI release body.",
-      "contentHash": "6aded95fb8d02c5be03262c8bf4d174d463e36b93ffd45d64c51a8fa3c3eb140",
+      "contentText": "THE CONSUMER PRICE INDEX -- JUNE 2026\nThe Consumer Price Index for All Urban Consumers increased 0.1 percent in June on a seasonally adjusted basis. The Consumer Price Index for All Urban Consumers increased 2.7 percent over the last 12 months. The index for all items less food and energy increased 0.2 percent in June. The index for all items less food and energy increased 2.9 percent over the last 12 months.",
+      "contentHash": "705485fce67e1eec6833268a2d0894a0a50926fd04c7f3090b5bc70f8a7743e3",
       "synthetic": true
     },
     {
@@ -49,8 +49,8 @@
       "releaseFamily": "employment_situation",
       "referencePeriod": "2026-06",
       "summaryFromSource": "Payroll employment changed little in June (synthetic).",
-      "contentText": "THE EMPLOYMENT SITUATION -- JUNE 2026 Synthetic employment release body.",
-      "contentHash": "91e576e5dc4421fa01dba764a2fcf9b099997da4e223f8fd424d5dc837d7a493",
+      "contentText": "THE EMPLOYMENT SITUATION -- JUNE 2026\nTotal nonfarm payroll employment increased by 147 thousand in June. The unemployment rate was 4.1 percent. The change in total nonfarm payroll employment for May was revised down by 22.",
+      "contentHash": "8d0898a7438db33f558a70559c49aacdb75d32d9d3c9d05d2613971abd72938c",
       "synthetic": true
     },
     {
@@ -66,8 +66,8 @@
       "releaseFamily": "personal_income_outlays",
       "referencePeriod": "2026-05",
       "summaryFromSource": "Personal income increased in May (synthetic BEA abstract).",
-      "contentText": "Personal Income and Outlays, May 2026. Synthetic BEA release body.",
-      "contentHash": "3542bc79f6f52dadd684ba0027f11a84b610e42b9161526099fcd8b42e5f4a0a",
+      "contentText": "Personal Income and Outlays, May 2026. Personal income increased 0.4 percent in May. Disposable personal income increased 0.3 percent. Personal consumption expenditures increased 0.2 percent. The PCE price index increased 2.5 percent from the same month a year ago. The PCE price index excluding food and energy increased 2.7 percent from the same month a year ago.",
+      "contentHash": "536784eb2b57b48cc92b958befb850d7e0b63d27a55d5bb384696f4adc52decf",
       "synthetic": true
     }
   ]

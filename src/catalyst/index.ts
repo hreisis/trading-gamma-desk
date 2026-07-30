@@ -61,3 +61,13 @@ export type {
   DocumentRevisionRecord,
   DocumentLinkingWarning,
 } from "./documents/types";
+export * from "./briefs/version";
+export * from "./briefs/evidence";
+export * from "./briefs/numbers";
+export * from "./briefs/registry";
+export * from "./briefs/extract";
+export * from "./briefs/cross-check";
+export * from "./briefs/materialize";
+export * from "./briefs/cache";
+export * from "./briefs/build-briefs";
+export type { CatalystBriefsCache, BriefRevisionRecord } from "./briefs/types";

@@ -7,6 +7,7 @@ import type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  OfficialBrief,
   OfficialDocument,
   ReleaseObservation,
   ReleaseResult,
@@ -134,6 +135,16 @@ export interface CatalystFeedResponse {
       readonly linkedCount?: number;
       readonly sources?: readonly DocumentProviderStatus[];
     };
+    readonly briefs?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly status?: "ok" | "error" | "missing" | "synthetic" | "partial" | "failed";
+      readonly error?: string;
+      readonly archiveBriefCount?: number;
+      readonly feedBriefCount?: number;
+      readonly extractorVersion?: string;
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -142,6 +153,8 @@ export interface CatalystFeedResponse {
    * these rows are never expanded into additional catalysts.
    */
   readonly documents?: OfficialDocument[];
+  /** Rule-based briefs for the default ~30d window (not AI). */
+  readonly briefs?: OfficialBrief[];
   readonly validationErrors: Array<{
     readonly index: number;
     readonly error: string;
@@ -191,6 +204,7 @@ export type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  OfficialBrief,
   OfficialDocument,
   ReleaseObservation,
   ReleaseResult,

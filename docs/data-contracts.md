@@ -532,6 +532,20 @@ Independent canonical contract `OfficialDocument` (stored in `data/catalyst/docu
 
 Sources (explicit registry only — no search/aggregators): Fed `press_monetary.xml`; BLS `cpi.rss` + `empsit.rss`; BEA `apps.bea.gov/rss/rss.xml` filtered by item `name`. Link to catalysts by `releaseFamily` + `referencePeriod` (or same Eastern calendar day + schedule identity). Documents never create a second catalyst; optional `Catalyst.officialDocuments[]` holds slim refs. Default UI/API materializes the last **30 days**; archive may be longer. No LLM summaries; FOMC statement linking does **not** parse rates, votes, dissent, hawkish/dovish, or SEP. Local: `npm run catalyst:documents:fetch`. Public demo uses labelled synthetic document fixtures only.
 
+### Evidence-grounded briefs (M2-3B)
+
+Independent canonical contract `OfficialBrief` (built offline into `data/catalyst/briefs-latest.json`):
+
+| Field | Notes |
+| --- | --- |
+| `documentId` / `documentContentHash` / `extractorVersion` | Idempotent rebuild key |
+| `status` | `complete` \| `partial` \| `unavailable` |
+| `facts[]` | Each fact requires `evidence.excerpt` that is an **exact substring** of normalized `contentText`, with resolvable `startOffset`/`endOffset` |
+| `omissions` | Expected facts not found with reliable evidence (unextracted ≠ “agency did not report”) |
+| `warnings` | Includes structured-result `crossCheck:matched` / `crossCheck:mismatch` when comparable |
+
+Briefs are **rule-based fact extracts**, not official prose and not AI interpretation. They must not invent hawkish/dovish, beat/miss, market direction, or trade advice. Headline templates may only restate evidenced facts. When M2-2C1 structured results exist for the same family+period, document values are cross-checked within explicit tolerances — never used to overwrite structured observations, and never used to invent undocumented facts. Local: `npm run catalyst:briefs:build` (reads documents/results caches; no network). Public demo derives briefs from synthetic documents at load time.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

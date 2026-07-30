@@ -1,6 +1,7 @@
 import type {
   Catalyst,
   CatalystFeedResponse,
+  OfficialBrief,
   OfficialDocument,
   ReleaseResult,
 } from "@/catalyst";
@@ -61,83 +62,179 @@ function ReleaseResultBlock({
   );
 }
 
+function providerLabel(provider: string): string {
+  if (provider === "federal_reserve") return "Federal Reserve";
+  if (provider === "bls") return "BLS";
+  if (provider === "bea") return "BEA";
+  return provider;
+}
+
+function OfficialBriefBlock({
+  brief,
+  documentUrl,
+  provider,
+}: {
+  brief: OfficialBrief;
+  documentUrl?: string;
+  provider: string;
+}) {
+  const topFacts = brief.facts.slice(0, 4);
+  return (
+    <div className="catalyst-official-brief" data-testid="catalyst-official-brief">
+      <p className="catalyst-release-meta">
+        Official brief · Rule-based summary · {providerLabel(provider)}
+      </p>
+      <p className="catalyst-release-meta">
+        Status: {brief.status}
+        {brief.referencePeriod ? ` · ref ${brief.referencePeriod}` : ""}
+      </p>
+      <p className="catalyst-headline">{brief.headline}</p>
+      <ul className="catalyst-release-obs">
+        {topFacts.map((f) => (
+          <li key={f.id}>
+            <span>{f.text}</span>
+            <details>
+              <summary>Evidence excerpt</summary>
+              <p className="catalyst-release-meta" data-testid="catalyst-brief-evidence">
+                “{f.evidence.excerpt}”
+              </p>
+            </details>
+          </li>
+        ))}
+      </ul>
+      {brief.warnings.length > 0 ? (
+        <p className="catalyst-release-meta">
+          Warnings: {brief.warnings.length} (cross-check / extraction)
+        </p>
+      ) : null}
+      {documentUrl ? (
+        <p className="catalyst-release-meta">
+          <a href={documentUrl} target="_blank" rel="noopener noreferrer">
+            View official document
+          </a>
+        </p>
+      ) : null}
+      <p className="catalyst-release-meta">
+        Rule-based fact extract — not official prose and not AI interpretation.
+        Does not replace the full release.
+      </p>
+    </div>
+  );
+}
+
 function OfficialDocumentBlock({
   docs,
+  briefsByDocId,
 }: {
   docs: NonNullable<Catalyst["officialDocuments"]>;
+  briefsByDocId: ReadonlyMap<string, OfficialBrief>;
 }) {
   return (
     <div className="catalyst-official-doc" data-testid="catalyst-official-doc">
-      {docs.map((d) => (
-        <div key={d.id} className="catalyst-official-doc-item">
-          <p className="catalyst-release-meta">Official release · {d.provider}</p>
-          <p className="catalyst-release-meta">
-            Published {formatWhen(d.publishedAt)}
-          </p>
-          {d.summaryFromSource ? (
-            <p className="catalyst-release-meta">{d.summaryFromSource}</p>
-          ) : null}
-          <p className="catalyst-release-meta">
-            <a
-              href={d.canonicalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="catalyst-official-doc-link"
-            >
-              View official document
-            </a>
-          </p>
-        </div>
-      ))}
+      {docs.map((d) => {
+        const brief = briefsByDocId.get(d.id);
+        return (
+          <div key={d.id} className="catalyst-official-doc-item">
+            <p className="catalyst-release-meta">
+              Official release · {providerLabel(d.provider)}
+            </p>
+            <p className="catalyst-release-meta">
+              Published {formatWhen(d.publishedAt)}
+            </p>
+            {d.summaryFromSource ? (
+              <p className="catalyst-release-meta">{d.summaryFromSource}</p>
+            ) : null}
+            <p className="catalyst-release-meta">
+              <a
+                href={d.canonicalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="catalyst-official-doc-link"
+              >
+                View official document
+              </a>
+            </p>
+            {brief ? (
+              <OfficialBriefBlock
+                brief={brief}
+                documentUrl={d.canonicalUrl}
+                provider={d.provider}
+              />
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function OfficialUpdates({
   documents,
+  briefs,
 }: {
   documents: readonly OfficialDocument[];
+  briefs: readonly OfficialBrief[];
 }) {
-  if (documents.length === 0) return null;
+  if (documents.length === 0 && briefs.length === 0) return null;
+  const briefsByDoc = new Map(briefs.map((b) => [b.documentId, b]));
   return (
     <div className="catalyst-official-updates" data-testid="catalyst-official-updates">
       <h3>Official Updates</h3>
       <p className="desk-section-note">
-        Source release documents from the last 30 days — evidence only, not
-        additional macro catalysts. No AI summaries.
+        Source release documents and rule-based briefs from the last 30 days —
+        evidence only, not additional macro catalysts. Briefs are rule-based
+        fact extracts, not AI interpretation.
       </p>
       <ul className="catalyst-list">
-        {documents.map((d) => (
-          <li key={d.id} className="catalyst-row">
-            <div className="catalyst-when">{formatWhen(d.publishedAt)}</div>
-            <div className="catalyst-main">
-              <p className="catalyst-headline">{d.title}</p>
-              <p className="catalyst-meta">
-                <span>{d.provider}</span>
-                <span>{d.documentType}</span>
-                {d.referencePeriod ? <span>ref {d.referencePeriod}</span> : null}
-              </p>
-              {d.summaryFromSource ? (
-                <p className="catalyst-release-meta">{d.summaryFromSource}</p>
-              ) : null}
-              <p className="catalyst-release-meta">
-                <a
-                  href={d.canonicalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View official document
-                </a>
-              </p>
-            </div>
-          </li>
-        ))}
+        {documents.map((d) => {
+          const brief = briefsByDoc.get(d.id);
+          return (
+            <li key={d.id} className="catalyst-row">
+              <div className="catalyst-when">{formatWhen(d.publishedAt)}</div>
+              <div className="catalyst-main">
+                <p className="catalyst-headline">{d.title}</p>
+                <p className="catalyst-meta">
+                  <span>{providerLabel(d.provider)}</span>
+                  <span>{d.documentType}</span>
+                  {d.referencePeriod ? (
+                    <span>ref {d.referencePeriod}</span>
+                  ) : null}
+                </p>
+                {d.summaryFromSource ? (
+                  <p className="catalyst-release-meta">{d.summaryFromSource}</p>
+                ) : null}
+                <p className="catalyst-release-meta">
+                  <a
+                    href={d.canonicalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View official document
+                  </a>
+                </p>
+                {brief ? (
+                  <OfficialBriefBlock
+                    brief={brief}
+                    documentUrl={d.canonicalUrl}
+                    provider={d.provider}
+                  />
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
 }
 
-function CatalystRow({ c }: { c: Catalyst }) {
+function CatalystRow({
+  c,
+  briefsByDocId,
+}: {
+  c: Catalyst;
+  briefsByDocId: ReadonlyMap<string, OfficialBrief>;
+}) {
   return (
     <li key={c.id} className="catalyst-row">
       <div className="catalyst-when">{formatWhen(c.occurredAt)}</div>
@@ -162,7 +259,10 @@ function CatalystRow({ c }: { c: Catalyst }) {
           />
         ) : null}
         {c.officialDocuments && c.officialDocuments.length > 0 ? (
-          <OfficialDocumentBlock docs={c.officialDocuments} />
+          <OfficialDocumentBlock
+            docs={c.officialDocuments}
+            briefsByDocId={briefsByDocId}
+          />
         ) : null}
       </div>
       <div className="catalyst-source">
@@ -195,6 +295,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       : feed.mode === "live_unavailable" || feed.mode === "stale_calendar"
         ? "desk-banner desk-banner-warn"
         : "desk-banner";
+  const briefsByDocId = new Map(
+    (feed.briefs ?? []).map((b) => [b.documentId, b]),
+  );
 
   return (
     <section className="desk-section" aria-labelledby="catalyst-heading">
@@ -213,6 +316,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           : ""}
         {feed.source.documents
           ? ` · documents:${feed.source.documents.status ?? (feed.source.documents.available ? "ok" : "missing")}`
+          : ""}
+        {feed.source.briefs
+          ? ` · briefs:${feed.source.briefs.status ?? (feed.source.briefs.available ? "ok" : "missing")}`
           : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
@@ -245,13 +351,17 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
       ) : (
         <ul className="catalyst-list" data-testid="catalyst-list">
           {feed.catalysts.map((c) => (
-            <CatalystRow key={c.id} c={c} />
+            <CatalystRow key={c.id} c={c} briefsByDocId={briefsByDocId} />
           ))}
         </ul>
       )}
 
-      {feed.documents && feed.documents.length > 0 ? (
-        <OfficialUpdates documents={feed.documents} />
+      {(feed.documents && feed.documents.length > 0) ||
+      (feed.briefs && feed.briefs.length > 0) ? (
+        <OfficialUpdates
+          documents={feed.documents ?? []}
+          briefs={feed.briefs ?? []}
+        />
       ) : null}
 
       {feed.mode !== "live_unavailable" ? (

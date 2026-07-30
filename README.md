@@ -81,6 +81,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run catalyst:fetch` | Pull BLS/BEA/FOMC **schedules** → `data/catalyst/calendar-latest.json` |
 | `npm run catalyst:results:fetch` | Pull BLS CPI/Employment **actuals** → `data/catalyst/results-latest.json` |
 | `npm run catalyst:documents:fetch` | Pull Fed/BLS/BEA **official release documents** → `data/catalyst/documents-latest.json` |
+| `npm run catalyst:briefs:build` | Build **rule-based evidence briefs** from local documents → `data/catalyst/briefs-latest.json` (offline) |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -107,6 +108,8 @@ If any calendar provider fails, successful sources still write a usable cache wi
 **BLS release results (M2-2C1):** `npm run catalyst:results:fetch` writes `data/catalyst/results-latest.json` (full period archive, separate from the calendar cache). The default feed materializes scheduled events plus **at most the latest observation per release family** — not one catalyst per historical period. CPI + Employment Situation actuals only — Consensus unavailable · Surprise unavailable. Events become `released` only via strict `releaseFamily` + `referencePeriod` match. Public demo uses a labelled synthetic results fixture and never calls the BLS API.
 
 **Official release documents (M2-3A):** `npm run catalyst:documents:fetch` writes `data/catalyst/documents-latest.json` (independent of calendar/results). Sources: Fed monetary-policy press RSS, BLS CPI + Employment Situation RSS, BEA news RSS (GDP / Personal Income / Trade only). Documents are evidence — linked onto existing catalysts when family+period (or schedule day) match; never expanded into dozens of new catalysts. Default UI shows a 30-day Official Updates window. No LLM summaries; FOMC statement text is stored/linked without parsing rates, votes, or SEP. Public demo uses labelled synthetic document fixtures only.
+
+**Evidence-grounded briefs (M2-3B):** `npm run catalyst:briefs:build` reads local documents (optional results for cross-check) and writes `data/catalyst/briefs-latest.json` — **offline only**. Each fact cites an exact excerpt + offsets from the official document. UI labels these **Rule-based summary** (not AI, not a substitute for the full release). Unextracted ≠ agency omitted. No hawkish/dovish or trade advice. Public demo derives briefs from synthetic documents at load time.
 
 ### Desk URLs (local)
 
@@ -199,4 +202,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-3A** (schedules + BLS actuals + official release documents, local fetch). Consensus/surprise, BEA results series, LLM summarization, and FOMC decision parsing remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-3B** (schedules + BLS actuals + official documents + rule-based briefs). Consensus/surprise, BEA results series, LLM summarization, and hawkish/dovish inference remain out of scope. Market Temperature stays in the backlog.

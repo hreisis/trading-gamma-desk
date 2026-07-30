@@ -28,6 +28,9 @@ describe("catalyst UI payload", () => {
       (c) => c.officialDocuments && c.officialDocuments.length > 0,
     );
     expect(withOfficial?.officialDocuments?.[0]?.canonicalUrl).toMatch(/^https:/);
+    expect(feed.briefs?.length).toBeGreaterThan(0);
+    expect(feed.source.briefs?.status).toBe("synthetic");
+    expect(feed.disclaimer).toMatch(/rule-based/i);
   });
 
   it("keeps catalyst demo copy distinct from macro illustrative banner", () => {
