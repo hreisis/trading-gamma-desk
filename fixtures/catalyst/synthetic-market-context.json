@@ -1,0 +1,510 @@
+{
+  "kind": "CatalystSyntheticMarketContextFixtureBatch",
+  "schemaVersion": "0.1.0",
+  "disclaimer": "Synthetic ETF market-context fixtures for public demo — not live Alpaca bars. Observed movement does not establish causation.",
+  "calculationVersion": "0.1.0",
+  "snapshots": [
+    {
+      "schemaVersion": "0.1.0",
+      "id": "mctx_7ca4acf6f84f9a0b",
+      "catalystId": "cat_747bd00a15206444",
+      "releaseFamily": "cpi",
+      "eventTimestamp": "2026-07-15T12:30:00.000Z",
+      "provider": "synthetic_fixture",
+      "feed": "synthetic",
+      "calculationVersion": "0.1.0",
+      "timeframe": "1Min",
+      "timezone": "America/New_York",
+      "status": "complete",
+      "fetchedAt": "2026-07-29T18:00:00.000Z",
+      "session": {
+        "easternDate": "2026-07-15",
+        "timezone": "America/New_York",
+        "isHoliday": false,
+        "isWeekend": false,
+        "isEarlyClose": false,
+        "regularSessionOpenEt": "09:30",
+        "regularSessionCloseEt": "16:00",
+        "eventInPremarket": true,
+        "eventInRegularSession": false
+      },
+      "symbols": [
+        {
+          "symbol": "SPY",
+          "instrumentLabel": "SPY ETF (US equities proxy)",
+          "proxyRole": "US equities",
+          "baseline": {
+            "price": 500.58,
+            "barTimestamp": "2026-07-15T12:29:00.000Z"
+          },
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "available",
+              "price": 500.7,
+              "barTimestamp": "2026-07-15T12:35:00.000Z",
+              "pctChange": 0.024
+            },
+            {
+              "kind": "plus30m",
+              "status": "available",
+              "price": 501.2,
+              "barTimestamp": "2026-07-15T13:00:00.000Z",
+              "pctChange": 0.1239
+            },
+            {
+              "kind": "plus2h",
+              "status": "available",
+              "price": 503,
+              "barTimestamp": "2026-07-15T14:30:00.000Z",
+              "pctChange": 0.4834
+            },
+            {
+              "kind": "sessionClose",
+              "status": "available",
+              "price": 509.58,
+              "barTimestamp": "2026-07-15T19:59:00.000Z",
+              "pctChange": 1.7979
+            }
+          ],
+          "missingWindows": []
+        },
+        {
+          "symbol": "QQQ",
+          "instrumentLabel": "QQQ ETF (Nasdaq-100 / growth proxy)",
+          "proxyRole": "Nasdaq/growth",
+          "baseline": {
+            "price": 510.58,
+            "barTimestamp": "2026-07-15T12:29:00.000Z"
+          },
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "available",
+              "price": 510.7,
+              "barTimestamp": "2026-07-15T12:35:00.000Z",
+              "pctChange": 0.0235
+            },
+            {
+              "kind": "plus30m",
+              "status": "available",
+              "price": 511.2,
+              "barTimestamp": "2026-07-15T13:00:00.000Z",
+              "pctChange": 0.1214
+            },
+            {
+              "kind": "plus2h",
+              "status": "available",
+              "price": 513,
+              "barTimestamp": "2026-07-15T14:30:00.000Z",
+              "pctChange": 0.474
+            },
+            {
+              "kind": "sessionClose",
+              "status": "available",
+              "price": 519.58,
+              "barTimestamp": "2026-07-15T19:59:00.000Z",
+              "pctChange": 1.7627
+            }
+          ],
+          "missingWindows": []
+        },
+        {
+          "symbol": "IWM",
+          "instrumentLabel": "IWM ETF (small-cap proxy)",
+          "proxyRole": "Small caps",
+          "baseline": {
+            "price": 520.58,
+            "barTimestamp": "2026-07-15T12:29:00.000Z"
+          },
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "available",
+              "price": 520.7,
+              "barTimestamp": "2026-07-15T12:35:00.000Z",
+              "pctChange": 0.0231
+            },
+            {
+              "kind": "plus30m",
+              "status": "available",
+              "price": 521.2,
+              "barTimestamp": "2026-07-15T13:00:00.000Z",
+              "pctChange": 0.1191
+            },
+            {
+              "kind": "plus2h",
+              "status": "available",
+              "price": 523,
+              "barTimestamp": "2026-07-15T14:30:00.000Z",
+              "pctChange": 0.4649
+            },
+            {
+              "kind": "sessionClose",
+              "status": "available",
+              "price": 529.58,
+              "barTimestamp": "2026-07-15T19:59:00.000Z",
+              "pctChange": 1.7288
+            }
+          ],
+          "missingWindows": []
+        },
+        {
+          "symbol": "TLT",
+          "instrumentLabel": "TLT ETF (long-duration Treasuries proxy)",
+          "proxyRole": "Long Treasuries",
+          "baseline": {
+            "price": 530.58,
+            "barTimestamp": "2026-07-15T12:29:00.000Z"
+          },
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "available",
+              "price": 530.7,
+              "barTimestamp": "2026-07-15T12:35:00.000Z",
+              "pctChange": 0.0226
+            },
+            {
+              "kind": "plus30m",
+              "status": "available",
+              "price": 531.2,
+              "barTimestamp": "2026-07-15T13:00:00.000Z",
+              "pctChange": 0.1169
+            },
+            {
+              "kind": "plus2h",
+              "status": "available",
+              "price": 533,
+              "barTimestamp": "2026-07-15T14:30:00.000Z",
+              "pctChange": 0.4561
+            },
+            {
+              "kind": "sessionClose",
+              "status": "available",
+              "price": 539.58,
+              "barTimestamp": "2026-07-15T19:59:00.000Z",
+              "pctChange": 1.6963
+            }
+          ],
+          "missingWindows": []
+        },
+        {
+          "symbol": "UUP",
+          "instrumentLabel": "UUP ETF (US dollar proxy)",
+          "proxyRole": "US dollar",
+          "baseline": {
+            "price": 540.58,
+            "barTimestamp": "2026-07-15T12:29:00.000Z"
+          },
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "available",
+              "price": 540.7,
+              "barTimestamp": "2026-07-15T12:35:00.000Z",
+              "pctChange": 0.0222
+            },
+            {
+              "kind": "plus30m",
+              "status": "available",
+              "price": 541.2,
+              "barTimestamp": "2026-07-15T13:00:00.000Z",
+              "pctChange": 0.1147
+            },
+            {
+              "kind": "plus2h",
+              "status": "available",
+              "price": 543,
+              "barTimestamp": "2026-07-15T14:30:00.000Z",
+              "pctChange": 0.4477
+            },
+            {
+              "kind": "sessionClose",
+              "status": "available",
+              "price": 549.58,
+              "barTimestamp": "2026-07-15T19:59:00.000Z",
+              "pctChange": 1.6649
+            }
+          ],
+          "missingWindows": []
+        },
+        {
+          "symbol": "GLD",
+          "instrumentLabel": "GLD ETF (gold proxy)",
+          "proxyRole": "Gold",
+          "baseline": {
+            "price": 550.58,
+            "barTimestamp": "2026-07-15T12:29:00.000Z"
+          },
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "available",
+              "price": 550.7,
+              "barTimestamp": "2026-07-15T12:35:00.000Z",
+              "pctChange": 0.0218
+            },
+            {
+              "kind": "plus30m",
+              "status": "available",
+              "price": 551.2,
+              "barTimestamp": "2026-07-15T13:00:00.000Z",
+              "pctChange": 0.1126
+            },
+            {
+              "kind": "plus2h",
+              "status": "available",
+              "price": 553,
+              "barTimestamp": "2026-07-15T14:30:00.000Z",
+              "pctChange": 0.4395
+            },
+            {
+              "kind": "sessionClose",
+              "status": "available",
+              "price": 559.58,
+              "barTimestamp": "2026-07-15T19:59:00.000Z",
+              "pctChange": 1.6346
+            }
+          ],
+          "missingWindows": []
+        }
+      ],
+      "errors": [],
+      "synthetic": true
+    },
+    {
+      "schemaVersion": "0.1.0",
+      "id": "mctx_52b61ebc5c672e40",
+      "catalystId": "cat_56817325d0e5b3eb",
+      "releaseFamily": "employment_situation",
+      "eventTimestamp": "2026-07-03T12:30:00.000Z",
+      "provider": "synthetic_fixture",
+      "feed": "synthetic",
+      "calculationVersion": "0.1.0",
+      "timeframe": "1Min",
+      "timezone": "America/New_York",
+      "status": "unavailable",
+      "fetchedAt": "2026-07-29T18:00:00.000Z",
+      "session": {
+        "easternDate": "2026-07-03",
+        "timezone": "America/New_York",
+        "isHoliday": true,
+        "isWeekend": false,
+        "isEarlyClose": false,
+        "eventInPremarket": false,
+        "eventInRegularSession": false
+      },
+      "symbols": [
+        {
+          "symbol": "SPY",
+          "instrumentLabel": "SPY ETF (US equities proxy)",
+          "proxyRole": "US equities",
+          "baseline": null,
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus30m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus2h",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "sessionClose",
+              "status": "unavailable",
+              "pctChange": null
+            }
+          ],
+          "missingWindows": [
+            "plus5m",
+            "plus30m",
+            "plus2h",
+            "sessionClose"
+          ]
+        },
+        {
+          "symbol": "QQQ",
+          "instrumentLabel": "QQQ ETF (Nasdaq-100 / growth proxy)",
+          "proxyRole": "Nasdaq/growth",
+          "baseline": null,
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus30m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus2h",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "sessionClose",
+              "status": "unavailable",
+              "pctChange": null
+            }
+          ],
+          "missingWindows": [
+            "plus5m",
+            "plus30m",
+            "plus2h",
+            "sessionClose"
+          ]
+        },
+        {
+          "symbol": "IWM",
+          "instrumentLabel": "IWM ETF (small-cap proxy)",
+          "proxyRole": "Small caps",
+          "baseline": null,
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus30m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus2h",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "sessionClose",
+              "status": "unavailable",
+              "pctChange": null
+            }
+          ],
+          "missingWindows": [
+            "plus5m",
+            "plus30m",
+            "plus2h",
+            "sessionClose"
+          ]
+        },
+        {
+          "symbol": "TLT",
+          "instrumentLabel": "TLT ETF (long-duration Treasuries proxy)",
+          "proxyRole": "Long Treasuries",
+          "baseline": null,
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus30m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus2h",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "sessionClose",
+              "status": "unavailable",
+              "pctChange": null
+            }
+          ],
+          "missingWindows": [
+            "plus5m",
+            "plus30m",
+            "plus2h",
+            "sessionClose"
+          ]
+        },
+        {
+          "symbol": "UUP",
+          "instrumentLabel": "UUP ETF (US dollar proxy)",
+          "proxyRole": "US dollar",
+          "baseline": null,
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus30m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus2h",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "sessionClose",
+              "status": "unavailable",
+              "pctChange": null
+            }
+          ],
+          "missingWindows": [
+            "plus5m",
+            "plus30m",
+            "plus2h",
+            "sessionClose"
+          ]
+        },
+        {
+          "symbol": "GLD",
+          "instrumentLabel": "GLD ETF (gold proxy)",
+          "proxyRole": "Gold",
+          "baseline": null,
+          "windows": [
+            {
+              "kind": "plus5m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus30m",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "plus2h",
+              "status": "unavailable",
+              "pctChange": null
+            },
+            {
+              "kind": "sessionClose",
+              "status": "unavailable",
+              "pctChange": null
+            }
+          ],
+          "missingWindows": [
+            "plus5m",
+            "plus30m",
+            "plus2h",
+            "sessionClose"
+          ]
+        }
+      ],
+      "errors": [
+        "Event falls on holiday 2026-07-03 — regular-session windows unavailable"
+      ],
+      "synthetic": true
+    }
+  ]
+}

@@ -566,6 +566,23 @@ Independent canonical contract `OfficialAiBrief` (built offline into `data/catal
 
 Local: `npm run catalyst:briefs:enhance` (reads `briefs-latest.json` only; no documents/calendar/results fetch). Public demo uses labelled synthetic AI fixtures only (`synthetic: true`); build/request paths never call an LLM.
 
+### Event market context (M2-4A)
+
+Independent canonical contract `EventMarketContext` (built offline into `data/catalyst/market-context-latest.json`):
+
+| Field | Notes |
+| --- | --- |
+| `catalystId` / `eventTimestamp` / `provider` / `feed` / `calculationVersion` | Cache identity — changes force refresh |
+| `status` | `complete` \| `partial` \| `unavailable` |
+| `symbols[]` | ETF proxies only (`SPY`, `QQQ`, `IWM`, `TLT`, `UUP`, `GLD`) with explicit `instrumentLabel` |
+| `baseline` + windows `plus5m` / `plus30m` / `plus2h` / `sessionClose` | Prices + `%` changes computed deterministically from saved 1Min bars |
+| `session` | Eastern date, holiday/weekend/early-close, premarket vs regular-session flags |
+| `synthetic` | Public demo fixtures are `true` |
+
+**Rules:** use the catalyst’s authoritative `occurredAt` (converted to UTC) — never document publish time. Baseline is the last valid bar **strictly before** the event (no look-ahead). Missing windows are `unavailable` without distant substitutes. Labels must say ETF/proxy — never call UUP “DXY”, TLT a yield, or SPY the official S&P 500 index. Observed moves **do not establish causation**.
+
+Local: `npm run catalyst:market-context:fetch` (reads calendar + results caches only; Alpaca Historical Stock Bars via `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`; optional `CATALYST_MARKET_FEED`, default `sip`). Public demo uses synthetic fixtures only — never calls Alpaca.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

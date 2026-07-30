@@ -1,6 +1,7 @@
 import type {
   Catalyst,
   CatalystFeedResponse,
+  EventMarketContext,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
@@ -339,15 +340,93 @@ function OfficialUpdates({
   );
 }
 
+function formatPct(pct: number | null | undefined): string {
+  if (pct === null || pct === undefined || !Number.isFinite(pct)) return "—";
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(2)}%`;
+}
+
+function MarketContextBlock({
+  ctx,
+  demo,
+}: {
+  ctx: EventMarketContext;
+  demo?: boolean;
+}) {
+  return (
+    <div
+      className="catalyst-market-context"
+      data-testid="catalyst-market-context"
+    >
+      <p className="catalyst-release-meta">
+        {demo
+          ? "Demo market context · Synthetic ETF bars"
+          : "Market context · Observed ETF moves around the release"}
+      </p>
+      <p className="catalyst-release-meta">
+        Provider {ctx.provider} · feed {ctx.feed} · status {ctx.status}
+        {ctx.session.isHoliday ? " · holiday" : ""}
+        {ctx.session.isEarlyClose ? " · early close" : ""}
+        {ctx.session.eventInPremarket ? " · premarket event" : ""}
+      </p>
+      <p className="catalyst-release-meta">
+        Event {formatWhen(ctx.eventTimestamp)} (UTC) · ET date{" "}
+        {ctx.session.easternDate}
+      </p>
+      <table className="catalyst-mctx-table" data-testid="catalyst-mctx-table">
+        <thead>
+          <tr>
+            <th>ETF proxy</th>
+            <th>Baseline</th>
+            <th>+5m</th>
+            <th>+30m</th>
+            <th>+2h</th>
+            <th>Close</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ctx.symbols.map((s) => {
+            const byKind = new Map(s.windows.map((w) => [w.kind, w]));
+            return (
+              <tr key={s.symbol}>
+                <td>
+                  <span>{s.symbol}</span>
+                  <span className="catalyst-release-meta">
+                    {" "}
+                    · {s.instrumentLabel}
+                  </span>
+                </td>
+                <td>
+                  {s.baseline ? s.baseline.price.toFixed(2) : "—"}
+                </td>
+                <td>{formatPct(byKind.get("plus5m")?.pctChange)}</td>
+                <td>{formatPct(byKind.get("plus30m")?.pctChange)}</td>
+                <td>{formatPct(byKind.get("plus2h")?.pctChange)}</td>
+                <td>{formatPct(byKind.get("sessionClose")?.pctChange)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="catalyst-release-meta" data-testid="catalyst-mctx-disclaimer">
+        ETF proxies only (not DXY, not Treasury yields, not official index
+        levels). Observed movement does not establish causation.
+      </p>
+    </div>
+  );
+}
+
 function CatalystRow({
   c,
   briefsByDocId,
   aiByBriefId,
+  marketByCatalystId,
   demo,
 }: {
   c: Catalyst;
   briefsByDocId: ReadonlyMap<string, OfficialBrief>;
   aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
+  marketByCatalystId: ReadonlyMap<string, EventMarketContext>;
   demo?: boolean;
 }) {
   return (
@@ -371,6 +450,12 @@ function CatalystRow({
           <ReleaseResultBlock
             result={c.releaseResult}
             synthetic={c.synthetic}
+          />
+        ) : null}
+        {marketByCatalystId.get(c.id) ? (
+          <MarketContextBlock
+            ctx={marketByCatalystId.get(c.id)!}
+            demo={demo}
           />
         ) : null}
         {c.officialDocuments && c.officialDocuments.length > 0 ? (
@@ -418,6 +503,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
   const aiByBriefId = new Map(
     (feed.aiBriefs ?? []).map((b) => [b.inputBriefId, b]),
   );
+  const marketByCatalystId = new Map(
+    (feed.marketContext ?? []).map((s) => [s.catalystId, s]),
+  );
   const demo = feed.mode === "synthetic_demo" || feed.isPublicDemo;
 
   return (
@@ -443,6 +531,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           : ""}
         {feed.source.aiBriefs
           ? ` · aiBriefs:${feed.source.aiBriefs.status ?? (feed.source.aiBriefs.available ? "ok" : "missing")}`
+          : ""}
+        {feed.source.marketContext
+          ? ` · mctx:${feed.source.marketContext.status ?? (feed.source.marketContext.available ? "ok" : "missing")}`
           : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
@@ -480,6 +571,7 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
               c={c}
               briefsByDocId={briefsByDocId}
               aiByBriefId={aiByBriefId}
+              marketByCatalystId={marketByCatalystId}
               demo={demo}
             />
           ))}

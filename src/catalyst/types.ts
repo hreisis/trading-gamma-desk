@@ -7,6 +7,7 @@ import type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  EventMarketContext,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
@@ -164,6 +165,25 @@ export interface CatalystFeedResponse {
       readonly promptVersion?: string;
       readonly model?: string;
     };
+    readonly marketContext?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly status?:
+        | "ok"
+        | "error"
+        | "missing"
+        | "synthetic"
+        | "partial"
+        | "failed"
+        | "unavailable";
+      readonly error?: string;
+      readonly archiveSnapshotCount?: number;
+      readonly feedSnapshotCount?: number;
+      readonly calculationVersion?: string;
+      readonly provider?: string;
+      readonly feed?: string;
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -176,6 +196,8 @@ export interface CatalystFeedResponse {
   readonly briefs?: OfficialBrief[];
   /** Evidence-grounded LLM narratives (M2-3C); may be empty when rejected/unavailable. */
   readonly aiBriefs?: OfficialAiBrief[];
+  /** Observed ETF moves around releases (M2-4A); never causation claims. */
+  readonly marketContext?: EventMarketContext[];
   readonly validationErrors: Array<{
     readonly index: number;
     readonly error: string;
@@ -225,6 +247,7 @@ export type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  EventMarketContext,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,

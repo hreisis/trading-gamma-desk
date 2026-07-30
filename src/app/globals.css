@@ -428,6 +428,26 @@ code {
   color: var(--warn);
 }
 
+.catalyst-mctx-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4rem 0;
+  font-size: 0.85em;
+}
+
+.catalyst-mctx-table th,
+.catalyst-mctx-table td {
+  text-align: left;
+  padding: 0.25rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.catalyst-mctx-table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 @media (max-width: 640px) {
   .desk {
     padding: 28px 16px 56px;

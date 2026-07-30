@@ -38,6 +38,15 @@ describe("catalyst UI payload", () => {
       expect(ai.synthetic).toBe(true);
       expect(ai.bullets.length).toBeGreaterThanOrEqual(2);
     }
+    expect(feed.marketContext?.length).toBeGreaterThan(0);
+    expect(feed.source.marketContext?.status).toBe("synthetic");
+    expect(feed.disclaimer).toMatch(/causation/i);
+    for (const m of feed.marketContext ?? []) {
+      expect(m.synthetic).toBe(true);
+      expect(m.symbols.some((s) => s.instrumentLabel.includes("ETF"))).toBe(
+        true,
+      );
+    }
   });
 
   it("keeps catalyst demo copy distinct from macro illustrative banner", () => {
