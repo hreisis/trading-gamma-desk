@@ -84,10 +84,11 @@ Status: **stack locked for Milestone 1** (single TypeScript runtime). Data flow 
 | --- | --- | --- |
 | `data/` | Source clients, rate limits, raw bar cache | Idempotent pulls keyed by `sessionDate` |
 | `macro/` | Transforms, z-scores, signature scoring, driver assembly | Pure functions, no IO, unit + property tested |
+| `catalyst/` | Raw event → canonical Catalyst; dedupe; feed query | Pure normalize; M2-1 fixture-only (no news network) |
 | `interpret/` | Template generator, optional LLM + guardrails | Emits contract-shaped JSON only |
 | `contracts/` | Zod schemas | Mirrors `docs/data-contracts.md` |
-| `app/api/` | Serve latest snapshot | Versioned payloads |
-| `app/` | Desk UI | Milestone 1 surface is macro-first |
+| `app/api/` | Serve latest snapshot + catalyst feed | Versioned payloads |
+| `app/` | Desk UI | Macro desk + minimal catalyst feed; no reclassify in UI |
 
 ---
 

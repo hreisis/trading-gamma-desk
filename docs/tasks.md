@@ -4,13 +4,14 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-11 public demo deployment ✅ (synthetic illustrative fixture; no cloud Tiingo). Do not start Milestone 2.
+**Milestone 2 — Catalyst.** **M2-1** catalyst core foundation (schema, normalize, synthetic fixtures, `/api/catalysts`, minimal feed UI). No external news fetch, no LLM, no macro regime/confidence changes. Market Temperature remains backlog.
 
 ### Queued (not started)
 
 | Item | Notes |
 | --- | --- |
 | **Market Temperature (experimental)** | Deterministic 0–100 risk-on/risk-off summary derived from the canonical snapshot, displayed separately from Signal Confidence, with a five-session trend. Spec only — do not implement until scheduled. |
+| **Catalyst → regime linkage** | Later milestone — do not mix catalyst direction into DominantDriver confidence in M2-1. |
 
 ### M1-6b calibration status (split)
 
@@ -75,7 +76,16 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-10 | Productization wrap-up | Loading / empty / malformed / stale / pipeline-error states; malformed live never silent-fixtures; `npm run daily` atomic driver write keeps last good; README + demo frames; no Tiingo/`data/` in git — ✅ |
 | M1-11 | Public demo deployment | `GAMMADESK_PUBLIC_DEMO=1` serves synthetic `public-demo.2026-07-29` fixture; banner **Illustrative demo · synthetic scenario** + synthetic disclaimer; `?source=live` → **Live data unavailable in public demo**; portfolio meta + GitHub link; no cloud Tiingo / no `data/` on host — ✅ |
 
-**Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists. Public deploy is fixture-only (M1-11); cloud Tiingo and Milestone 2 remain out of scope.
+**Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists. Public deploy is fixture-only (M1-11).
+
+---
+
+## Milestone 2 — Catalyst / Events
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M2-1 | Catalyst core foundation | Canonical Catalyst schema; deterministic normalize/dedupe; synthetic fixtures; `/api/catalysts` filters; minimal Catalyst Feed UI; public-demo banner **Illustrative catalyst demo · synthetic events**; no news fetch / LLM / macro scoring changes — ✅ |
+| M2-2+ | Live calendar / news / X sources | Deferred — needs source selection and credentials outside M2-1 |
 
 ### Deferred out of Milestone 1
 

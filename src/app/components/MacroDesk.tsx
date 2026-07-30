@@ -1,4 +1,5 @@
 import type { DominantDriver } from "@/contracts";
+import type { CatalystFeedResponse } from "@/catalyst";
 import type { MacroDeskView } from "@/desk";
 import {
   assetDisplayName,
@@ -9,6 +10,7 @@ import {
   roleLabel,
   sessionBannerText,
 } from "@/desk";
+import { CatalystFeed } from "./CatalystFeed";
 import { DeskChrome } from "./DeskChrome";
 import { DeskStatusBanners } from "./DeskStatusBanners";
 
@@ -207,7 +209,13 @@ function DriverBody({
   );
 }
 
-export function MacroDesk({ view }: { view: MacroDeskView }) {
+export function MacroDesk({
+  view,
+  catalystFeed,
+}: {
+  view: MacroDeskView;
+  catalystFeed?: CatalystFeedResponse | null;
+}) {
   if (view.status === "live_unavailable") {
     return (
       <DeskChrome>
@@ -281,6 +289,7 @@ export function MacroDesk({ view }: { view: MacroDeskView }) {
           isPublicDemo={view.isPublicDemo}
         />
       </div>
+      {catalystFeed ? <CatalystFeed feed={catalystFeed} /> : null}
     </DeskChrome>
   );
 }

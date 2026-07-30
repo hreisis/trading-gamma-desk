@@ -433,26 +433,65 @@ Priority when more than one rule could fire: (4) `insufficient_data`, then (2) `
 
 ---
 
-## 2. CatalystDigest (Events output)
+## 2. Catalyst (Events — M2-1 canonical item)
+
+Milestone 2 introduces a per-event **Catalyst** contract. The older sketch `CatalystDigest` remains a future aggregation envelope; M2-1 serves a feed of canonical items.
+
+**Separation of concerns (do not collapse these):**
+
+| Concept | Answers | Module |
+| --- | --- | --- |
+| Regime / DominantDriver | What pattern is the market trading *now*? | Macro |
+| Catalyst | What event may *change* that pattern? | Catalyst |
+| Confidence (macro) | How clean is the regime classification? | Macro |
+| Confidence (catalyst) | How clear is the event taxonomy? | Catalyst |
+
+Catalyst confidence is **classification clarity only**, always `calibrated: false` in M2-1 — never a market-up probability. Catalyst `direction` must not be merged into macro regime or macro confidence until a later linkage milestone.
 
 ```json
 {
-  "$id": "CatalystDigest",
+  "$id": "Catalyst",
   "schemaVersion": "0.1.0",
-  "asOf": "2026-07-29T09:35:00-04:00",
-  "items": [
+  "id": "cat_a1b2c3d4e5f60718",
+  "occurredAt": "2026-07-15T08:30:00-04:00",
+  "observedAt": "2026-07-15T09:05:00-04:00",
+  "sourceType": "calendar",
+  "sourceName": "Synthetic Macro Calendar",
+  "sourceUrl": "https://example.invalid/synthetic/cpi-update",
+  "headline": "CPI print surprise — updated detail (illustrative)",
+  "summary": "Updated synthetic CPI row…",
+  "category": "inflation",
+  "importance": "high",
+  "status": "released",
+  "affectedAssets": ["US10Y", "GOLD", "USD", "OIL"],
+  "macroChannels": ["inflation"],
+  "direction": "inflationary",
+  "confidence": {
+    "score": 100,
+    "calibrated": false,
+    "note": "classification clarity only — not a market direction probability"
+  },
+  "evidence": [
     {
-      "id": "evt_fomc_2026-07-30",
-      "category": "fed_data",
-      "headline": "FOMC decision tomorrow",
-      "impact": "high",
-      "whyNow": "Policy path is the active pricing variable for 2Y and equity duration."
+      "id": "cat_a1b2c3d4e5f60718_ev1",
+      "statement": "Synthetic CPI update superseding prior fixture row",
+      "basis": "synthetic_fixture"
     }
-  ]
+  ],
+  "dedupeKey": "ext:syn-cpi-surprise-001",
+  "synthetic": true
 }
 ```
 
-`category` enum (MVP): `fed_data` | `treasury_auction` | `geopolitics` | `earnings` | `issuance` | `mechanical` (OPEX, rebalance, collar, etc.)
+| Field | Notes |
+| --- | --- |
+| `category` | `monetary-policy` \| `inflation` \| `labor` \| `growth` \| `fiscal` \| `geopolitics` \| `energy` \| `liquidity` \| `earnings` \| `positioning` \| `other` |
+| `status` | `upcoming` \| `released` \| `developing` \| `resolved` |
+| `importance` | `low` \| `medium` \| `high` \| `critical` — ranked in compute, not in the UI |
+| `direction` | `risk-on` \| `risk-off` \| `inflationary` \| `disinflationary` \| `growth-positive` \| `growth-negative` \| `mixed` \| `unclear` |
+| `synthetic` | M2-1 fixtures are always `true`; must not be presented as real news |
+
+Normalization is deterministic (`src/catalyst/normalize.ts`). The UI and `/api/catalysts` only read the feed — they do not reclassify.
 
 ---
 

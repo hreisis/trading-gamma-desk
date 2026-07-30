@@ -3,6 +3,10 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  CATALYST_DEMO_BANNER,
+  CATALYST_DEMO_DISCLAIMER,
+} from "@/catalyst";
+import {
   LIVE_DATA_UNAVAILABLE_MESSAGE,
   PUBLIC_DEMO_BANNER,
   PUBLIC_DEMO_DISCLAIMER,
@@ -109,6 +113,9 @@ describe("public demo production build", () => {
     expect(html).toContain(
       `${PUBLIC_DEMO_DRIVER.confidence.score}/100 (uncalibrated)`,
     );
+    expect(html).toContain(CATALYST_DEMO_BANNER);
+    expect(html).toContain(CATALYST_DEMO_DISCLAIMER);
+    expect(html).toContain("Catalyst feed");
     expect(html.toLowerCase()).not.toContain("live driver");
     expect(html).not.toContain("fixture missing or invalid");
     expect(html).not.toContain("ENOENT");
@@ -141,5 +148,13 @@ describe("public demo production build", () => {
     expect(live.status).toBe("live_unavailable");
     expect(live.driver).toBeNull();
     expect(live.error?.message).toBe(LIVE_DATA_UNAVAILABLE_MESSAGE);
+
+    const catalysts = await fetch(baseUrl + "/api/catalysts", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).then((r) => r.json());
+    expect(catalysts.mode).toBe("synthetic_demo");
+    expect(catalysts.banner).toBe(CATALYST_DEMO_BANNER);
+    expect(catalysts.isPublicDemo).toBe(true);
+    expect(Array.isArray(catalysts.catalysts)).toBe(true);
   });
 });

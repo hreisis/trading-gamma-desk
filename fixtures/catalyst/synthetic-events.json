@@ -1,0 +1,140 @@
+{
+  "kind": "CatalystSyntheticFixtureBatch",
+  "schemaVersion": "0.1.0",
+  "disclaimer": "Synthetic values for product demonstration — not actual news, calendar prints, or market observations.",
+  "events": [
+    {
+      "synthetic": true,
+      "externalId": "syn-fomc-decision-001",
+      "occurredAt": "2026-07-30T14:00:00-04:00",
+      "observedAt": "2026-07-29T18:00:00-04:00",
+      "sourceType": "calendar",
+      "sourceName": "Synthetic Macro Calendar",
+      "sourceUrl": "https://example.invalid/synthetic/fomc",
+      "headline": "FOMC policy decision (illustrative)",
+      "summary": "Synthetic scheduled FOMC decision used to exercise monetary-policy catalyst normalization.",
+      "rawCategory": "fomc",
+      "rawStatus": "upcoming",
+      "rawImportance": "high",
+      "rawDirection": "unclear",
+      "affectedAssets": ["US2Y", "US10Y", "USD", "SPX"],
+      "macroChannels": ["fed_rates"],
+      "evidenceStatements": [
+        "Synthetic calendar row labelled FOMC decision",
+        "Mapped to monetary-policy / fed_rates channels"
+      ]
+    },
+    {
+      "synthetic": true,
+      "externalId": "syn-cpi-surprise-001",
+      "occurredAt": "2026-07-15T08:30:00-04:00",
+      "observedAt": "2026-07-15T08:31:00-04:00",
+      "sourceType": "calendar",
+      "sourceName": "Synthetic Macro Calendar",
+      "sourceUrl": "https://example.invalid/synthetic/cpi",
+      "headline": "CPI print surprise (illustrative)",
+      "summary": "Synthetic CPI surprise scenario for inflation-channel mapping — not a real release.",
+      "rawCategory": "cpi",
+      "rawStatus": "released",
+      "rawImportance": "high",
+      "rawDirection": "inflationary",
+      "affectedAssets": ["US10Y", "GOLD", "USD"],
+      "macroChannels": ["inflation"],
+      "evidenceStatements": [
+        "Synthetic CPI surprise flag in fixture batch"
+      ]
+    },
+    {
+      "synthetic": true,
+      "externalId": "syn-payrolls-miss-001",
+      "occurredAt": "2026-07-03T08:30:00-04:00",
+      "observedAt": "2026-07-03T08:32:00-04:00",
+      "sourceType": "calendar",
+      "sourceName": "Synthetic Macro Calendar",
+      "sourceUrl": "https://example.invalid/synthetic/nfp",
+      "headline": "Payrolls miss (illustrative)",
+      "summary": "Synthetic nonfarm payrolls miss for labor/growth channel tests.",
+      "rawCategory": "payrolls",
+      "rawStatus": "released",
+      "rawImportance": "high",
+      "rawDirection": "growth-negative",
+      "affectedAssets": ["US2Y", "SPX"],
+      "macroChannels": ["growth", "fed_rates"],
+      "evidenceStatements": [
+        "Synthetic payrolls miss label"
+      ]
+    },
+    {
+      "synthetic": true,
+      "externalId": "syn-oil-geo-shock-001",
+      "occurredAt": "2026-07-20T11:15:00Z",
+      "observedAt": "2026-07-20T11:20:00Z",
+      "sourceType": "news",
+      "sourceName": "Synthetic Wire Desk",
+      "sourceUrl": "https://example.invalid/synthetic/oil-shock",
+      "headline": "Oil / geopolitical shock (illustrative)",
+      "summary": "Synthetic energy-geopolitics shock — not a real headline.",
+      "rawCategory": "geopolitics",
+      "rawStatus": "developing",
+      "rawImportance": "critical",
+      "rawDirection": "risk-off",
+      "affectedAssets": ["OIL", "GOLD", "VIX", "USD"],
+      "macroChannels": ["energy", "risk_sentiment"],
+      "evidenceStatements": [
+        "Synthetic geopolitical energy shock fixture"
+      ]
+    },
+    {
+      "synthetic": true,
+      "externalId": "syn-ai-earnings-001",
+      "occurredAt": "2026-07-22T16:05:00-04:00",
+      "observedAt": "2026-07-22T16:10:00-04:00",
+      "sourceType": "news",
+      "sourceName": "Synthetic Earnings Wire",
+      "sourceUrl": "https://example.invalid/synthetic/ai-earnings",
+      "headline": "Major AI earnings (illustrative)",
+      "summary": "Synthetic mega-cap AI earnings print for earnings-channel mapping.",
+      "rawCategory": "earnings",
+      "rawStatus": "released",
+      "rawImportance": "high",
+      "rawDirection": "growth-positive",
+      "affectedAssets": ["NVDA", "QQQ", "SPX"],
+      "macroChannels": ["earnings", "growth"],
+      "evidenceStatements": [
+        "Synthetic AI earnings fixture row"
+      ]
+    },
+    {
+      "synthetic": true,
+      "externalId": "syn-cpi-surprise-001",
+      "supersedesExternalId": "syn-cpi-surprise-001",
+      "occurredAt": "2026-07-15T08:30:00-04:00",
+      "observedAt": "2026-07-15T09:05:00-04:00",
+      "sourceType": "calendar",
+      "sourceName": "Synthetic Macro Calendar",
+      "sourceUrl": "https://example.invalid/synthetic/cpi-update",
+      "headline": "CPI print surprise — updated detail (illustrative)",
+      "summary": "Updated synthetic CPI row that must replace the earlier duplicate by dedupeKey/externalId.",
+      "rawCategory": "cpi",
+      "rawStatus": "released",
+      "rawImportance": "high",
+      "rawDirection": "inflationary",
+      "affectedAssets": ["US10Y", "GOLD", "USD", "OIL"],
+      "macroChannels": ["inflation"],
+      "evidenceStatements": [
+        "Synthetic CPI update superseding prior fixture row"
+      ]
+    },
+    {
+      "synthetic": true,
+      "externalId": "syn-malformed-001",
+      "occurredAt": "not-a-date",
+      "observedAt": "2026-07-01T00:00:00Z",
+      "sourceType": "news",
+      "sourceName": "Synthetic Wire Desk",
+      "headline": "Malformed event (illustrative)",
+      "rawCategory": "other",
+      "rawStatus": "released"
+    }
+  ]
+}

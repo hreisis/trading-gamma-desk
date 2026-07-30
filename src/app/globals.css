@@ -351,9 +351,65 @@ code {
   font-size: 0.88rem;
 }
 
+.catalyst-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalyst-row {
+  display: grid;
+  grid-template-columns: 11rem 1fr 10rem;
+  gap: 12px 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(42, 51, 64, 0.65);
+}
+
+.catalyst-when {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.catalyst-headline {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 500;
+}
+
+.catalyst-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 6px 0 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.catalyst-assets {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.catalyst-source {
+  font-size: 0.78rem;
+  text-align: right;
+}
+
 @media (max-width: 640px) {
   .desk {
     padding: 28px 16px 56px;
+  }
+
+  .catalyst-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .catalyst-source {
+    text-align: left;
   }
 
   .desk-product {

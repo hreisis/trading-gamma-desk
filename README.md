@@ -4,13 +4,23 @@ AI Market Structure Copilot.
 
 Reasoning chain: **Driver → Catalyst → Structure → Confirmation → Updated View**
 
-Milestone 1 ships a **read-only Macro Desk**: cross-asset regime, evidence, and an interpreted `DominantDriver`. The UI never classifies markets or recomputes confidence — it only renders precomputed payloads.
+Milestone 1 ships a **read-only Macro Desk**: cross-asset regime, evidence, and an interpreted `DominantDriver`. Milestone 2-1 adds a **Catalyst feed** from synthetic fixtures (no news crawl, no LLM). The UI never classifies markets or recomputes confidence — it only renders precomputed payloads.
 
-**Public portfolio demo:** synthetic scenario fixture only — illustrative, not live or historical market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
+**Public portfolio demo:** synthetic macro + catalyst fixtures — illustrative, not live or historical market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
+
+### Regime vs catalyst vs confidence
+
+| Concept | Meaning (today) |
+| --- | --- |
+| **Regime** (`DominantDriver`) | What cross-asset pattern the market is trading *now* |
+| **Catalyst** | An event that may *push* that pattern to change |
+| **Confidence** | Classification clarity (macro regime or catalyst taxonomy) — **uncalibrated**, not P(up) |
+
+These three are **independent** in M2-1. Catalyst direction is not mixed into macro regime or macro confidence; linkage is a later milestone.
 
 ---
 
-## Architecture (Milestone 1)
+## Architecture
 
 ```text
 .env (TIINGO_TOKEN)          gitignored — local daily only
@@ -24,11 +34,12 @@ npm run daily
 data/pipeline/status.json    ok | error (keeps last good session)
         │
         ▼
-Next.js desk (app/) + GET /api/macro/latest
-  └─ resolveDeskRequest() — Zod-parse only, no scoring
+Next.js desk (app/)
+  ├─ GET /api/macro/latest     → resolveDeskRequest() (no scoring)
+  └─ GET /api/catalysts        → loadCatalystFeed() (fixture normalize only)
 
 Public deploy (GAMMADESK_PUBLIC_DEMO=1):
-  bundled synthetic fixture (static import) → desk UI
+  bundled synthetic macro + catalyst fixtures → desk UI
   (no runtime fixtures/ path; no Tiingo; no data/; no live label)
 ```
 
@@ -36,10 +47,11 @@ Public deploy (GAMMADESK_PUBLIC_DEMO=1):
 | --- | --- |
 | `src/ingest` | Pull Treasury / CBOE / Tiingo, cache bars, write compute snapshot |
 | `src/macro` | Pure features + signature scoring (no IO) |
+| `src/catalyst` | Raw synthetic event → canonical Catalyst; dedupe; filters |
 | `src/interpret` | Template `DominantDriver` from snapshot; copies confidence verbatim |
 | `src/pipeline` | Daily orchestration + atomic driver write |
 | `src/desk` | Filesystem load + public-demo / status model for UI/API |
-| `src/app` | Macro Desk UI (read-only) |
+| `src/app` | Macro Desk + minimal Catalyst Feed (read-only) |
 
 Docs: [product](docs/product.md) · [architecture](docs/architecture.md) · [contracts](docs/data-contracts.md) · [tasks](docs/tasks.md) · [AGENTS](AGENTS.md)
 
@@ -73,6 +85,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily` and `/?source
 | `/?source=fixture` | Always demo fixture (even if live exists) |
 | `/?source=live` | Live only — empty if no drivers (no silent fixture) |
 | `/api/macro/latest` | Same view model as JSON |
+| `/api/catalysts` | Synthetic catalyst feed (`?category=&status=&importance=&asset=&start=&end=`) |
 
 Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md).
 
@@ -94,11 +107,12 @@ The public page uses a **synthetic** `DominantDriver` fixture (`fixtures/macro/p
    - `GAMMADESK_PUBLIC_DEMO=1`
    - Do **not** set `TIINGO_TOKEN`, do **not** upload `data/`
 3. Expected behaviour:
-   - `/` shows **Illustrative demo · synthetic scenario**
+   - `/` shows **Illustrative demo · synthetic scenario** plus catalyst banner **Illustrative catalyst demo · synthetic events**
    - Disclaimer: **Synthetic values for product demonstration — not actual market observations.**
    - Confidence shows `N/100 (uncalibrated)` — no band labels
    - `/?source=live` shows **Live data unavailable in public demo** (no silent fixture, no live label)
    - Page title / description are portfolio-oriented; GitHub link in header/footer
+   - `/api/catalysts` returns only synthetic fixtures (`mode: synthetic_demo`)
 
 Preview public mode locally without touching daily:
 
@@ -151,4 +165,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11** (public synthetic demo). **Do not start Milestone 2** until explicitly scheduled. Cloud Tiingo on the public host remains out of scope.
+Milestone 1 Macro path through **M1-11**; Milestone 2 starts at **M2-1** (catalyst foundation, fixture-only). Cloud Tiingo / live news on the public host remain out of scope. Market Temperature stays in the backlog.
