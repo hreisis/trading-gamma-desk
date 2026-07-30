@@ -7,6 +7,7 @@ import type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  AiMarketReactionNarrative,
   EventMarketContext,
   EventMarketReaction,
   OfficialAiBrief,
@@ -202,6 +203,25 @@ export interface CatalystFeedResponse {
       readonly feedReactionCount?: number;
       readonly reactionRulesVersion?: string;
     };
+    readonly aiMarketReactions?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly status?:
+        | "ok"
+        | "error"
+        | "missing"
+        | "synthetic"
+        | "partial"
+        | "failed"
+        | "unavailable";
+      readonly error?: string;
+      readonly archiveNarrativeCount?: number;
+      readonly feedNarrativeCount?: number;
+      readonly promptVersion?: string;
+      readonly model?: string;
+      readonly reactionRulesVersion?: string;
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -218,6 +238,8 @@ export interface CatalystFeedResponse {
   readonly marketContext?: EventMarketContext[];
   /** Deterministic reaction patterns over M2-4A (M2-4B). */
   readonly marketReactions?: EventMarketReaction[];
+  /** Evidence-grounded LLM narratives over 4A/4B (M2-4C). */
+  readonly aiMarketReactions?: AiMarketReactionNarrative[];
   readonly validationErrors: Array<{
     readonly index: number;
     readonly error: string;
@@ -267,6 +289,7 @@ export type {
   CatalystReleaseFamily,
   CatalystSourceType,
   CatalystStatus,
+  AiMarketReactionNarrative,
   EventMarketContext,
   EventMarketReaction,
   OfficialAiBrief,

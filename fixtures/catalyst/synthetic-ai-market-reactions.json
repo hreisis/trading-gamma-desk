@@ -1,0 +1,47 @@
+{
+  "kind": "CatalystSyntheticAiMarketReactionFixtureBatch",
+  "schemaVersion": "0.1.0",
+  "disclaimer": "Synthetic AI market-reaction fixtures for public demo — generated from synthetic 4A/4B evidence via the same prompt contract + fake narrator. Not live LLM output. Observed movement does not establish causation.",
+  "promptVersion": "0.1.0",
+  "narratives": [
+    {
+      "schemaVersion": "0.1.0",
+      "id": "aimrxn_0289fb22af42821b",
+      "catalystId": "cat_747bd00a15206444",
+      "marketContextId": "mctx_7ca4acf6f84f9a0b",
+      "marketContextIdentity": "mctx_7ca4acf6f84f9a0b|cat_747bd00a15206444|2026-07-15T12:30:00.000Z|synthetic_fixture|synthetic|0.1.0|complete",
+      "marketReactionId": "mrxn_066cb8854888f722",
+      "marketReactionIdentity": "mrxn_066cb8854888f722|cat_747bd00a15206444|mctx_7ca4acf6f84f9a0b|mctx_7ca4acf6f84f9a0b|cat_747bd00a15206444|2026-07-15T12:30:00.000Z|synthetic_fixture|synthetic|0.1.0|complete|0.1.0|complete",
+      "reactionRulesVersion": "0.1.0",
+      "promptVersion": "0.1.0",
+      "provider": "synthetic_fixture",
+      "model": "synthetic",
+      "status": "complete",
+      "headline": "Observed ETF proxy moves around the release",
+      "bullets": [
+        {
+          "id": "b1",
+          "text": "At +30m, the three equity ETF proxies were broadly higher.",
+          "evidenceIds": [
+            "reaction:30m:equityBreadth"
+          ]
+        },
+        {
+          "id": "b2",
+          "text": "Over the observed window, SPY ETF proxy changed 0.024%.",
+          "evidenceIds": [
+            "context:SPY:5m:changePct"
+          ]
+        }
+      ],
+      "validationErrors": [],
+      "usage": {
+        "inputTokens": 10,
+        "outputTokens": 20,
+        "totalTokens": 30
+      },
+      "generatedAt": "2026-07-29T18:00:00.000Z",
+      "synthetic": true
+    }
+  ]
+}

@@ -47,6 +47,14 @@ describe("catalyst UI payload", () => {
       expect(r.synthetic).toBe(true);
       expect(r.observations.every((o) => o.ruleId.length > 0)).toBe(true);
     }
+    expect(feed.aiMarketReactions?.length).toBeGreaterThan(0);
+    expect(feed.source.aiMarketReactions?.status).toBe("synthetic");
+    expect(feed.disclaimer).toMatch(/AI market-reaction|Demo AI reaction|observed evidence/i);
+    for (const n of feed.aiMarketReactions ?? []) {
+      expect(n.synthetic).toBe(true);
+      expect(n.bullets?.length).toBeGreaterThanOrEqual(2);
+      expect(n.status).toMatch(/complete|partial/);
+    }
   });
 
   it("keeps catalyst demo copy distinct from macro illustrative banner", () => {

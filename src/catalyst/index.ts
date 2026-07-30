@@ -106,3 +106,24 @@ export * from "./market-reactions/cache";
 export * from "./market-reactions/materialize";
 export * from "./market-reactions/build-reactions";
 export type { CatalystMarketReactionsCache } from "./market-reactions/types";
+export {
+  DEFAULT_CATALYST_REACTION_LLM_MODEL,
+  AI_REACTION_TIMEOUT_MS,
+  AI_REACTION_MAX_RETRIES,
+  AI_REACTION_MAX_OUTPUT_TOKENS,
+  AI_REACTION_MAX_CONCURRENCY,
+  AI_REACTION_MAX_PER_RUN,
+  AI_REACTION_FEED_DAYS,
+  resolveCatalystReactionLlmModel,
+  loadCatalystReactionLlmConfig,
+} from "./market-reactions/ai/config";
+export type { CatalystReactionLlmRuntimeConfig } from "./market-reactions/ai/config";
+export * from "./market-reactions/ai/evidence";
+export * from "./market-reactions/ai/prompt";
+export * from "./market-reactions/ai/narrator";
+export * from "./market-reactions/ai/validate";
+export * from "./market-reactions/ai/fake-narrator";
+export * from "./market-reactions/ai/openai-narrator";
+export * from "./market-reactions/ai/cache";
+export * from "./market-reactions/ai/enhance";
+export type { CatalystAiMarketReactionsCache } from "./market-reactions/ai/types";

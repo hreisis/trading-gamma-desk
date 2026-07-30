@@ -599,6 +599,24 @@ Independent canonical contract `EventMarketReaction` (built offline into `data/c
 
 Local: `npm run catalyst:market-reactions:build` (reads `market-context-latest.json` only; offline). Public demo derives reactions from synthetic market-context fixtures via the same rules engine.
 
+### AI market-reaction narratives (M2-4C)
+
+Independent canonical contract `AiMarketReactionNarrative` (enhanced offline into `data/catalyst/ai-market-reactions-latest.json`):
+
+| Field | Notes |
+| --- | --- |
+| `marketContextIdentity` / `marketReactionIdentity` / `reactionRulesVersion` / `promptVersion` / `model` | Cache identity — excludes `generatedAt` and `usage` |
+| `status` | `complete` \| `partial` \| `rejected` \| `unavailable` |
+| `headline` / `bullets[].evidenceIds` | Present only when validation passes; every bullet cites ≥1 evidenceId |
+| `validationErrors` | Hard-fail reasons; rejected narratives omit display copy |
+| `synthetic` | Public demo fixtures are `true` |
+
+**Rules:** LLM may only reorganize supplied 4A percentage changes + 4B classifications. Neutral / observational wording; explicit windows (`At +30m`); ETF/proxy names only. Forbidden: causal verbs, investor psychology, hawkish/dovish, bullish/bearish, risk-on/off, beat/miss, trade advice, TLT→yields, UUP→DXY, SPY/QQQ/IWM as official index levels. Local validator checks citations, numbers, entities, classification consistency, and banned phrasing — it **cannot** mathematically prove every NL claim is entailed by the input, so UI must keep an expand-original-evidence path. `rejected` / `unavailable` → UI shows rule-based M2-4B only (no empty AI card).
+
+**Layering:** 4A = objective ETF proxy prices; 4B = deterministic rules; 4C = AI organizes cited observed evidence only.
+
+Local: `npm run catalyst:market-reactions:enhance` (reads market-context + market-reactions caches only; OpenAI Responses API via `OPENAI_API_KEY` / optional `CATALYST_REACTION_LLM_MODEL`, config default `gpt-5.6-luna`; reasoning `none`; max 12 events/run; concurrency 2; 800 max output tokens). Public demo uses synthetic fixtures only — never calls OpenAI.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

@@ -1,4 +1,5 @@
 import type {
+  AiMarketReactionNarrative,
   Catalyst,
   CatalystFeedResponse,
   EventMarketContext,
@@ -9,8 +10,11 @@ import type {
   ReleaseResult,
 } from "@/catalyst";
 import {
+  buildReactionEvidencePack,
   formatCrossAssetSignatureText,
   formatLeadershipText,
+  marketContextIdentity,
+  marketReactionIdentity,
 } from "@/catalyst";
 
 function formatWhen(iso: string): string {
@@ -429,18 +433,135 @@ function windowShort(w: string): string {
   return w;
 }
 
+function MarketReactionAiBlock({
+  ai,
+  reaction,
+  context,
+  demo,
+}: {
+  ai: AiMarketReactionNarrative;
+  reaction: EventMarketReaction;
+  context?: EventMarketContext;
+  demo?: boolean;
+}) {
+  const evidenceById = new Map(
+    context
+      ? buildReactionEvidencePack(
+          context,
+          reaction,
+          marketContextIdentity(context),
+          marketReactionIdentity(reaction),
+        ).map((e) => [e.evidenceId, e])
+      : [],
+  );
+  return (
+    <div
+      className="catalyst-ai-market-reaction"
+      data-testid="catalyst-ai-market-reaction"
+    >
+      <p className="catalyst-release-meta">
+        {demo
+          ? "Demo AI reaction brief · Synthetic data"
+          : "AI market reaction brief · Generated from cited ETF proxy observations"}
+      </p>
+      <p className="catalyst-release-meta">
+        AI-generated · Status: {ai.status}
+      </p>
+      {ai.headline ? (
+        <p className="catalyst-headline">{ai.headline}</p>
+      ) : null}
+      {ai.bullets && ai.bullets.length > 0 ? (
+        <ul className="catalyst-release-obs">
+          {ai.bullets.map((b) => (
+            <li key={b.id}>
+              <span>{b.text}</span>
+              <details>
+                <summary>Cited evidence</summary>
+                {b.evidenceIds.map((eid) => {
+                  const ev = evidenceById.get(eid);
+                  if (!ev) {
+                    return (
+                      <p key={eid} className="catalyst-release-meta">
+                        {eid}
+                      </p>
+                    );
+                  }
+                  const pct =
+                    ev.kind === "changePct" && typeof ev.value === "number"
+                      ? ` · ${formatPct(ev.value)}`
+                      : "";
+                  return (
+                    <p
+                      key={eid}
+                      className="catalyst-release-meta"
+                      data-testid="catalyst-ai-mrxn-evidence"
+                    >
+                      {eid}: {String(ev.value)}
+                      {ev.symbol ? ` (${ev.symbol})` : ""}
+                      {ev.window ? ` @ ${windowShort(ev.window)}` : ""}
+                      {pct}
+                    </p>
+                  );
+                })}
+              </details>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <details data-testid="catalyst-ai-mrxn-meta">
+        <summary>Provider / model details</summary>
+        <p className="catalyst-release-meta">
+          {ai.provider}/{ai.model} · prompt {ai.promptVersion} · rules{" "}
+          {ai.reactionRulesVersion}
+        </p>
+      </details>
+      <p className="catalyst-release-meta" data-testid="catalyst-ai-mrxn-disclaimer">
+        AI-generated narrative over cited ETF proxy observations — not an
+        official market interpretation, official summary, or explanation of the
+        release. Observed movement does not establish causation.
+      </p>
+    </div>
+  );
+}
+
 function MarketReactionBlock({
   reaction,
+  context,
+  ai,
   demo,
 }: {
   reaction: EventMarketReaction;
+  context?: EventMarketContext;
+  ai?: AiMarketReactionNarrative;
   demo?: boolean;
 }) {
+  const showAi =
+    ai &&
+    (ai.status === "complete" || ai.status === "partial") &&
+    ai.validationErrors.length === 0 &&
+    Boolean(ai.headline) &&
+    Boolean(ai.bullets?.length);
+
   return (
     <div
       className="catalyst-market-reaction"
       data-testid="catalyst-market-reaction"
     >
+      {showAi ? (
+        <MarketReactionAiBlock
+          ai={ai}
+          reaction={reaction}
+          context={context}
+          demo={demo}
+        />
+      ) : null}
+      <details open={!showAi} data-testid="catalyst-mrxn-rule-based">
+        <summary>
+          {demo
+            ? "Demo reaction pattern · Synthetic data"
+            : "Rule-based reaction pattern"}
+          {showAi ? " (grounding)" : ""}
+        </summary>
       <p className="catalyst-release-meta">
         {demo
           ? "Demo reaction pattern · Synthetic data"
@@ -523,7 +644,11 @@ function MarketReactionBlock({
         proxies ≠ index / DXY / yields. Observed movement does not establish
         causation. Mixed/insufficient are conservative classifications, not
         errors.
+        {showAi
+          ? ""
+          : " AI market reaction unavailable/rejected — showing rule-based pattern."}
       </p>
+      </details>
     </div>
   );
 }
@@ -534,6 +659,7 @@ function CatalystRow({
   aiByBriefId,
   marketByCatalystId,
   reactionByCatalystId,
+  aiReactionByCatalystId,
   demo,
 }: {
   c: Catalyst;
@@ -541,6 +667,7 @@ function CatalystRow({
   aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
   marketByCatalystId: ReadonlyMap<string, EventMarketContext>;
   reactionByCatalystId: ReadonlyMap<string, EventMarketReaction>;
+  aiReactionByCatalystId: ReadonlyMap<string, AiMarketReactionNarrative>;
   demo?: boolean;
 }) {
   return (
@@ -575,6 +702,8 @@ function CatalystRow({
         {reactionByCatalystId.get(c.id) ? (
           <MarketReactionBlock
             reaction={reactionByCatalystId.get(c.id)!}
+            context={marketByCatalystId.get(c.id)}
+            ai={aiReactionByCatalystId.get(c.id)}
             demo={demo}
           />
         ) : null}
@@ -629,6 +758,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
   const reactionByCatalystId = new Map(
     (feed.marketReactions ?? []).map((r) => [r.catalystId, r]),
   );
+  const aiReactionByCatalystId = new Map(
+    (feed.aiMarketReactions ?? []).map((n) => [n.catalystId, n]),
+  );
   const demo = feed.mode === "synthetic_demo" || feed.isPublicDemo;
 
   return (
@@ -660,6 +792,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           : ""}
         {feed.source.marketReactions
           ? ` · mrxn:${feed.source.marketReactions.status ?? (feed.source.marketReactions.available ? "ok" : "missing")}`
+          : ""}
+        {feed.source.aiMarketReactions
+          ? ` · aiMrxn:${feed.source.aiMarketReactions.status ?? (feed.source.aiMarketReactions.available ? "ok" : "missing")}`
           : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
@@ -699,6 +834,7 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
               aiByBriefId={aiByBriefId}
               marketByCatalystId={marketByCatalystId}
               reactionByCatalystId={reactionByCatalystId}
+              aiReactionByCatalystId={aiReactionByCatalystId}
               demo={demo}
             />
           ))}
