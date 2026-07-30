@@ -1,0 +1,245 @@
+{
+  "kind": "MacroCalibrationReport",
+  "schemaVersion": "0.1.0",
+  "generatedAt": "2026-07-30T00:57:27.787Z",
+  "sample": {
+    "firstSession": "2026-06-17",
+    "lastSession": "2026-07-29",
+    "dayCount": 29,
+    "minHistorySessions": 22,
+    "note": "Aggregates only. Point-in-time replay over local data/bars (gitignored). No Tiingo raw prints are embedded. Scenario fixtures remain semantic constraints, not the fit target."
+  },
+  "regimeFrequency": {
+    "fed_rates": 8,
+    "mixed_unresolved": 8,
+    "growth": 3,
+    "inflation": 5,
+    "risk_sentiment": 2,
+    "liquidity": 3
+  },
+  "fallbackFrequency": {
+    "mixed_unresolved": 8,
+    "single_asset_shock": 0,
+    "insufficient_data": 0
+  },
+  "polarityFrequency": {
+    "positive": 11,
+    "null": 8,
+    "negative": 10
+  },
+  "riskDirectionFrequency": {
+    "risk_off": 9,
+    "null": 8,
+    "risk_on": 10,
+    "mixed": 2
+  },
+  "hardCapFrequency": {
+    "insufficient_effective_confirmations": 3,
+    "mixed_unresolved": 8
+  },
+  "zeroedByFrequency": {},
+  "completeSessionRate": 1,
+  "distributions": {
+    "confidenceScore": {
+      "n": 29,
+      "min": 30,
+      "p25": 47,
+      "p50": 56,
+      "p75": 67,
+      "max": 91,
+      "mean": 55.827586206896555
+    },
+    "winnerMargin": {
+      "n": 29,
+      "min": 0.006938795352399274,
+      "p25": 0.036869644815046065,
+      "p50": 0.0738058839431075,
+      "p75": 0.1379352820336167,
+      "max": 0.43550702362774374,
+      "mean": 0.11505341919041254
+    },
+    "patternMatch": {
+      "n": 29,
+      "min": 0.2694365551478615,
+      "p25": 0.5752006567029571,
+      "p50": 0.705259375555043,
+      "p75": 0.7904177999546236,
+      "max": 0.9291916192737312,
+      "mean": 0.679240323807835
+    },
+    "distinctiveness": {
+      "n": 29,
+      "min": 0.02435346152098993,
+      "p25": 0.15838924389758915,
+      "p50": 0.2590404621184869,
+      "p75": 0.7064041430168839,
+      "max": 1,
+      "mean": 0.4116457507764673
+    },
+    "coherence": {
+      "n": 29,
+      "min": 0.7825794464858354,
+      "p25": 0.928667555803351,
+      "p50": 1,
+      "p75": 1,
+      "max": 1,
+      "mean": 0.9644489520972581
+    },
+    "effectiveBreadth": {
+      "n": 29,
+      "min": 0.2452830188679245,
+      "p25": 0.45833333333333337,
+      "p50": 0.625,
+      "p75": 0.7916666666666666,
+      "max": 1,
+      "mean": 0.6530644243610376
+    },
+    "strength": {
+      "n": 29,
+      "min": 0.2267497003370397,
+      "p25": 0.35430211154757935,
+      "p50": 0.41581564879176175,
+      "p75": 0.5553591160824825,
+      "max": 1,
+      "mean": 0.4639883469295124
+    },
+    "coveragePenalty": {
+      "n": 29,
+      "min": 0,
+      "p25": 0,
+      "p50": 0,
+      "p75": 0,
+      "max": 0,
+      "mean": 0
+    },
+    "effectiveConfirmations": {
+      "n": 29,
+      "min": 1,
+      "p25": 2,
+      "p50": 3,
+      "p75": 3.5,
+      "max": 5,
+      "mean": 2.9482758620689653
+    },
+    "observedZCount": {
+      "n": 29,
+      "min": 8,
+      "p25": 8,
+      "p50": 8,
+      "p75": 8,
+      "max": 8,
+      "mean": 8
+    }
+  },
+  "confidenceBuckets": {
+    "0": 0,
+    "1-19": 0,
+    "20-39": 4,
+    "40-59": 14,
+    "60-69": 7,
+    "70-84": 3,
+    "85-100": 1
+  },
+  "scenarioConstraints": {
+    "note": "Scenario fixtures constrain regime semantics. This report does not retune parameters to maximize their pass rate.",
+    "fixturePath": "fixtures/macro/scenarios.m1.json",
+    "results": [
+      {
+        "id": "fed_rates_easing",
+        "expectedRegime": "fed_rates",
+        "observedRegime": "fed_rates",
+        "ok": true
+      },
+      {
+        "id": "inflation",
+        "expectedRegime": "inflation",
+        "observedRegime": "inflation",
+        "ok": true
+      },
+      {
+        "id": "growth",
+        "expectedRegime": "growth",
+        "observedRegime": "growth",
+        "ok": true
+      },
+      {
+        "id": "risk_off",
+        "expectedRegime": "risk_sentiment",
+        "observedRegime": "risk_sentiment",
+        "ok": true
+      },
+      {
+        "id": "mixed_unresolved",
+        "expectedRegime": "mixed_unresolved",
+        "observedRegime": "mixed_unresolved",
+        "ok": true
+      },
+      {
+        "id": "single_asset_shock",
+        "expectedRegime": "single_asset_shock",
+        "observedRegime": "single_asset_shock",
+        "ok": true
+      },
+      {
+        "id": "insufficient_data_missing_rate",
+        "expectedRegime": "insufficient_data",
+        "observedRegime": "insufficient_data",
+        "ok": true
+      },
+      {
+        "id": "insufficient_data_sparse_coverage",
+        "expectedRegime": "insufficient_data",
+        "observedRegime": "insufficient_data",
+        "ok": true
+      }
+    ]
+  },
+  "parameterSuggestions": {
+    "status": "review_only",
+    "calibratedRemains": false,
+    "items": [
+      {
+        "parameter": "ambiguityFloor",
+        "current": 0.2,
+        "observation": "mixed_unresolved on 8/29 days (27.6%); driver-day distinctiveness p50=0.467.",
+        "suggestion": "Keep ambiguityFloor unchanged until the live sample is larger than ~60 driver days.",
+        "caution": "Hand scenarios already pin the gate wiring; fitting the floor to ~30 warm days will overfit seasonality."
+      },
+      {
+        "parameter": "marginRef",
+        "current": 0.15,
+        "observation": "Driver-day |s_top|-|s_second| p50=0.111, p75=0.174.",
+        "suggestion": "Keep marginRef; the current scale is not obviously misaligned with observed margins.",
+        "caution": "marginRef also scales with templateSimilarity; changing it moves mixed_unresolved and confidence together."
+      },
+      {
+        "parameter": "concentrationThreshold",
+        "current": 0.6,
+        "observation": "single_asset_shock on 0/29 days; thin-breadth cap fired on 3/29 days.",
+        "suggestion": "No shocks in this window — do not loosen the threshold; wait for a violent single-name day in a longer sample.",
+        "caution": "This threshold is a hard regime override, not a soft score knob."
+      },
+      {
+        "parameter": "lambda (component weights)",
+        "current": "equal 0.2 each",
+        "observation": "Driver-day breadth p50=0.623; strength enters confidence but cosine components dominate regime choice.",
+        "suggestion": "Keep equal λ until M1-6b has enough days to estimate which components predict stable next-day regime persistence.",
+        "caution": "Reweighting λ without an outcome label is decoration, not calibration."
+      },
+      {
+        "parameter": "highBandFloor / confidence bands",
+        "current": 70,
+        "observation": "Driver-day confidence p50=59.0; 4/21 driver days score ≥ 70.",
+        "suggestion": "Leave bands unpublished (calibrated: false). The 70 placeholder is fine as a thin-breadth cap only; do not invent high/medium/low cut-offs from this sample.",
+        "caution": "Publishing band labels before outcome-linked calibration is exactly what the product forbids."
+      },
+      {
+        "parameter": "calibrated",
+        "current": false,
+        "observation": "Replay covers 29 sessions after warm-up; insufficient_data=0.",
+        "suggestion": "Keep calibrated: false until a multi-quarter PIT sample exists and band cut-offs are outcome-checked.",
+        "caution": "Scenario fixtures constrain semantics; they must not be the sole fit target."
+      }
+    ]
+  }
+}

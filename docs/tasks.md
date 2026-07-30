@@ -4,9 +4,16 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-8 landing; next is **M1-9** (macro desk UI). M1-6b stays deferred until joint calibration against scenarios + locally regenerated history (Tiingo EOD is not in the public freeze).
+**Milestone 1 — Cross-Asset Macro.** Next: **M1-9 Macro desk UI** (read-only over snapshot + interpretation; show `confidence.score` as uncalibrated; no band labels).
 
-> **M1-6b is deferred.** Do not calibrate `marginRef`, `ambiguityFloor`, `λ` or confidence bands against hand-tuned scenarios alone — that overfits placeholders. After M1-7 freezes a batch of real historical samples, calibrate jointly against scenario fixtures **and** the live distribution. Until then `confidenceParams.calibrated` stays `false` and no surface may render band labels.
+### M1-6b calibration status (split)
+
+| Track | Status |
+| --- | --- |
+| **Calibration reporting infrastructure** | ✅ Done — PIT replay (`npm run calibrate`), commit-safe aggregates in `fixtures/macro/calibration/`, per-day ledgers stay in gitignored `data/calibration/`. Parameters unchanged; `calibrated` remains `false`. |
+| **Multi-quarter outcome-linked calibration** | ⏳ Pending — do not retune `marginRef`, `ambiguityFloor`, `λ`, or confidence bands, and do not set `calibrated: true`, until a multi-quarter PIT sample exists and band cut-offs are checked against outcomes. Scenario fixtures stay semantic constraints, not the sole fit target. |
+
+> Until outcome-linked calibration lands, `confidenceParams.calibrated` stays `false` and no surface may render high/medium/low band labels.
 
 ---
 
@@ -55,7 +62,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented — ✅ `classifyDriver` + 16 scoring tests; placeholders `highBandFloor=70` / `zNoiseFloor=0.5` documented as uncalibrated |
 | M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move — ✅ 10 property tests; sign-flip keeps confirming membership (does not swap roles); scaling requires unsaturated strength |
 | M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data — ✅ `fixtures/macro/scenarios.m1.json` + 8 scenario acceptance tests against `classifyDriver` |
-| M1-6b | Calibrate `confidenceParams` | Deferred until M1-7 freezes real historical samples; then jointly fit `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs against scenarios **and** the live distribution; only then `calibrated: true` |
+| M1-6b | Calibrate `confidenceParams` | **Reporting infra ✅** (`npm run calibrate`, `fixtures/macro/calibration/report-2026-07-29.json`). **Outcome-linked fit ⏳** — params unchanged, `calibrated: false` until multi-quarter review |
 | M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; year-boundary merge for Treasury; response validation rules enforced; immutable snapshot with versions — ✅ `src/ingest/*`, `npm run ingest`, offline parser tests; live bars in gitignored `data/`; public freeze keeps only Treasury/CBOE + summary (no Tiingo EOD redistribution) |
 | M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template — ✅ `interpretSnapshot` reads compute snapshot only, copies confidence verbatim, template generator + equity-claim/band-label/number guardrails; no LLM on this path |
 | M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
