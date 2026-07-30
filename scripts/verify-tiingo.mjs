@@ -14,7 +14,8 @@
 
 import { writeFileSync, mkdirSync } from "node:fs";
 
-const TOKEN = (process.env.TIINGO_TOKEN ?? "").trim();
+/** Tolerate a pasted `KEY= "value"`, so stray quotes are not sent as token characters. */
+const TOKEN = (process.env.TIINGO_TOKEN ?? "").trim().replace(/^["']|["']$/g, "");
 
 if (!TOKEN) {
   console.error(

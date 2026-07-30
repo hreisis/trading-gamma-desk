@@ -101,8 +101,8 @@ FRED is **not** viable as a primary source: it republishes upstream data with a 
 | --- | --- | --- | --- |
 | US 2Y, US 10Y | Treasury.gov daily par yield curve CSV | none | ✅ verified, same session |
 | VIX | CBOE daily `VIX_History.csv` | none | ✅ verified, T-1 |
-| Gold, Copper, Oil, USD | Tiingo EOD, ETF proxies `GLD` / `CPER` / `USO` / `UUP` | token | ⛔ blocked on token |
-| BTC | Tiingo crypto | token | ⛔ blocked on token |
+| Gold, Copper, Oil, USD | Tiingo EOD, ETF proxies `GLD` / `CPER` / `USO` / `UUP` | token | ✅ verified, same session |
+| BTC | Tiingo crypto | token | ✅ verified, UTC-dated, needs session snap |
 | FRED | Backfill and cross-check only | none | Lagging by design |
 | Stooq | **Rejected** | none | Bot challenge, see M1-1 findings |
 
@@ -114,11 +114,22 @@ Yields keep native **bps** semantics from Treasury data. `UUP` is closer to DXY 
 
 **CBOE VIX — usable, one session behind.** 9,239 rows back to `01/02/1990`, columns `DATE,OPEN,HIGH,LOW,CLOSE`, dates `MM/DD/YYYY` **ascending**, no zero or blank OHLC in the recent window. At 19:00 ET on `07/29` the latest row was `07/28`, confirming a CDN update lag and confirming the pre-open schedule choice.
 
-**Tiingo — still blocked, now one command away.** Both `/tiingo/daily/<sym>/prices` and `/tiingo/crypto/prices` return `403 {"detail":"Please supply a token"}`, and `TIINGO_TOKEN` in `.env` is still empty as of `2026-07-29`.
+**Tiingo — verified, all five symbols usable.** Reproduce with `npm run verify:tiingo` (`scripts/verify-tiingo.mjs`). The probe sends the token as an `Authorization` header rather than a query parameter so the secret cannot leak through a URL echoed in an error, redacts it from every line it prints, applies the Stooq lesson by checking `content-type` and payload shape before trusting HTTP 200, and exits non-zero without writing anything if any probe fails.
 
-`npm run verify:tiingo` (`scripts/verify-tiingo.mjs`) performs the verification the moment a token exists. It sends the token as an `Authorization` header rather than a query parameter, so the secret cannot leak through a URL echoed in an error, and redacts it from every line it prints. Per symbol it records: actual field names against the expected set, the real `date` format and latest available session, `close` versus `adjClose` divergence together with `divCash` and `splitFactor` occurrences, non-positive closes, and for `btcusd` the bar timestamp and weekend-bar count that decide whether a 16:00 ET snap is definable. It applies the Stooq lesson by checking `content-type` and payload shape before trusting HTTP 200, and it exits non-zero without writing anything if any probe fails.
+Findings at `2026-07-29` 20:13 ET, over a 75-calendar-day request:
 
-It also persists the observed session dates to `fixtures/macro/observed-sessions.tiingo.json` (dates only, no secrets), so the M1-3 market calendar can be reconciled offline against a second independent source. The Treasury file already agrees with that calendar; a second source disagreeing would mean the holiday set is wrong.
+**ETF proxies (`GLD`, `CPER`, `USO`, `UUP`).** All four returned HTTP 200, `application/json`, and the full expected field set with nothing missing and nothing unexpected: `date, open, high, low, close, volume, adjOpen, adjHigh, adjLow, adjClose, adjVolume, divCash, splitFactor`. 50 sessions each, no non-positive or non-finite closes, latest session `2026-07-29` — the **same session**, available after the 16:00 ET close. 75 calendar days yielding 50 sessions also confirms the 45–60 day request window comfortably covers a 22-session need.
+
+**Two date traps, both verified rather than assumed.**
+
+1. The daily `date` field is `"2026-07-29T00:00:00.000Z"` and the crypto endpoint uses `"2026-05-16T00:00:00+00:00"` — two different serialisations of the same idea. Dates must be taken by **string slice**. Converting through a local `Date` renders `2026-07-29` as `2026-07-28` in both ET and PT, which is a silent one-session shift that would corrupt every change the pipeline computes while looking entirely plausible.
+2. The `btcusd` daily bars are **UTC-dated**, so the latest bar was `2026-07-30`: a calendar day that had been in progress for thirteen minutes. Taking the last bar naively would score an incomplete session and label it with tomorrow's date. The adapter must drop the in-progress UTC day and intersect with equity sessions; 22 of 76 bars were weekends.
+
+**`adjClose` is policy, not a measurement.** `close` and `adjClose` diverged by 0.0000% across all four ETFs, with zero `divCash` rows and no `splitFactor != 1`. This does **not** show the two are interchangeable — it shows the sampled window contained no adjustment event. `UUP` in particular does distribute. Milestone 1 therefore uses `adjClose` deliberately, because it is the series that stays continuous the first time a distribution lands.
+
+**BTC carries no `adjClose`.** Crypto bars expose `date, open, high, low, close, volume, tradesDone, volumeNotional` inside a `priceData` envelope keyed by `ticker, baseCurrency, quoteCurrency`. The adapter cannot assume one row shape across both endpoints.
+
+**Calendar reconciled against a second source.** The probe persists observed session dates to `fixtures/macro/observed-sessions.tiingo.json` (dates only, no secrets), and `tests/session-calendar.test.ts` reconciles the M1-3 holiday set against it offline. Tiingo's 50 sessions match the calendar exactly, with no date the calendar expects that the vendor skipped and none the vendor traded that the calendar calls a holiday. The holiday set now has two independent witnesses: Treasury's sparse file and this fixture.
 
 **Stooq — rejected.** `stooq.com/q/d/l/` returns **HTTP 200 with a JavaScript proof-of-work bot challenge page**, not CSV. This is the important finding: a client that checks only the status code would parse an HTML challenge as price data and produce silent garbage.
 
