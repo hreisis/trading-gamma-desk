@@ -87,6 +87,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run catalyst:market-reactions:build` | Classify M2-4A snapshots into reaction patterns → `data/catalyst/market-reactions-latest.json` (offline) |
 | `npm run catalyst:market-reactions:enhance` | Evidence-grounded AI narratives over 4A/4B → `data/catalyst/ai-market-reactions-latest.json` (reads context+reactions only) |
 | `npm run catalyst:integration:smoke` | M2-5A-Lite integration smoke (manual; see below) |
+| `npm run catalyst:update` | M2-5B unified incremental update (manual; see below) |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -139,7 +140,20 @@ npm run catalyst:integration:smoke -- --live --max-events 2
 - **Report:** gitignored `data/catalyst/integration-smoke-latest.json` (schema `0.1.0`) — statuses/counts/safe error codes only; keys/headers/prompt/response bodies redacted.
 - **Overall:** OpenAI success with Alpaca still awaiting → `partial` (full M2-5A not closed). `passed` requires all executable live stages including Alpaca.
 - **Tests vs live:** Vitest uses injected fake narrators and never hits the network even if `.env` has keys. Public demo never runs this command and never reads `.env` for providers.
-- **Alpaca:** Live market-context smoke remains **awaiting_credentials / awaiting_live_smoke** until valid credentials exist; do not invent or bypass Alpaca auth.
+- **Alpaca:** Report **`awaiting_valid_credentials`** (incomplete/invalid key shape), **`authentication_error`** (live 401/403), or **`awaiting_live_smoke`** (shape present, end-to-end not validated). Do not invent or bypass Alpaca auth.
+
+**Unified incremental update (M2-5B):** Manual orchestration — **not** a scheduler.
+
+```bash
+npm run catalyst:update -- --dry-run
+npm run catalyst:update -- --max-events 2
+```
+
+- **Stages:** `official_facts` → `openai_official_brief` (briefs branch); `market_context_4a` → `reaction_4b` → `openai_reaction_4c` (market branch). Branches are independent — Alpaca failure does not block official AI briefs.
+- **Incremental:** reuses each stage’s identity skip (input / rules / prompt / model / dependency versions). `--force` rebuilds.
+- **Safety:** single-instance lock (`update.lock.json`, stale recovery); atomic manifest `data/catalyst/update-latest.json`; provider-wide AI failure preserves prior AI caches; no synthetic fill of live 4A.
+- **Dry-run:** zero provider calls, zero business cache writes — plan + eligibility only.
+- **M2-5B does not** add cron, database, deployment secrets, or new market-data providers.
 
 ### Desk URLs (local)
 
@@ -232,4 +246,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-5A-Lite** (prior catalyst modules + OpenAI integration smoke; Alpaca live smoke deferred). Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and M2-5B unified update remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-5B** (prior catalyst modules + OpenAI integration smoke + unified incremental `catalyst:update`; Alpaca live smoke still deferred until valid credentials). Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope. Market Temperature stays in the backlog.

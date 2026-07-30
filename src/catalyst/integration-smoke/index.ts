@@ -4,7 +4,11 @@ export {
   integrationSmokeReportPath,
 } from "./paths";
 export { redactSecrets, redactUnknown } from "./redaction";
-export { classifySmokeError, type SmokeErrorCode } from "./errors";
+export {
+  classifySmokeError,
+  classifyAlpacaCredentialState,
+  type SmokeErrorCode,
+} from "./errors";
 export {
   INTEGRATION_SMOKE_DEFAULT_MAX_EVENTS,
   runCatalystIntegrationSmoke,

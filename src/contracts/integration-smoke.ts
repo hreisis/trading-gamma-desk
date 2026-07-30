@@ -8,6 +8,8 @@ export const IntegrationSmokeStageStatus = z.enum([
   "skipped_no_eligible_input",
   "skipped_dependency_unavailable",
   "awaiting_credentials",
+  "awaiting_valid_credentials",
+  "awaiting_live_smoke",
   "unavailable",
   "failed",
 ]);

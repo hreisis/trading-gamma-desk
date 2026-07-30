@@ -129,6 +129,19 @@ describe("M2-5A-Lite redaction + error codes", () => {
 
   it("classifies provider errors safely", () => {
     expect(classifySmokeError("OpenAI HTTP 429: rate")).toBe("rate_limit");
+    expect(
+      classifySmokeError(
+        'OpenAI HTTP 429: {"error":{"type":"insufficient_quota","message":"You exceeded your current quota"}}',
+      ),
+    ).toBe("insufficient_quota");
+    expect(
+      classifySmokeError(
+        "OpenAI HTTP 403: forbidden — exceeded your current quota, check billing",
+      ),
+    ).toBe("insufficient_quota");
+    expect(
+      classifySmokeError("OpenAI HTTP 403: invalid API key provided"),
+    ).toBe("authentication_error");
     expect(classifySmokeError("OpenAI timed out after 1ms")).toBe("timeout");
     expect(classifySmokeError("OpenAI HTTP 500: x")).toBe("provider_5xx");
     expect(classifySmokeError("OpenAI HTTP 400: x")).toBe("provider_4xx");
@@ -181,7 +194,7 @@ describe("M2-5A-Lite dry-run / opt-in", () => {
     expect(
       result.report.stages.find((s) => s.stage === "alpaca_market_context")
         ?.status,
-    ).toBe("awaiting_credentials");
+    ).toBe("awaiting_valid_credentials");
     expect(existsSync(aiBriefsLatestPath(root))).toBe(false);
     expect(existsSync(integrationSmokeReportPath(root))).toBe(true);
     expect(
@@ -252,7 +265,7 @@ describe("M2-5A-Lite live stages with fake narrators", () => {
     expect(
       result.report.stages.find((s) => s.stage === "alpaca_market_context")
         ?.status,
-    ).toBe("awaiting_credentials");
+    ).toBe("awaiting_valid_credentials");
     expect(
       result.report.stages.find((s) => s.stage === "openai_official_brief")
         ?.status,

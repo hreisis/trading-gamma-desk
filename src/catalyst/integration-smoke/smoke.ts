@@ -44,7 +44,7 @@ import {
 import { aiMarketReactionsLatestPath } from "../market-reactions/ai/paths";
 import type { MarketReactionNarrator } from "../market-reactions/ai/narrator";
 import { createOpenAiMarketReactionNarrator } from "../market-reactions/ai/openai-narrator";
-import { classifySmokeError } from "./errors";
+import { classifyAlpacaCredentialState, classifySmokeError } from "./errors";
 import {
   DEFAULT_INTEGRATION_SMOKE_DATA_ROOT,
   integrationSmokeReportPath,
@@ -113,7 +113,10 @@ function overallFromStages(
   const anyOpenaiPassed = openaiStages.some((s) => s.status === "passed");
   const anyOpenaiFailed = openaiStages.some((s) => s.status === "failed");
   const alpaca = stages.find((s) => s.stage === "alpaca_market_context");
-  const alpacaAwaiting = alpaca?.status === "awaiting_credentials";
+  const alpacaAwaiting =
+    alpaca?.status === "awaiting_credentials" ||
+    alpaca?.status === "awaiting_valid_credentials" ||
+    alpaca?.status === "awaiting_live_smoke";
 
   if (!live) {
     // Dry-run / plan-only never claims full provider pass.
@@ -325,20 +328,26 @@ export async function runCatalystIntegrationSmoke(
 
     // --- 2. Alpaca ---
     const alpacaStart = new Date().toISOString();
-    if (!alpacaCreds) {
+    const keyIdPresent = Boolean((env.APCA_API_KEY_ID ?? "").trim());
+    const secretPresent = Boolean((env.APCA_API_SECRET_KEY ?? "").trim());
+    const alpacaCredState = classifyAlpacaCredentialState({
+      keyIdPresent,
+      secretPresent,
+    });
+    if (alpacaCredState.status === "awaiting_valid_credentials") {
       stages.push(
         stageBase("alpaca_market_context", {
-          status: "awaiting_credentials",
+          status: "awaiting_valid_credentials",
           provider: "alpaca",
           feed,
           cachePreserved: true,
-          errorCodes: ["missing_credentials"],
+          errorCodes: ["awaiting_valid_credentials"],
           startedAt: alpacaStart,
           completedAt: new Date().toISOString(),
         }),
       );
       notes.push(
-        "alpaca_market_context = awaiting_credentials — no Alpaca call; no empty 4A cache written; awaiting_live_smoke.",
+        "alpaca_market_context = awaiting_valid_credentials — no Alpaca call; no empty 4A cache written.",
       );
       if (mctxLoaded.ok) {
         notes.push(
@@ -348,36 +357,37 @@ export async function runCatalystIntegrationSmoke(
     } else if (!live) {
       stages.push(
         stageBase("alpaca_market_context", {
-          status: "skipped_dependency_unavailable",
+          status: "awaiting_live_smoke",
           provider: "alpaca",
           feed,
-          errorCodes: ["live_opt_in_required"],
+          errorCodes: ["awaiting_live_smoke", "live_opt_in_required"],
           cachePreserved: true,
           startedAt: alpacaStart,
           completedAt: new Date().toISOString(),
         }),
       );
       notes.push(
-        "Alpaca credentials present but --live not set — zero Alpaca calls (M2-5A-Lite defers full Alpaca live smoke).",
+        "Alpaca credential shape present but --live not set / smoke deferred — awaiting_live_smoke; zero Alpaca HTTP.",
       );
     } else {
-      // Credentials exist but M2-5A-Lite still does not run live Alpaca fetch
-      // (identity verification deferred). Record awaiting_live_smoke explicitly.
+      // Both key parts present but M2-5A-Lite does not run live Alpaca fetch
+      // until credentials are validated end-to-end.
       stages.push(
         stageBase("alpaca_market_context", {
-          status: "awaiting_credentials",
+          status: "awaiting_live_smoke",
           provider: "alpaca",
           feed,
-          errorCodes: ["missing_credentials"],
+          errorCodes: ["awaiting_live_smoke"],
           cachePreserved: true,
           startedAt: alpacaStart,
           completedAt: new Date().toISOString(),
         }),
       );
       notes.push(
-        "Alpaca live fetch deferred in M2-5A-Lite (awaiting validated live smoke path). Zero Alpaca HTTP calls this run.",
+        "Alpaca live fetch deferred (awaiting_live_smoke). Zero Alpaca HTTP calls this run.",
       );
     }
+    void alpacaCreds;
 
     // Isolated output root for live AI stages
     if (live && openaiKey) {
@@ -746,11 +756,9 @@ export async function runCatalystIntegrationSmoke(
       );
     }
 
-    if (alpacaCreds === null) {
-      notes.push(
-        "Full M2-5A: partial, awaiting Alpaca live smoke (awaiting_credentials).",
-      );
-    }
+    notes.push(
+      "Full M2-5A: partial until Alpaca live smoke succeeds (awaiting_valid_credentials / awaiting_live_smoke).",
+    );
     notes.push(`Provider narrate() calls this run: ${providerCalls}.`);
 
     const overall = overallFromStages(stages, live);
@@ -839,7 +847,12 @@ export function formatSummary(report: CatalystIntegrationSmokeReport): string[] 
     if (s.validatedCount > 0 || s.attemptedCount > 0) {
       if (s.status === "passed") {
         detail = `${s.status} (${s.validatedCount} events)`;
-      } else if (s.attemptedCount > 0 && s.status !== "awaiting_credentials") {
+      } else if (
+        s.attemptedCount > 0 &&
+        s.status !== "awaiting_credentials" &&
+        s.status !== "awaiting_valid_credentials" &&
+        s.status !== "awaiting_live_smoke"
+      ) {
         detail = `${s.status} (attempted ${s.attemptedCount})`;
       }
     }
@@ -853,11 +866,13 @@ export function formatSummary(report: CatalystIntegrationSmokeReport): string[] 
     report.stages.some(
       (s) =>
         s.stage === "alpaca_market_context" &&
-        s.status === "awaiting_credentials",
+        (s.status === "awaiting_credentials" ||
+          s.status === "awaiting_valid_credentials" ||
+          s.status === "awaiting_live_smoke"),
     )
   ) {
     lines.push(
-      "Note                      Alpaca awaiting_credentials / awaiting_live_smoke",
+      "Note                      Alpaca awaiting_valid_credentials / awaiting_live_smoke",
     );
   }
   return lines.map(redactSecrets);

@@ -626,9 +626,22 @@ Sanitized run report `CatalystIntegrationSmokeReport` written to gitignored `dat
 | `mode` | `live` only with explicit `--live`; otherwise `dry-run` |
 | `overallStatus` | `passed` \| `partial` \| `unavailable` \| `failed` |
 | `stages[]` | preflight → alpaca → openai official brief → openai reaction → cache integrity |
-| `errorCodes` | Safe categories only (`timeout`, `validation_rejected`, `missing_credentials`, …) — never keys/headers/bodies |
+| `errorCodes` | Safe categories only (`timeout`, `insufficient_quota`, `rate_limit`, `validation_rejected`, `missing_credentials`, …) — never keys/headers/bodies |
 
-**Status meanings:** `passed` = requested live stages that could run actually called the provider and passed validators; `partial` = at least one OpenAI stage passed while Alpaca remains `awaiting_credentials` (current expected M2-5A outcome); `unavailable` = no live provider stage could execute; `awaiting_credentials` = Alpaca keys absent — zero Alpaca calls, not an adapter failure. Automatic tests use fake narrators only; public demo never runs this smoke.
+**Status meanings:** `passed` = requested live stages that could run actually called the provider and passed validators; `partial` = at least one OpenAI stage passed while Alpaca remains awaiting; `unavailable` = no live provider stage could execute; `awaiting_valid_credentials` = Alpaca key/secret incomplete or invalid shape; `awaiting_live_smoke` = credential shape present but live Alpaca path not yet validated; `insufficient_quota` / `rate_limit` for billing/throttle (not auth). Automatic tests use fake narrators only; public demo never runs this smoke.
+
+### Unified incremental update manifest (M2-5B)
+
+`CatalystUpdateManifest` schemaVersion **`0.1.0`** written to gitignored `data/catalyst/update-latest.json` by `npm run catalyst:update`:
+
+| Field | Notes |
+| --- | --- |
+| `mode` | `dry-run` (plan only) or `live` |
+| `stages[]` | `official_facts` → `openai_official_brief`; `market_context_4a` → `reaction_4b` → `openai_reaction_4c` |
+| counts | `attemptedCount` / `updatedCount` / `skippedCount` / `failedCount` |
+| `errorCodes` | Safe categories incl. `insufficient_quota`, `awaiting_valid_credentials`, `awaiting_live_smoke` |
+
+**Incremental identity:** each stage reuses existing adapters — recompute only when input identity, rules/prompt/model, or dependency versions change. Run lock `data/catalyst/update.lock.json` (stale after 30m or dead PID). No scheduler.
 
 ---
 

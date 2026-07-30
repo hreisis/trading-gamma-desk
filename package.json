@@ -24,6 +24,7 @@
     "catalyst:market-reactions:build": "tsx scripts/build-catalyst-market-reactions.ts",
     "catalyst:market-reactions:enhance": "tsx --env-file=.env scripts/enhance-catalyst-market-reactions.ts",
     "catalyst:integration:smoke": "tsx --env-file=.env scripts/catalyst-integration-smoke.ts",
+    "catalyst:update": "tsx --env-file=.env scripts/update-catalyst.ts",
     "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts",
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },
