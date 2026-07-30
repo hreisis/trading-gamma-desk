@@ -1,13 +1,30 @@
 import type { MacroDeskView } from "@/desk";
+import { PUBLIC_DEMO_BANNER } from "@/desk/public-demo";
 
 export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
   const banners: { className: string; text: string; testId: string }[] = [];
 
-  if (view.isDemo) {
+  if (view.isPublicDemo && view.driver) {
+    banners.push({
+      className: "desk-banner desk-banner-demo desk-banner-historical",
+      text: PUBLIC_DEMO_BANNER,
+      testId: "banner-historical-demo",
+    });
+  } else if (view.isDemo && !view.isPublicDemo) {
     banners.push({
       className: "desk-banner desk-banner-demo",
       text: "Demo · fixture fallback — not a live market session. Run npm run daily for a live driver.",
       testId: "banner-demo",
+    });
+  }
+
+  if (view.error?.code === "live_unavailable" || view.status === "live_unavailable") {
+    banners.push({
+      className: "desk-banner desk-banner-error",
+      text:
+        view.error?.message ??
+        "Live data unavailable — this public deployment serves a historical fixture only.",
+      testId: "banner-live-unavailable",
     });
   }
 
@@ -34,7 +51,12 @@ export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
     });
   }
 
-  if (view.sessionStale && view.driver && view.error?.code !== "malformed") {
+  if (
+    view.sessionStale &&
+    view.driver &&
+    view.error?.code !== "malformed" &&
+    !view.isPublicDemo
+  ) {
     banners.push({
       className: "desk-banner desk-banner-warn",
       text: `Stale or incomplete session · ${view.driver.marketSessionDate} · ${view.driver.sessionAlignment}${
@@ -44,7 +66,12 @@ export function DeskStatusBanners({ view }: { view: MacroDeskView }) {
     });
   }
 
-  if (view.source === "local_driver" && !view.snapshotPresent && view.driver) {
+  if (
+    view.source === "local_driver" &&
+    !view.snapshotPresent &&
+    view.driver &&
+    !view.isPublicDemo
+  ) {
     banners.push({
       className: "desk-banner desk-banner-warn",
       text: "Live driver present but matching compute snapshot is missing.",

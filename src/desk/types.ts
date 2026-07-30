@@ -7,7 +7,8 @@ export type DeskStatusKind =
   | "ready"
   | "empty"
   | "malformed"
-  | "pipeline_error";
+  | "pipeline_error"
+  | "live_unavailable";
 
 export type PipelineStage =
   | "ingest"
@@ -29,7 +30,7 @@ export interface PipelineStatus {
 }
 
 export interface DeskError {
-  readonly code: "empty" | "malformed" | "pipeline";
+  readonly code: "empty" | "malformed" | "pipeline" | "live_unavailable";
   readonly message: string;
   readonly path?: string;
   readonly stage?: PipelineStage | null;
@@ -44,6 +45,8 @@ export interface MacroDeskView {
   readonly source: DeskPayloadSource | null;
   readonly sourceLabel: string | null;
   readonly isDemo: boolean;
+  /** True when GAMMADESK_PUBLIC_DEMO is on (portfolio deployment). */
+  readonly isPublicDemo: boolean;
   readonly isLiveDriver: boolean;
   readonly driver: DominantDriver | null;
   readonly driverPath: string | null;

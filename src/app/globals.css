@@ -45,12 +45,62 @@ code {
   margin-bottom: 20px;
 }
 
+.desk-brand-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .desk-product {
   margin: 0;
   font-size: clamp(2rem, 4vw, 2.75rem);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.1;
+}
+
+.desk-repo {
+  color: var(--accent);
+  font-size: 0.92rem;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.desk-repo:hover {
+  border-bottom-color: var(--accent);
+}
+
+.desk-footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.desk-footer a {
+  color: var(--accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.desk-footer a:hover {
+  text-decoration: underline;
+}
+
+.desk-footer-sep {
+  opacity: 0.5;
+}
+
+.desk-banner-historical {
+  font-weight: 500;
+  font-size: 0.95rem;
 }
 
 .desk-chain {
@@ -306,13 +356,32 @@ code {
     padding: 28px 16px 56px;
   }
 
+  .desk-product {
+    font-size: 1.75rem;
+  }
+
   .desk-table {
     display: block;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .desk-evidence li {
     grid-template-columns: 3.5rem 1fr;
     gap: 8px;
+  }
+
+  .desk-meta {
+    gap: 8px 12px;
+  }
+
+  .desk-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .desk-footer-sep {
+    display: none;
   }
 }

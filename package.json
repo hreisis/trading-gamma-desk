@@ -14,7 +14,8 @@
     "ingest": "tsx --env-file=.env scripts/ingest-macro.ts",
     "interpret": "tsx --env-file=.env scripts/interpret-macro.ts",
     "daily": "tsx --env-file=.env scripts/run-daily.ts",
-    "calibrate": "tsx --env-file=.env scripts/calibrate-report.ts"
+    "calibrate": "tsx --env-file=.env scripts/calibrate-report.ts",
+    "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts"
   },
   "dependencies": {
     "next": "16.2.12",

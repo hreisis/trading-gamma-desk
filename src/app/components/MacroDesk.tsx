@@ -16,13 +16,16 @@ function DriverBody({
   driver,
   sourceLabel,
   isDemo,
+  isPublicDemo,
 }: {
   driver: DominantDriver;
   sourceLabel: string;
   isDemo: boolean;
+  isPublicDemo: boolean;
 }) {
   const contradictionSet = new Set(driver.contradictions);
   const evidenceById = new Map(driver.evidence.map((e) => [e.id, e]));
+  const showAsFixture = isDemo || isPublicDemo;
 
   const sortedAssets = [...driver.assets].sort((a, b) => {
     const rank = (role: typeof a.role) =>
@@ -39,18 +42,20 @@ function DriverBody({
   return (
     <>
       <p className="desk-banner" data-testid="banner-session">
-        {sessionBannerText(driver)}
+        {isPublicDemo
+          ? `Historical session ${driver.marketSessionDate}`
+          : sessionBannerText(driver)}
         <span className="desk-banner-meta">
           · {driver.sessionAlignment}
           {driver.isCompleteSession ? "" : " · incomplete"}
           {" · "}
           <span
             className={
-              isDemo
+              showAsFixture
                 ? "desk-source desk-source-fixture"
                 : "desk-source desk-source-live"
             }
-            data-desk-source={isDemo ? "fixture" : "local_driver"}
+            data-desk-source={showAsFixture ? "fixture" : "local_driver"}
           >
             {sourceLabel}
           </span>
@@ -186,6 +191,26 @@ function DriverBody({
 }
 
 export function MacroDesk({ view }: { view: MacroDeskView }) {
+  if (view.status === "live_unavailable") {
+    return (
+      <DeskChrome>
+        <DeskStatusBanners view={view} />
+        <section className="desk-state" data-testid="state-live-unavailable">
+          <h1 className="desk-title">Live data unavailable</h1>
+          <p className="desk-interpretation">
+            {view.error?.message ??
+              "This public deployment does not serve live drivers."}
+          </p>
+          <p className="desk-section-note">
+            Open <a href="/">the historical demo</a> for frozen fixture data.
+            Local development can still use <code>npm run daily</code> with
+            live mode when <code>GAMMADESK_PUBLIC_DEMO</code> is unset.
+          </p>
+        </section>
+      </DeskChrome>
+    );
+  }
+
   if (view.status === "empty" || (view.driver === null && !view.error)) {
     return (
       <DeskChrome>
@@ -235,6 +260,7 @@ export function MacroDesk({ view }: { view: MacroDeskView }) {
           driver={view.driver}
           sourceLabel={view.sourceLabel ?? "unknown"}
           isDemo={view.isDemo}
+          isPublicDemo={view.isPublicDemo}
         />
       </div>
     </DeskChrome>

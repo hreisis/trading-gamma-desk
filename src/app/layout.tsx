@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { SITE_DESCRIPTION, SITE_TITLE } from "@/desk/public-demo";
 import "./globals.css";
 
 const sans = IBM_Plex_Sans({
@@ -15,8 +16,13 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GammaDesk",
-  description: "AI Market Structure Copilot",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    type: "website",
+  },
 };
 
 export default function RootLayout({

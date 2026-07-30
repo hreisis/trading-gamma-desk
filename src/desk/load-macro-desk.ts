@@ -30,6 +30,11 @@ export interface LoadMacroDeskOptions {
    * When false, never serve the fixture. Empty live store → `empty` status.
    */
   readonly allowFixture?: boolean;
+  /**
+   * Public portfolio demo: never read `data/drivers`, only the frozen fixture.
+   * Prefer `resolveDeskRequest()` for request-level wiring.
+   */
+  readonly publicDemoMode?: boolean;
 }
 
 function listDriverSessions(dir: string): string[] {
@@ -80,6 +85,7 @@ function readyView(options: {
     source: options.source,
     sourceLabel: deskSourceLabel(options.source),
     isDemo,
+    isPublicDemo: false,
     isLiveDriver: options.source === "local_driver",
     driver: options.driver,
     driverPath: options.driverPath,
@@ -105,6 +111,7 @@ function fixtureView(
       source: null,
       sourceLabel: null,
       isDemo: false,
+      isPublicDemo: false,
       isLiveDriver: false,
       driver: null,
       driverPath: null,
@@ -139,6 +146,7 @@ function emptyView(
     source: null,
     sourceLabel: null,
     isDemo: false,
+    isPublicDemo: false,
     isLiveDriver: false,
     driver: null,
     driverPath: null,
@@ -165,7 +173,14 @@ export function loadMacroDesk(
   const dataRoot = options.dataRoot ?? "data";
   const fixturePath = options.fixturePath ?? FIXTURE_DRIVER_PATH;
   const allowFixture = options.allowFixture !== false;
-  const pipeline = readPipelineStatus(dataRoot);
+  const pipeline = options.publicDemoMode
+    ? null
+    : readPipelineStatus(dataRoot);
+
+  // Public demo never opens data/drivers — fixture only.
+  if (options.publicDemoMode) {
+    return fixtureView(fixturePath, null);
+  }
 
   if (options.preferFixture) {
     if (!allowFixture) {
@@ -221,6 +236,7 @@ export function loadMacroDesk(
         source: "local_driver",
         sourceLabel: deskSourceLabel("local_driver"),
         isDemo: false,
+        isPublicDemo: false,
         isLiveDriver: true,
         driver: previous.driver,
         driverPath: previous.path,
@@ -237,6 +253,7 @@ export function loadMacroDesk(
       source: null,
       sourceLabel: null,
       isDemo: false,
+      isPublicDemo: false,
       isLiveDriver: false,
       driver: null,
       driverPath: latestPath,

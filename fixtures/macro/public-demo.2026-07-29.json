@@ -1,0 +1,225 @@
+{
+  "schemaVersion": "0.2.2",
+  "marketSessionDate": "2026-07-29",
+  "generatedAt": "2026-07-29T08:15:00-04:00",
+  "sessionAlignment": "aligned",
+  "isCompleteSession": true,
+  "primaryRegime": "fed_rates",
+  "polarity": "negative",
+  "riskDirection": "risk_on",
+  "label": "Rates-led risk-on",
+  "confidence": {
+    "score": 60,
+    "aggregation": "weighted_geometric_mean",
+    "components": [
+      { "name": "patternMatch", "value": 0.784, "weight": 0.2 },
+      { "name": "distinctiveness", "value": 0.37, "weight": 0.2 },
+      { "name": "coherence", "value": 0.898, "weight": 0.2 },
+      { "name": "effectiveBreadth", "value": 0.6, "weight": 0.2 },
+      { "name": "strength", "value": 0.48, "weight": 0.2 }
+    ],
+    "coveragePenalty": 0,
+    "zeroedBy": null,
+    "hardCapsApplied": [],
+    "calibrated": false,
+    "detail": {
+      "runnerUpRegime": "liquidity",
+      "scoreTop": -0.784,
+      "scoreSecond": -0.679,
+      "templateSimilarity": 0.9,
+      "effectiveConfirmations": 3,
+      "blocksScored": 5,
+      "exposureTotal": 2.6
+    }
+  },
+  "evidence": [
+    {
+      "id": "ev_us2y",
+      "symbol": "US2Y",
+      "instrument": "UST 2Y par yield",
+      "isProxy": false,
+      "statement": "US 2Y fell 8 bps (z = -1.80)",
+      "value": -8,
+      "unit": "bps",
+      "zScore": -1.8,
+      "sourceDate": "2026-07-29"
+    },
+    {
+      "id": "ev_us10y",
+      "symbol": "US10Y",
+      "instrument": "UST 10Y par yield",
+      "isProxy": false,
+      "statement": "US 10Y fell 5 bps (z = -1.10)",
+      "value": -5,
+      "unit": "bps",
+      "zScore": -1.1,
+      "sourceDate": "2026-07-29"
+    },
+    {
+      "id": "ev_usd",
+      "symbol": "USD",
+      "instrument": "UUP",
+      "isProxy": true,
+      "statement": "USD via UUP fell 0.60% (z = -1.20)",
+      "value": -0.6,
+      "unit": "pct",
+      "zScore": -1.2,
+      "sourceDate": "2026-07-29"
+    },
+    {
+      "id": "ev_btc",
+      "symbol": "BTC",
+      "instrument": "btcusd",
+      "isProxy": false,
+      "statement": "BTC rose 2.40% (z = 0.90)",
+      "value": 2.4,
+      "unit": "pct",
+      "zScore": 0.9,
+      "sourceDate": "2026-07-29"
+    },
+    {
+      "id": "ev_gold",
+      "symbol": "GOLD",
+      "instrument": "GLD",
+      "isProxy": true,
+      "statement": "Gold via GLD fell 0.90% (z = -0.70), against the easing pattern",
+      "value": -0.9,
+      "unit": "pct",
+      "zScore": -0.7,
+      "sourceDate": "2026-07-29"
+    }
+  ],
+  "contradictions": ["ev_gold"],
+  "assets": [
+    {
+      "symbol": "US2Y",
+      "instrument": "UST 2Y par yield",
+      "isProxy": false,
+      "value": -8,
+      "unit": "bps",
+      "zScore": -1.8,
+      "role": "confirming",
+      "contribution": -0.45,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "US10Y",
+      "instrument": "UST 10Y par yield",
+      "isProxy": false,
+      "value": -5,
+      "unit": "bps",
+      "zScore": -1.1,
+      "role": "confirming",
+      "contribution": -0.118,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "USD",
+      "instrument": "UUP",
+      "isProxy": true,
+      "value": -0.6,
+      "unit": "pct",
+      "zScore": -1.2,
+      "role": "confirming",
+      "contribution": -0.214,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "BTC",
+      "instrument": "btcusd",
+      "isProxy": false,
+      "value": 2.4,
+      "unit": "pct",
+      "zScore": 0.9,
+      "role": "confirming",
+      "contribution": -0.096,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "GOLD",
+      "instrument": "GLD",
+      "isProxy": true,
+      "value": -0.9,
+      "unit": "pct",
+      "zScore": -0.7,
+      "role": "contradicting",
+      "contribution": 0.1,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "VIX",
+      "instrument": "VIX index",
+      "isProxy": false,
+      "value": -1.6,
+      "unit": "pct",
+      "zScore": -0.3,
+      "role": "neutral",
+      "contribution": -0.021,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "COPPER",
+      "instrument": "CPER",
+      "isProxy": true,
+      "value": 0.4,
+      "unit": "pct",
+      "zScore": 0.3,
+      "role": "neutral",
+      "contribution": 0,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    },
+    {
+      "symbol": "OIL",
+      "instrument": "USO",
+      "isProxy": true,
+      "value": 0.1,
+      "unit": "pct",
+      "zScore": 0.1,
+      "role": "neutral",
+      "contribution": 0,
+      "sourceDate": "2026-07-29",
+      "staleDays": 0
+    }
+  ],
+  "interpretation": {
+    "text": "Front-end yields and the dollar fell together, which reprices policy easing rather than stronger growth. Gold did not confirm.",
+    "evidenceIds": ["ev_us2y", "ev_usd", "ev_us10y", "ev_gold"],
+    "generator": "template"
+  },
+  "methodology": {
+    "methodologyVersion": "0.2.2",
+    "signatureVersion": "sig-2026-07-01",
+    "window": 20,
+    "excludesCurrentObservation": true,
+    "muAssumption": "zero",
+    "sigmaEstimator": "mad_about_zero_x1.4826",
+    "cosineRenormalizedOnObservedDims": true
+  },
+  "sourceDateByAsset": {
+    "US2Y": "2026-07-29",
+    "US10Y": "2026-07-29",
+    "GOLD": "2026-07-29",
+    "COPPER": "2026-07-29",
+    "OIL": "2026-07-29",
+    "USD": "2026-07-29",
+    "VIX": "2026-07-29",
+    "BTC": "2026-07-29"
+  },
+  "staleDaysByAsset": {
+    "US2Y": 0,
+    "US10Y": 0,
+    "GOLD": 0,
+    "COPPER": 0,
+    "OIL": 0,
+    "USD": 0,
+    "VIX": 0,
+    "BTC": 0
+  }
+}

@@ -1,8 +1,8 @@
-# Macro Desk demo & acceptance (M1-10)
+# Macro Desk demo & acceptance (M1-10 / M1-11)
 
 Short demo of the read-only Macro Desk. The UI only renders payload fields; it does not classify or recompute confidence.
 
-## Acceptance checklist
+## Acceptance checklist (local)
 
 | Case | How | Pass when |
 | --- | --- | --- |
@@ -13,6 +13,18 @@ Short demo of the read-only Macro Desk. The UI only renders payload fields; it d
 | Malformed live | Corrupt latest `data/drivers/<date>.json` | **Malformed** error; previous good driver if any; **not** fixture |
 | Stale session | Incomplete / partial alignment or pipeline fail with last good | Stale banner; not labeled “today” |
 | Pipeline error | Failed `npm run daily` leaving `data/pipeline/status.json` ok:false | Pipeline error banner; last good driver retained |
+
+## Public demo (M1-11)
+
+```bash
+GAMMADESK_PUBLIC_DEMO=1 npm run dev
+```
+
+| Case | Pass when |
+| --- | --- |
+| `/` | Banner **Historical demo · fixture data · 2026-07-29**; no live label |
+| `/?source=live` | **Live data unavailable**; no driver payload; not disguised as live |
+| Confidence | `N/100 (uncalibrated)` only |
 
 API mirror: `GET /api/macro/latest` and `?source=fixture` / `?source=live`.
 
