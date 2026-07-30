@@ -73,6 +73,9 @@ export const FeatureFlag = z.enum([
 export type Regime = z.infer<typeof Regime>;
 export type RegimeFallback = z.infer<typeof RegimeFallback>;
 export type PrimaryRegime = z.infer<typeof PrimaryRegime>;
+export type Polarity = z.infer<typeof Polarity>;
+export type RiskDirection = z.infer<typeof RiskDirection>;
+export type AssetRole = z.infer<typeof AssetRole>;
 export type Unit = z.infer<typeof Unit>;
 export type FeatureFlag = z.infer<typeof FeatureFlag>;
 

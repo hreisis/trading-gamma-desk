@@ -373,11 +373,24 @@ scored blocks = blocks that both
 
 for each scored block b:
     exposure_b     = min(Σ_{i∈b, observed} |w_i|, blockWeightBudget_b)
-    confirmRatio_b = confirmingObserved_b / observedNonZeroWeight_b     // ≤ 1
+    confirmRatio_b = (# confirming among observed non-zero-weight members)
+                     / (# observed non-zero-weight members)              // ≤ 1
 
 effectiveConfirmations = Σ_b confirmRatio_b            // a count, for the hard gate
 effectiveBreadth       = Σ_b exposure_b × confirmRatio_b / Σ_b exposure_b
 ```
+
+**Role assignment** against the winning signature (after cosine and polarity are known):
+
+```text
+missing        — no usable z-score
+neutral        — signature weight is 0, or |z| < zNoiseFloor (placeholder 0.5),
+                 or w·z = 0
+confirming     — sign(w·z) == sign(s_top)
+contradicting  — sign(w·z) != sign(s_top)
+```
+
+`contribution = (w·z) / Σ|w·z|` over observed members of the winning signature. The noise floor is uncalibrated until M1-6b; it exists so a half-sigma wiggle cannot mint a confirmation.
 
 Two properties matter:
 
@@ -407,12 +420,14 @@ A **weighted geometric mean**, not a raw product. Multiplicative gating is the r
 
 **Hard rules that override the score**
 
-1. `effectiveConfirmations < 2` → `confidenceScore` capped below the `high` band. Raw confirming-asset count is never used for this test.
-2. Top contributor accounts for > 60% of `Σ|w_i z_i|` while `effectiveConfirmations < 2` → `primaryRegime = single_asset_shock`, regardless of cosine.
-3. `distinctiveness < ambiguityFloor` → `primaryRegime = mixed_unresolved`.
-4. Any core rate missing, or fewer than 6 of 8 core assets present → `primaryRegime = insufficient_data`, no driver claim emitted.
+Priority when more than one rule could fire: (4) `insufficient_data`, then (2) `single_asset_shock`, then (3) `mixed_unresolved`. Rule (1) only caps the score; it never changes the regime label.
 
-**Uncalibrated parameters.** `marginRef`, `ambiguityFloor`, the 60% concentration threshold, `λ` weights, per-asset sigma floors, and the high/medium/low band cut-offs are all placeholders until scenario fixtures exist. The formula and the component set are frozen; the numbers are not.
+1. `effectiveConfirmations < 2` → `confidence.score` capped below the `high` band. Raw confirming-asset count is never used for this test. Until M1-6b calibrates band cut-offs, the placeholder is `highBandFloor = 70` and the cap writes `cappedAt: 69` into `hardCapsApplied` with the measured basis.
+2. Top contributor accounts for > `concentrationThreshold` of `Σ|w_i z_i|` while `effectiveConfirmations < 2` → `primaryRegime = single_asset_shock`, regardless of cosine. Fallbacks carry `polarity: null` and `riskDirection: null`.
+3. `distinctiveness < ambiguityFloor` → `primaryRegime = mixed_unresolved`.
+4. Any core rate missing, or fewer than 6 of 8 core assets present → `primaryRegime = insufficient_data`, `confidence.score = 0` via `hardCapsApplied` with `cappedAt: 0`, no driver claim emitted.
+
+**Uncalibrated parameters.** `marginRef`, `ambiguityFloor`, the concentration threshold, `λ` weights, per-asset sigma floors, `zNoiseFloor`, `highBandFloor`, and the high/medium/low band cut-offs are all placeholders until scenario fixtures exist. The formula and the component set are frozen; the numbers are not. While `calibrated: false`, no surface may render band labels.
 
 ---
 

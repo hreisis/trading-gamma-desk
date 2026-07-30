@@ -69,6 +69,8 @@ export const HardCapApplied = z.object({
   /** The measured quantity that triggered the cap, for audit. */
   basis: z.string().min(1),
 });
+export type HardCapApplied = z.infer<typeof HardCapApplied>;
+export type HardCapRule = z.infer<typeof HardCapRule>;
 
 export const ConfidenceDetail = z.object({
   runnerUpRegime: Regime.nullable(),

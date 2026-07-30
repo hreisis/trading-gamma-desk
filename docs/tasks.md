@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-3 done; next is M1-4 (signature scoring and confidence).
+**Milestone 1 — Cross-Asset Macro.** M1-4 done; next is M1-5 (property tests) or M1-6 (scenario fixtures).
 
 > **M1-1 is complete.** All five Tiingo symbols verified against real responses on `2026-07-29`; reproduce with `npm run verify:tiingo`. Two date traps were found and are recorded in `architecture.md`: the `date` field must be sliced as a string rather than parsed through a local `Date`, and `btcusd` bars are UTC-dated so the newest bar can be an in-progress day. M1-7 is unblocked.
 
@@ -52,7 +52,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-1 | Verify sources hands-on | Treasury, CBOE and Tiingo responses checked for actual dates and fields per symbol; results recorded in `architecture.md` — ✅ all sources verified, Stooq rejected, probe reproducible via `npm run verify:tiingo`, holiday set reconciled against a second source |
 | M1-2 | Zod contracts from `data-contracts.md` 0.2.1 | Fixtures validate; `RegimeSignatureConfig` has its own schema — ✅ 30 contract tests green, `tsc` and `next build` clean |
 | M1-3 | Transforms + z-scores | Window ends at `t-1`; MAD about zero; `sigmaRaw == 0` → `volUnavailable` + `repeatedPrints` — ✅ session calendar, simple returns, floor boundary and eight counterexample classes covered by 33 tests |
-| M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented |
+| M1-4 | Signature scoring + confidence | Cosine re-normalized on observed dims; six components incl. `distinctiveness` and block-based `effectiveBreadth`; weighted geometric-mean aggregation; all four hard override rules implemented — ✅ `classifyDriver` + 16 scoring tests; placeholders `highBandFloor=70` / `zNoiseFloor=0.5` documented as uncalibrated |
 | M1-5 | Property tests | Sign-flip, positive-scaling (unsaturated fixture), permutation invariance all pass; correlated-block case proves `effectiveConfirmations ≤ 1` for a rates-only move |
 | M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data |
 | M1-6b | Calibrate `confidenceParams` | `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs set from fixtures; `calibrated: true` |
