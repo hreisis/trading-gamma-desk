@@ -25,6 +25,11 @@ const MONTH_NAME_TO_NUM: Record<string, number> = {
   dec: 12,
 };
 
+export interface YearMonth {
+  readonly year: number;
+  readonly month: number;
+}
+
 /** Canonical reference period YYYY-MM. */
 export function formatReferencePeriod(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
@@ -35,12 +40,49 @@ export function formatSourcePeriod(year: number, month: number): string {
   return `${year}-M${String(month).padStart(2, "0")}`;
 }
 
+/** Parse YYYY-MM or YYYY-Mmm into numeric year/month. */
+export function parseYearMonth(token: string): YearMonth | null {
+  const ref = token.match(/^(\d{4})-(\d{2})$/);
+  if (ref) {
+    const year = Number(ref[1]);
+    const month = Number(ref[2]);
+    if (month >= 1 && month <= 12) return { year, month };
+    return null;
+  }
+  const src = token.match(/^(\d{4})-M(\d{1,2})$/i);
+  if (src) {
+    const year = Number(src[1]);
+    const month = Number(src[2]);
+    if (month >= 1 && month <= 12) return { year, month };
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Deterministic numeric ordering by year then month (M01…M12).
+ * M09 < M10; cross-year December < next January.
+ */
+export function compareReferencePeriod(a: string, b: string): number {
+  const pa = parseYearMonth(a);
+  const pb = parseYearMonth(b);
+  if (pa && pb) {
+    if (pa.year !== pb.year) return pa.year - pb.year;
+    return pa.month - pb.month;
+  }
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function compareSourcePeriod(a: string, b: string): number {
+  return compareReferencePeriod(a, b);
+}
+
 export function parseBlsYearPeriod(
   year: string,
   period: string,
 ): { year: number; month: number; referencePeriod: string; sourcePeriod: string } | null {
   if (period === "M13" || period === "A01") return null; // annual averages
-  const m = period.match(/^M(\d{2})$/);
+  const m = period.match(/^M(\d{1,2})$/i);
   if (!m) return null;
   const month = Number(m[1]);
   const y = Number(year);
@@ -71,8 +113,4 @@ export function parseReferencePeriodFromScheduleText(
   const year = Number(match[2]);
   if (month === undefined || !Number.isFinite(year)) return null;
   return formatReferencePeriod(year, month);
-}
-
-export function compareReferencePeriod(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
 }

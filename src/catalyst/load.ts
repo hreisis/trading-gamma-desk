@@ -5,7 +5,7 @@ import type { Catalyst, ReleaseResult } from "@/contracts";
 import { loadCalendarCache } from "./cache";
 import { normalizeAndDedupe } from "./dedupe";
 import { filterCatalysts } from "./query";
-import { linkReleasesToCatalysts } from "./results/link";
+import { materializeResultsFeed } from "./results/link";
 import { loadResultsCache } from "./results/cache";
 import type { BuiltRelease } from "./results/types";
 import type {
@@ -24,13 +24,16 @@ export const CATALYST_OFFICIAL_BANNER =
   "Official US macro calendar · schedules + BLS series results when linked";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. A past schedule time alone does not mark an event released.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. A past schedule time alone does not mark an event released. Default feed shows scheduled events plus at most the latest observation per release family.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";
 
 export const CATALYST_UNAVAILABLE_BANNER =
   "Official US macro calendar · live cache unavailable";
+
+export const CATALYST_RESULTS_ONLY_BANNER =
+  "Official BLS results · calendar cache unavailable";
 
 export const SYNTHETIC_FIXTURE_NAME =
   "fixtures/catalyst/synthetic-events.json";
@@ -80,7 +83,11 @@ function loadSyntheticFeed(
   const { catalysts, validationErrors } = normalizeAndDedupe(
     rawEventsFromBatch(),
   );
-  const linked = linkReleasesToCatalysts(catalysts, syntheticBuiltReleases());
+  const linked = materializeResultsFeed({
+    scheduled: catalysts,
+    releases: syntheticBuiltReleases(),
+    calendarAvailable: true,
+  });
   const filtered = filterCatalysts(linked.catalysts, query);
   return {
     kind: "CatalystFeed",
@@ -100,6 +107,9 @@ function loadSyntheticFeed(
         fetchedAt: options.now.toISOString(),
         stale: false,
         partialFailure: false,
+        archiveReleaseCount: linked.archiveReleaseCount,
+        materializedStandaloneCount: linked.materializedStandaloneCount,
+        linkedCount: linked.linkedCount,
       },
     },
     count: filtered.length,
@@ -109,47 +119,21 @@ function loadSyntheticFeed(
   };
 }
 
-function mergeOfficialResults(
-  catalysts: readonly Catalyst[],
-  options: { readonly dataRoot?: string; readonly now: Date },
-): {
-  catalysts: Catalyst[];
-  linkingWarnings: CatalystFeedResponse["linkingWarnings"];
-  resultsMeta: NonNullable<CatalystFeedResponse["source"]["results"]>;
-} {
-  const loaded = loadResultsCache({
-    dataRoot: options.dataRoot,
-    now: options.now,
-  });
-  if (!loaded.ok) {
-    return {
-      catalysts: [...catalysts],
-      linkingWarnings: [],
-      resultsMeta: {
-        available: false,
-        status: "missing",
-        error: loaded.error,
-        stale: false,
-        partialFailure: false,
-      },
-    };
-  }
-  const linked = linkReleasesToCatalysts(catalysts, loaded.cache.releases);
+function resultsMetaFromMaterialize(
+  loaded: Extract<ReturnType<typeof loadResultsCache>, { ok: true }>,
+  linked: ReturnType<typeof materializeResultsFeed>,
+): NonNullable<CatalystFeedResponse["source"]["results"]> {
   return {
-    catalysts: linked.catalysts,
-    linkingWarnings: [
-      ...loaded.cache.linkingWarnings,
-      ...linked.linkingWarnings,
-    ],
-    resultsMeta: {
-      available: true,
-      status: loaded.cache.sources.some((s) => s.status === "error")
-        ? "error"
-        : "ok",
-      fetchedAt: loaded.cache.fetchedAt,
-      stale: loaded.stale,
-      partialFailure: loaded.cache.partialFailure,
-    },
+    available: true,
+    status: loaded.cache.sources.some((s) => s.status === "error")
+      ? "error"
+      : "ok",
+    fetchedAt: loaded.cache.fetchedAt,
+    stale: loaded.stale,
+    partialFailure: loaded.cache.partialFailure,
+    archiveReleaseCount: linked.archiveReleaseCount,
+    materializedStandaloneCount: linked.materializedStandaloneCount,
+    linkedCount: linked.linkedCount,
   };
 }
 
@@ -157,8 +141,8 @@ function mergeOfficialResults(
  * Catalyst feed loader.
  *
  * - Public demo: synthetic fixtures + synthetic results; never network.
- * - Local: official calendar cache + optional results cache linked strictly
- *   by releaseFamily + referencePeriod.
+ * - Local: official calendar + results archive; default feed materializes
+ *   scheduled events (linked when possible) and ≤1 latest observation per family.
  */
 export function loadCatalystFeed(
   query: CatalystQuery = {},
@@ -181,8 +165,46 @@ export function loadCatalystFeed(
     dataRoot: options.dataRoot,
     now,
   });
+  const resultsLoaded = loadResultsCache({
+    dataRoot: options.dataRoot,
+    now,
+  });
 
   if (!loaded.ok) {
+    // Calendar unavailable: still surface latest CPI/Employment observations.
+    if (resultsLoaded.ok) {
+      const linked = materializeResultsFeed({
+        scheduled: [],
+        releases: resultsLoaded.cache.releases,
+        calendarAvailable: false,
+        calendarUnavailableReason: loaded.error,
+      });
+      const filtered = filterCatalysts(linked.catalysts, query);
+      return {
+        kind: "CatalystFeed",
+        schemaVersion: "0.1.0",
+        generatedAt: now.toISOString(),
+        mode: "official_calendar",
+        isPublicDemo: false,
+        banner: CATALYST_RESULTS_ONLY_BANNER,
+        disclaimer: `${CATALYST_OFFICIAL_DISCLAIMER} ${loaded.error}`,
+        source: {
+          type: "official_calendar",
+          name: OFFICIAL_RESULTS_CACHE_NAME,
+          synthetic: false,
+          stale: resultsLoaded.stale,
+          partialFailure: resultsLoaded.cache.partialFailure,
+          results: resultsMetaFromMaterialize(resultsLoaded, linked),
+        },
+        count: filtered.length,
+        catalysts: filtered,
+        validationErrors: [
+          { index: -1, error: loaded.error },
+        ],
+        linkingWarnings: linked.linkingWarnings,
+      };
+    }
+
     return {
       kind: "CatalystFeed",
       schemaVersion: "0.1.0",
@@ -211,11 +233,25 @@ export function loadCatalystFeed(
   }
 
   const { cache, stale } = loaded;
-  const merged = mergeOfficialResults(cache.catalysts, {
-    dataRoot: options.dataRoot,
-    now,
-  });
-  const filtered = filterCatalysts(merged.catalysts, query);
+  let catalysts: Catalyst[] = [...cache.catalysts];
+  let linkingWarnings: CatalystFeedResponse["linkingWarnings"] = [];
+  let resultsMeta: NonNullable<CatalystFeedResponse["source"]["results"]> = {
+    available: false,
+    status: "missing",
+  };
+
+  if (resultsLoaded.ok) {
+    const linked = materializeResultsFeed({
+      scheduled: cache.catalysts,
+      releases: resultsLoaded.cache.releases,
+      calendarAvailable: true,
+    });
+    catalysts = linked.catalysts;
+    linkingWarnings = linked.linkingWarnings;
+    resultsMeta = resultsMetaFromMaterialize(resultsLoaded, linked);
+  }
+
+  const filtered = filterCatalysts(catalysts, query);
   const partialFailure = cache.partialFailure;
 
   let banner = CATALYST_OFFICIAL_BANNER;
@@ -225,7 +261,7 @@ export function loadCatalystFeed(
       ? `${CATALYST_STALE_BANNER} · partial source failure`
       : `${CATALYST_OFFICIAL_BANNER} · partial source failure`;
   }
-  if (merged.resultsMeta.stale) {
+  if (resultsMeta.stale) {
     banner = `${banner} · stale results`;
   }
 
@@ -246,11 +282,11 @@ export function loadCatalystFeed(
       partialFailure,
       window: cache.requestedWindow,
       sources: cache.sources,
-      results: merged.resultsMeta,
+      results: resultsMeta,
     },
     count: filtered.length,
     catalysts: filtered,
     validationErrors: cache.validationErrors,
-    linkingWarnings: merged.linkingWarnings,
+    linkingWarnings,
   };
 }

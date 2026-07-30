@@ -2,7 +2,7 @@ import { writeJsonAtomic } from "@/desk/atomic-write";
 import { isPublicDemoMode } from "@/desk/public-demo";
 import type { FetchLike } from "@/ingest/http";
 import { loadCalendarCache } from "../cache";
-import { linkReleasesToCatalysts } from "./link";
+import { materializeResultsFeed } from "./link";
 import { buildReleasesFromSeries, observationFingerprint } from "./build";
 import { fetchBlsSeriesData } from "./bls-api";
 import {
@@ -157,22 +157,17 @@ export async function fetchOfficialResults(
   const priorRevisionHistory = prior.ok ? prior.cache.revisions : [];
   const allRevisions = [...revisions, ...priorRevisionHistory].slice(0, 100);
 
-  let linkingWarnings: CatalystResultsCache["linkingWarnings"] = [];
   const calendarRoot = options.calendarDataRoot ?? dataRoot;
   const calendar = loadCalendarCache({ dataRoot: calendarRoot, now });
-  if (calendar.ok) {
-    const linked = linkReleasesToCatalysts(
-      calendar.cache.catalysts,
-      built.releases,
-    );
-    linkingWarnings = linked.linkingWarnings;
-  } else {
-    linkingWarnings = [
-      {
-        error: `Calendar cache unavailable for linking diagnostics: ${calendar.error}`,
-      },
-    ];
-  }
+  const linked = materializeResultsFeed({
+    scheduled: calendar.ok ? calendar.cache.catalysts : [],
+    releases: built.releases,
+    calendarAvailable: calendar.ok,
+    calendarUnavailableReason: calendar.ok ? undefined : calendar.error,
+  });
+  // Diagnostics only for materialized standalones (latest unmatched per family).
+  const linkingWarnings: CatalystResultsCache["linkingWarnings"] =
+    linked.linkingWarnings;
 
   const cache: CatalystResultsCache = {
     kind: "CatalystResultsCache",

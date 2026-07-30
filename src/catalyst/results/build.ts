@@ -1,4 +1,8 @@
-import type { CatalystReleaseFamily, ReleaseObservation } from "@/contracts";
+import type {
+  CatalystReleaseFamily,
+  ReleaseObservation,
+  ReleaseObservationInputs,
+} from "@/contracts";
 import {
   BLS_RELEASE_PAGE_URL,
   BLS_RESULTS_SOURCE_NAME,
@@ -6,6 +10,7 @@ import {
   seriesSpecsForFamily,
   type BlsSeriesSpec,
 } from "./registry";
+import { compareReferencePeriod } from "./period";
 import {
   momPercentChange,
   payrollMonthlyChangeThousands,
@@ -40,10 +45,12 @@ function yearAgo(period: string): string | null {
 
 function observationFingerprint(obs: readonly ReleaseObservation[]): string {
   return obs
-    .map(
-      (o) =>
-        `${o.metric}:${o.sourceSeriesId}:${o.sourcePeriod}:${o.actual}:${o.transformation}:${o.preliminary ? "P" : ""}`,
-    )
+    .map((o) => {
+      const inputs = o.inputs
+        ? `:c=${o.inputs.current.value}:p=${o.inputs.previous?.value ?? ""}:y=${o.inputs.yearAgo?.value ?? ""}`
+        : "";
+      return `${o.metric}:${o.sourceSeriesId}:${o.sourcePeriod}:${o.actual}:${o.transformation}:${o.preliminary ? "P" : ""}${inputs}`;
+    })
     .sort()
     .join("|");
 }
@@ -58,6 +65,12 @@ function buildObservation(
   if (!current) return null;
 
   if (spec.transformation === "level") {
+    const inputs: ReleaseObservationInputs = {
+      current: {
+        sourcePeriod: current.sourcePeriod,
+        value: current.value,
+      },
+    };
     return {
       metric: spec.metric,
       actual: current.value,
@@ -65,6 +78,7 @@ function buildObservation(
       sourceSeriesId: spec.levelSeriesId,
       sourcePeriod: current.sourcePeriod,
       transformation: "level",
+      inputs,
       ...(current.preliminary ? { preliminary: true } : {}),
     };
   }
@@ -78,6 +92,16 @@ function buildObservation(
         ? payrollMonthlyChangeThousands(current.value, prev.value)
         : momPercentChange(current.value, prev.value);
     if (actual === null) return null;
+    const inputs: ReleaseObservationInputs = {
+      current: {
+        sourcePeriod: current.sourcePeriod,
+        value: current.value,
+      },
+      previous: {
+        sourcePeriod: prev.sourcePeriod,
+        value: prev.value,
+      },
+    };
     return {
       metric: spec.metric,
       actual,
@@ -85,6 +109,7 @@ function buildObservation(
       sourceSeriesId: spec.levelSeriesId,
       sourcePeriod: current.sourcePeriod,
       transformation: "mom-change",
+      inputs,
       ...(current.preliminary ? { preliminary: true } : {}),
     };
   }
@@ -95,6 +120,16 @@ function buildObservation(
   if (!ya) return null;
   const actual = yoyPercentChange(current.value, ya.value);
   if (actual === null) return null;
+  const inputs: ReleaseObservationInputs = {
+    current: {
+      sourcePeriod: current.sourcePeriod,
+      value: current.value,
+    },
+    yearAgo: {
+      sourcePeriod: ya.sourcePeriod,
+      value: ya.value,
+    },
+  };
   return {
     metric: spec.metric,
     actual,
@@ -102,6 +137,7 @@ function buildObservation(
     sourceSeriesId: spec.levelSeriesId,
     sourcePeriod: current.sourcePeriod,
     transformation: "yoy-change",
+    inputs,
     ...(current.preliminary ? { preliminary: true } : {}),
   };
 }
@@ -117,12 +153,13 @@ function periodsForFamily(
     if (!map) continue;
     for (const p of map.keys()) periods.add(p);
   }
-  return [...periods].sort();
+  return [...periods].sort(compareReferencePeriod);
 }
 
 /**
  * Build release bundles from parsed BLS series. Only periods with at least one
  * complete observation for the family are emitted.
+ * Full history is retained in the results cache; feed materialization is separate.
  */
 export function buildReleasesFromSeries(
   series: readonly BlsSeriesData[],
@@ -181,12 +218,7 @@ export function buildReleasesFromSeries(
   }
 
   releases.sort((a, b) => {
-    const byPeriod =
-      a.referencePeriod < b.referencePeriod
-        ? 1
-        : a.referencePeriod > b.referencePeriod
-          ? -1
-          : 0;
+    const byPeriod = compareReferencePeriod(b.referencePeriod, a.referencePeriod);
     if (byPeriod !== 0) return byPeriod;
     return a.releaseFamily < b.releaseFamily
       ? -1

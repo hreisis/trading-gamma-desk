@@ -169,8 +169,23 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
 
       {feed.linkingWarnings && feed.linkingWarnings.length > 0 ? (
         <p className="desk-section-note" data-testid="catalyst-linking">
-          Linking: {feed.linkingWarnings.length} warning(s) (unmatched
-          observations kept separate — no weak supersede).
+          Linking:{" "}
+          {feed.linkingWarnings
+            .map(
+              (w) =>
+                `${w.releaseFamily ?? "?"} ${w.referencePeriod ?? "?"}${w.reason ? ` (${w.reason})` : ""}`,
+            )
+            .join("; ")}
+          . Historical archive periods are not duplicated as feed items.
+        </p>
+      ) : null}
+      {feed.source.results?.archiveReleaseCount !== undefined ? (
+        <p className="desk-section-note" data-testid="catalyst-results-archive">
+          Results archive: {feed.source.results.archiveReleaseCount} period
+          record(s); feed standalones:{" "}
+          {feed.source.results.materializedStandaloneCount ?? 0}; linked:{" "}
+          {feed.source.results.linkedCount ?? 0}. Consensus unavailable ·
+          Surprise unavailable.
         </p>
       ) : null}
 

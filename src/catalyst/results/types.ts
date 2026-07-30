@@ -71,6 +71,7 @@ export interface CatalystResultsCache {
     readonly error: string;
     readonly releaseFamily?: CatalystReleaseFamily;
     readonly referencePeriod?: string;
+    readonly reason?: string;
   }>;
   readonly partialFailure: boolean;
 }

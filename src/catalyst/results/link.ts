@@ -1,17 +1,35 @@
 import { createHash } from "node:crypto";
 import type { Catalyst, CatalystReleaseFamily } from "@/contracts";
 import { matchOfficialEvent } from "../registry";
+import { compareReferencePeriod } from "./period";
 import type { BuiltRelease } from "./types";
+
+export interface LinkingWarning {
+  readonly error: string;
+  readonly releaseFamily: CatalystReleaseFamily;
+  readonly referencePeriod: string;
+  readonly reason:
+    | "no_matching_schedule"
+    | "calendar_unavailable"
+    | "schedule_missing_reference_period";
+}
 
 export interface LinkResult {
   readonly catalysts: Catalyst[];
-  readonly linkingWarnings: Array<{
-    readonly error: string;
-    readonly releaseFamily?: CatalystReleaseFamily;
-    readonly referencePeriod?: string;
-  }>;
+  readonly linkingWarnings: LinkingWarning[];
   readonly linkedCount: number;
+  /** Standalone feed events materialized (≤ one per family). */
   readonly unmatchedReleaseCount: number;
+  /** Total historical release records considered (cache size). */
+  readonly archiveReleaseCount: number;
+  readonly materializedStandaloneCount: number;
+}
+
+export interface MaterializeOptions {
+  readonly scheduled: readonly Catalyst[];
+  readonly releases: readonly BuiltRelease[];
+  readonly calendarAvailable: boolean;
+  readonly calendarUnavailableReason?: string;
 }
 
 function buildStandaloneId(family: CatalystReleaseFamily, period: string): string {
@@ -22,7 +40,11 @@ function buildStandaloneId(family: CatalystReleaseFamily, period: string): strin
   return `cat_${digest}`;
 }
 
-function standaloneFromRelease(release: BuiltRelease): Catalyst {
+function standaloneFromRelease(
+  release: BuiltRelease,
+  reason: LinkingWarning["reason"],
+  detail: string,
+): Catalyst {
   const mapping =
     release.releaseFamily === "cpi"
       ? matchOfficialEvent("bls", "Consumer Price Index")
@@ -40,6 +62,9 @@ function standaloneFromRelease(release: BuiltRelease): Catalyst {
     )
     .join("; ");
 
+  const mergeNote =
+    "When a scheduled catalyst with the same releaseFamily + referencePeriod is available, this observation merges into that event (stable schedule identity) and is not duplicated.";
+
   return {
     schemaVersion: "0.1.0",
     id,
@@ -48,8 +73,8 @@ function standaloneFromRelease(release: BuiltRelease): Catalyst {
     sourceType: "calendar",
     sourceName: release.releaseResult.sourceName,
     sourceUrl: release.releaseResult.sourceUrl,
-    headline: `${mapping.headline.replace(" scheduled release", "")} — ${release.referencePeriod} (unlinked observation)`,
-    summary: `Official BLS series observation for ${release.referencePeriod} without a strictly matched scheduled catalyst. Consensus/surprise unavailable. ${obsLines}`,
+    headline: `${mapping.headline.replace(" scheduled release", "")} — ${release.referencePeriod} (independent observation)`,
+    summary: `Official BLS series observation for ${release.referencePeriod}. ${detail} Consensus/surprise unavailable. ${obsLines} ${mergeNote}`,
     category: mapping.category,
     importance: mapping.importance,
     status: "released",
@@ -64,7 +89,7 @@ function standaloneFromRelease(release: BuiltRelease): Catalyst {
     evidence: [
       {
         id: `${id}_ev1`,
-        statement: `Unlinked BLS observation ${release.releaseFamily} ${release.referencePeriod}: ${obsLines}`,
+        statement: `Independent BLS observation ${release.releaseFamily} ${release.referencePeriod} (${reason}): ${obsLines}`,
         basis: "official_bls_series",
       },
     ],
@@ -88,8 +113,13 @@ function applyReleaseToCatalyst(
     )
     .join("; ");
 
+  // Drop prior result evidence rows so re-link/revision stays a single result note.
+  const baseEvidence = catalyst.evidence.filter(
+    (e) => e.basis !== "official_bls_series",
+  );
+
   const evidence = [
-    ...catalyst.evidence,
+    ...baseEvidence,
     {
       id: `${catalyst.id}_result`,
       statement: `Official BLS series values for ${release.referencePeriod} observed at ${release.observedAt}: ${obsLines}. Consensus unavailable; surprise unavailable.`,
@@ -100,7 +130,6 @@ function applyReleaseToCatalyst(
   return {
     ...catalyst,
     status: "released",
-    // Official results never imply market direction; synthetic demo may keep fixture direction.
     direction: catalyst.synthetic ? catalyst.direction : "unclear",
     observedAt: release.observedAt,
     releaseFamily: release.releaseFamily,
@@ -110,21 +139,44 @@ function applyReleaseToCatalyst(
   };
 }
 
-/**
- * Strict link: same releaseFamily + referencePeriod.
- * Matched scheduled rows become released (identity preserved).
- * Unmatched releases become standalone observations with warnings.
- * Never supersede on weak/fuzzy match. Never set released from clock alone.
- */
-export function linkReleasesToCatalysts(
-  catalysts: readonly Catalyst[],
+function latestReleaseByFamily(
   releases: readonly BuiltRelease[],
-): LinkResult {
-  const warnings: LinkResult["linkingWarnings"] = [];
+): Map<CatalystReleaseFamily, BuiltRelease> {
+  const latest = new Map<CatalystReleaseFamily, BuiltRelease>();
+  for (const release of releases) {
+    const prev = latest.get(release.releaseFamily);
+    if (
+      !prev ||
+      compareReferencePeriod(release.referencePeriod, prev.referencePeriod) > 0
+    ) {
+      latest.set(release.releaseFamily, release);
+    }
+  }
+  return latest;
+}
+
+/**
+ * Materialize the default Catalyst feed from scheduled events + full results archive.
+ *
+ * - Results cache may hold all historical periods.
+ * - Feed emits: all scheduled catalysts (with strict links applied) + at most one
+ *   independent observation per release family (the latest unmatched period).
+ * - Historical unmatched periods stay in the archive only — never dozens of
+ *   top-level catalysts.
+ */
+export function materializeResultsFeed(options: MaterializeOptions): LinkResult {
+  const {
+    scheduled,
+    releases,
+    calendarAvailable,
+    calendarUnavailableReason,
+  } = options;
+
+  const warnings: LinkingWarning[] = [];
   const usedReleaseKeys = new Set<string>();
   const out: Catalyst[] = [];
 
-  for (const catalyst of catalysts) {
+  for (const catalyst of scheduled) {
     const family = catalyst.releaseFamily;
     const period = catalyst.referencePeriod;
     if (!family || !period) {
@@ -142,27 +194,36 @@ export function linkReleasesToCatalysts(
     out.push(applyReleaseToCatalyst(catalyst, release));
   }
 
-  // Unmatched historical periods stay in the results cache only.
-  // Emit at most one standalone observation per family (latest unmatched period).
-  const latestUnmatched = new Map<CatalystReleaseFamily, BuiltRelease>();
-  for (const release of releases) {
-    const key = `${release.releaseFamily}|${release.referencePeriod}`;
-    if (usedReleaseKeys.has(key)) continue;
-    const prev = latestUnmatched.get(release.releaseFamily);
-    if (!prev || release.referencePeriod > prev.referencePeriod) {
-      latestUnmatched.set(release.releaseFamily, release);
-    }
-  }
+  const latestByFamily = latestReleaseByFamily(releases);
+  let materializedStandaloneCount = 0;
 
-  let unmatchedReleaseCount = 0;
-  for (const release of latestUnmatched.values()) {
-    unmatchedReleaseCount += 1;
+  for (const [family, release] of latestByFamily) {
+    const key = `${family}|${release.referencePeriod}`;
+    if (usedReleaseKeys.has(key)) continue;
+
+    let reason: LinkingWarning["reason"];
+    let detail: string;
+    if (!calendarAvailable) {
+      reason = "calendar_unavailable";
+      detail =
+        `BLS calendar schedule unavailable` +
+        (calendarUnavailableReason
+          ? ` (${calendarUnavailableReason})`
+          : "") +
+        `; keeping latest ${family} observation as an independent released event.`;
+    } else {
+      reason = "no_matching_schedule";
+      detail = `No strictly matched scheduled catalyst for ${family} ${release.referencePeriod}; keeping independent observation.`;
+    }
+
     warnings.push({
-      error: `No strictly matched scheduled catalyst for ${release.releaseFamily} ${release.referencePeriod}; keeping independent observation`,
-      releaseFamily: release.releaseFamily,
+      error: detail,
+      releaseFamily: family,
       referencePeriod: release.referencePeriod,
+      reason,
     });
-    out.push(standaloneFromRelease(release));
+    out.push(standaloneFromRelease(release, reason, detail));
+    materializedStandaloneCount += 1;
   }
 
   out.sort((a, b) => {
@@ -176,6 +237,20 @@ export function linkReleasesToCatalysts(
     catalysts: out,
     linkingWarnings: warnings,
     linkedCount: usedReleaseKeys.size,
-    unmatchedReleaseCount,
+    unmatchedReleaseCount: materializedStandaloneCount,
+    archiveReleaseCount: releases.length,
+    materializedStandaloneCount,
   };
+}
+
+/** @deprecated Prefer materializeResultsFeed — kept for call-site compatibility. */
+export function linkReleasesToCatalysts(
+  catalysts: readonly Catalyst[],
+  releases: readonly BuiltRelease[],
+): LinkResult {
+  return materializeResultsFeed({
+    scheduled: catalysts,
+    releases,
+    calendarAvailable: true,
+  });
 }

@@ -5,7 +5,7 @@ import {
   BLS_RESULTS_SOURCE_NAME,
   blsSeriesIdsToFetch,
 } from "./registry";
-import { parseBlsYearPeriod } from "./period";
+import { compareReferencePeriod, parseBlsYearPeriod } from "./period";
 import type { BlsSeriesData, BlsSeriesPoint } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 25_000;
@@ -31,14 +31,15 @@ function parseSeriesPoints(
       `BLS API: series ${seriesId} data is not an array`,
     );
   }
-  const points: BlsSeriesPoint[] = [];
+  // Last write wins for duplicate year+period rows (API sometimes repeats).
+  const byPeriod = new Map<string, BlsSeriesPoint>();
   for (const row of data) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
     const year = String(r.year ?? "");
     const period = String(r.period ?? "");
     const parsed = parseBlsYearPeriod(year, period);
-    if (!parsed) continue; // drops M13 / malformed
+    if (!parsed) continue; // drops M13 / malformed / month>12
     // BLS uses "-" for unpublished / suppressed cells — skip, do not invent 0.
     const rawValue = String(r.value ?? "").trim();
     if (rawValue === "" || rawValue === "-" || rawValue.toLowerCase() === "n/a") {
@@ -51,7 +52,7 @@ function parseSeriesPoints(
         `BLS API: series ${seriesId} has non-numeric value ${JSON.stringify(rawValue)} for ${parsed.sourcePeriod}`,
       );
     }
-    points.push({
+    byPeriod.set(parsed.referencePeriod, {
       year: parsed.year,
       month: parsed.month,
       referencePeriod: parsed.referencePeriod,
@@ -60,15 +61,10 @@ function parseSeriesPoints(
       preliminary: isPreliminary(r.footnotes),
     });
   }
-  // Ascending for transforms; API usually returns newest-first.
-  points.sort((a, b) =>
-    a.referencePeriod < b.referencePeriod
-      ? -1
-      : a.referencePeriod > b.referencePeriod
-        ? 1
-        : 0,
+  // Ascending by numeric year + month (M01…M12), independent of payload order.
+  return [...byPeriod.values()].sort((a, b) =>
+    compareReferencePeriod(a.referencePeriod, b.referencePeriod),
   );
-  return points;
 }
 
 /**

@@ -112,6 +112,13 @@ export interface CatalystFeedResponse {
       readonly partialFailure?: boolean;
       readonly status?: "ok" | "error" | "missing" | "synthetic";
       readonly error?: string;
+      /**
+       * Archive metadata only — full historical periods live in
+       * results-latest.json and must not inflate the default catalysts array.
+       */
+      readonly archiveReleaseCount?: number;
+      readonly materializedStandaloneCount?: number;
+      readonly linkedCount?: number;
     };
   };
   readonly count: number;
@@ -125,6 +132,7 @@ export interface CatalystFeedResponse {
     readonly error: string;
     readonly releaseFamily?: string;
     readonly referencePeriod?: string;
+    readonly reason?: string;
   }>;
 }
 

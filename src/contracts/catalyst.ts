@@ -94,6 +94,26 @@ export const ReleaseObservationTransformation = z.enum([
   "yoy-change",
 ]);
 
+/** Audit inputs for a derived actual — optional for schema compatibility. */
+export const ReleaseObservationInputs = z.object({
+  current: z.object({
+    sourcePeriod: z.string().min(1),
+    value: z.number(),
+  }),
+  previous: z
+    .object({
+      sourcePeriod: z.string().min(1),
+      value: z.number(),
+    })
+    .optional(),
+  yearAgo: z
+    .object({
+      sourcePeriod: z.string().min(1),
+      value: z.number(),
+    })
+    .optional(),
+});
+
 export const ReleaseObservation = z.object({
   metric: z.string().min(1),
   actual: z.number(),
@@ -103,6 +123,8 @@ export const ReleaseObservation = z.object({
   sourcePeriod: z.string().min(1),
   transformation: ReleaseObservationTransformation,
   preliminary: z.boolean().optional(),
+  /** Calculation provenance (current / previous / year-ago periods + raw values). */
+  inputs: ReleaseObservationInputs.optional(),
 });
 
 /**
@@ -162,6 +184,7 @@ export type CatalystConfidence = z.infer<typeof CatalystConfidence>;
 export type CatalystEvidence = z.infer<typeof CatalystEvidence>;
 export type CatalystReleaseFamily = z.infer<typeof CatalystReleaseFamily>;
 export type ReleaseObservation = z.infer<typeof ReleaseObservation>;
+export type ReleaseObservationInputs = z.infer<typeof ReleaseObservationInputs>;
 export type ReleaseResult = z.infer<typeof ReleaseResult>;
 export type ReleaseObservationTransformation = z.infer<
   typeof ReleaseObservationTransformation

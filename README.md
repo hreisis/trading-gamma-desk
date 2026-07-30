@@ -103,7 +103,7 @@ Sources (schedule only — not observed prints):
 
 If any calendar provider fails, successful sources still write a usable cache with `partialFailure: true`. All three failing leaves the prior cache untouched.
 
-**BLS release results (M2-2C1):** `npm run catalyst:results:fetch` writes `data/catalyst/results-latest.json` (separate from the calendar cache). CPI + Employment Situation actuals only — Consensus unavailable · Surprise unavailable. Events become `released` only via strict `releaseFamily` + `referencePeriod` match to official series data. Public demo uses a labelled synthetic results fixture and never calls the BLS API.
+**BLS release results (M2-2C1):** `npm run catalyst:results:fetch` writes `data/catalyst/results-latest.json` (full period archive, separate from the calendar cache). The default feed materializes scheduled events plus **at most the latest observation per release family** — not one catalyst per historical period. CPI + Employment Situation actuals only — Consensus unavailable · Surprise unavailable. Events become `released` only via strict `releaseFamily` + `referencePeriod` match. Public demo uses a labelled synthetic results fixture and never calls the BLS API.
 
 ### Desk URLs (local)
 

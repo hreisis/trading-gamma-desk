@@ -10,13 +10,17 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildReleasesFromSeries,
+  compareReferencePeriod,
+  compareSourcePeriod,
   fetchOfficialResults,
   linkReleasesToCatalysts,
   loadCatalystFeed,
+  materializeResultsFeed,
   momPercentChange,
   normalizeAndDedupe,
   parseBlsApiTimeseriesBody,
   parseBlsIcs,
+  parseBlsYearPeriod,
   parseReferencePeriodFromScheduleText,
   payrollMonthlyChangeThousands,
   resultsLatestPath,
@@ -24,7 +28,7 @@ import {
 } from "@/catalyst";
 import { calendarLatestPath } from "@/catalyst/fetch-calendar";
 import { writeJsonAtomic } from "@/desk/atomic-write";
-import type { Catalyst } from "@/contracts";
+import type { BuiltRelease, Catalyst } from "@/catalyst";
 
 const PROVIDERS = join(process.cwd(), "fixtures/catalyst/providers");
 
@@ -129,6 +133,26 @@ describe("BLS API parse + build", () => {
       juneEmp.observations.find((o) => o.metric === "total_nonfarm_payrolls_mom")
         ?.preliminary,
     ).toBe(true);
+
+    const mom = juneCpi.observations.find((o) => o.metric === "headline_cpi_sa_mom")!;
+    expect(mom.inputs?.current).toEqual({
+      sourcePeriod: "2026-M06",
+      value: 332.568,
+    });
+    expect(mom.inputs?.previous).toEqual({
+      sourcePeriod: "2026-M05",
+      value: 333.979,
+    });
+    const yoy = juneCpi.observations.find((o) => o.metric === "headline_cpi_sa_yoy")!;
+    expect(yoy.inputs?.yearAgo).toEqual({
+      sourcePeriod: "2025-M06",
+      value: 322.892,
+    });
+    const pay = juneEmp.observations.find(
+      (o) => o.metric === "total_nonfarm_payrolls_mom",
+    )!;
+    expect(pay.inputs?.current.sourcePeriod).toBe("2026-M06");
+    expect(pay.inputs?.previous?.sourcePeriod).toBe("2026-M05");
   });
 
   it("rejects malformed JSON / failed status", () => {
@@ -219,8 +243,16 @@ describe("strict linking + revisions", () => {
     expect(linked.unmatchedReleaseCount).toBeGreaterThanOrEqual(1);
     expect(linked.linkingWarnings.length).toBeGreaterThanOrEqual(1);
     expect(
-      linked.catalysts.some((c) => c.headline.includes("unlinked observation")),
+      linked.catalysts.some((c) =>
+        c.headline.includes("independent observation"),
+      ),
     ).toBe(true);
+    expect(linked.linkingWarnings.every((w) => w.releaseFamily && w.referencePeriod)).toBe(
+      true,
+    );
+    // At most one warning/standalone per family — not one per historical period.
+    expect(linked.materializedStandaloneCount).toBeLessThanOrEqual(2);
+    expect(linked.archiveReleaseCount).toBe(releases.length);
   });
 });
 
@@ -337,5 +369,195 @@ describe("API/UI feed with synthetic results", () => {
     expect(feed.source.results?.status).toBe("synthetic");
     expect(JSON.stringify(feed).toLowerCase()).not.toContain("beat");
     expect(JSON.stringify(feed).toLowerCase()).not.toContain("bullish");
+  });
+});
+
+describe("M2-2C1 hardening: archive vs feed materialization", () => {
+  function makeArchive(countPerFamily: number): BuiltRelease[] {
+    const base = buildReleasesFromSeries(
+      parseBlsApiTimeseriesBody(readProvider("bls-api-sample.json")).series,
+      "2026-07-15T12:00:00.000Z",
+    ).releases;
+    const templateCpi = base.find((r) => r.releaseFamily === "cpi")!;
+    const templateEmp = base.find(
+      (r) => r.releaseFamily === "employment_situation",
+    )!;
+    const out: BuiltRelease[] = [];
+    // 29 months each ≈ 58 total (matches live fetch scale).
+    for (let i = 0; i < countPerFamily; i += 1) {
+      const year = 2024 + Math.floor(i / 12);
+      const month = (i % 12) + 1;
+      const period = `${year}-${String(month).padStart(2, "0")}`;
+      for (const tmpl of [templateCpi, templateEmp]) {
+        out.push({
+          ...tmpl,
+          referencePeriod: period,
+          releaseResult: {
+            ...tmpl.releaseResult,
+            referencePeriod: period,
+          },
+        });
+      }
+    }
+    return out;
+  }
+
+  it("does not turn 58 historical result records into 58 default feed items", () => {
+    const archive = makeArchive(29);
+    expect(archive.length).toBe(58);
+
+    const mat = materializeResultsFeed({
+      scheduled: [],
+      releases: archive,
+      calendarAvailable: false,
+      calendarUnavailableReason: "BLS calendar cache missing",
+    });
+
+    expect(mat.archiveReleaseCount).toBe(58);
+    expect(mat.materializedStandaloneCount).toBe(2);
+    expect(mat.catalysts).toHaveLength(2);
+    expect(mat.linkingWarnings).toHaveLength(2);
+    expect(
+      mat.linkingWarnings.every(
+        (w) =>
+          w.reason === "calendar_unavailable" &&
+          w.releaseFamily &&
+          w.referencePeriod,
+      ),
+    ).toBe(true);
+    // Latest periods only (2026-05 from index 29*… 2024-01 + 28 months = 2026-05)
+    expect(
+      mat.catalysts.every((c) => c.referencePeriod === "2026-05"),
+    ).toBe(true);
+  });
+
+  it("merges stably when calendar recovers for same family + period", () => {
+    const archive = makeArchive(29);
+    const latestPeriod = "2026-05";
+
+    const withoutCal = materializeResultsFeed({
+      scheduled: [],
+      releases: archive,
+      calendarAvailable: false,
+      calendarUnavailableReason: "missing calendar",
+    });
+    const standaloneId = withoutCal.catalysts.find(
+      (c) => c.releaseFamily === "cpi",
+    )?.id;
+    expect(standaloneId).toMatch(/^cat_/);
+
+    const scheduled: Catalyst = {
+      schemaVersion: "0.1.0",
+      id: "cat_sched_cpi_stable",
+      occurredAt: "2026-06-11T12:30:00.000Z",
+      observedAt: "2026-06-11T12:30:00.000Z",
+      sourceType: "calendar",
+      sourceName: "BLS News Release Schedule",
+      sourceUrl: "https://www.bls.gov/cpi/",
+      headline: "Consumer Price Index (CPI) scheduled release",
+      summary: "schedule",
+      category: "inflation",
+      importance: "high",
+      status: "upcoming",
+      affectedAssets: ["US10Y"],
+      macroChannels: ["inflation"],
+      direction: "unclear",
+      confidence: {
+        score: 80,
+        calibrated: false,
+        note: "classification clarity only — not a market direction probability",
+      },
+      evidence: [
+        { id: "e1", statement: "sched", basis: "official_release_schedule" },
+      ],
+      dedupeKey: "ext:bls-cpi-sched-2026-05",
+      synthetic: false,
+      releaseFamily: "cpi",
+      referencePeriod: latestPeriod,
+    };
+
+    const withCal = materializeResultsFeed({
+      scheduled: [scheduled],
+      releases: archive,
+      calendarAvailable: true,
+    });
+
+    const cpiRows = withCal.catalysts.filter((c) => c.releaseFamily === "cpi");
+    expect(cpiRows).toHaveLength(1);
+    expect(cpiRows[0]?.id).toBe("cat_sched_cpi_stable");
+    expect(cpiRows[0]?.status).toBe("released");
+    expect(cpiRows.some((c) => c.id === standaloneId)).toBe(false);
+    expect(withCal.linkingWarnings.some((w) => w.releaseFamily === "cpi")).toBe(
+      false,
+    );
+  });
+
+  it("orders BLS periods numerically (M09 < M10, cross-year, unordered, dedupe, M13)", () => {
+    expect(compareSourcePeriod("2025-M09", "2025-M10")).toBeLessThan(0);
+    expect(compareReferencePeriod("2025-12", "2026-01")).toBeLessThan(0);
+    expect(parseBlsYearPeriod("2025", "M13")).toBeNull();
+
+    const disordered = {
+      status: "REQUEST_SUCCEEDED",
+      Results: {
+        series: [
+          {
+            seriesID: "LNS14000000",
+            data: [
+              { year: "2025", period: "M10", value: "4.1", footnotes: [{}] },
+              { year: "2025", period: "M09", value: "4.0", footnotes: [{}] },
+              { year: "2025", period: "M13", value: "4.2", footnotes: [{}] },
+              { year: "2025", period: "M09", value: "4.05", footnotes: [{}] },
+              { year: "2026", period: "M01", value: "4.3", footnotes: [{}] },
+            ],
+          },
+        ],
+      },
+    };
+    const parsed = parseBlsApiTimeseriesBody(JSON.stringify(disordered));
+    const periods = parsed.series[0]!.points.map((p) => p.sourcePeriod);
+    expect(periods).toEqual(["2025-M09", "2025-M10", "2026-M01"]);
+    // Duplicate M09 kept last value
+    expect(parsed.series[0]!.points[0]!.value).toBe(4.05);
+  });
+
+  it("surfaces results-only feed when calendar cache is missing", () => {
+    const root = tempRoot();
+    const now = new Date("2026-07-15T12:00:00.000Z");
+    const archive = makeArchive(29);
+    writeJsonAtomic(resultsLatestPath(root), {
+      kind: "CatalystResultsCache",
+      schemaVersion: "0.1.0",
+      fetchedAt: now.toISOString(),
+      sources: [
+        {
+          id: "bls_api",
+          name: "BLS Public Data API",
+          url: "https://api.bls.gov/publicAPI/v1/timeseries/data/",
+          status: "ok",
+          seriesCount: 4,
+        },
+      ],
+      seriesMetadata: [],
+      releases: archive,
+      revisions: [],
+      validationErrors: [],
+      linkingWarnings: [],
+      partialFailure: false,
+    });
+
+    const feed = loadCatalystFeed(
+      {},
+      { publicDemo: false, dataRoot: root, now },
+    );
+    expect(feed.mode).toBe("official_calendar");
+    expect(feed.banner).toMatch(/calendar cache unavailable/i);
+    expect(feed.catalysts.length).toBe(2);
+    expect(feed.source.results?.archiveReleaseCount).toBe(58);
+    expect(feed.source.results?.materializedStandaloneCount).toBe(2);
+    expect(feed.catalysts.every((c) => c.direction === "unclear")).toBe(true);
+    expect(feed.catalysts.every((c) => c.releaseResult?.consensus === null)).toBe(
+      true,
+    );
   });
 });

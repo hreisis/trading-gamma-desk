@@ -515,7 +515,7 @@ Optional Catalyst fields:
 | `referencePeriod` | `YYYY-MM` from official schedule/API metadata — never guessed from release day |
 | `releaseResult` | Official series actuals; `consensus: null`, `surprise: null`, `surpriseStatus: "unavailable"` |
 
-BLS series (explicit registry): `CUSR0000SA0` (headline CPI SA), `CUSR0000SA0L1E` (core CPI SA — all items less food and energy), `CES0000000001` (payrolls), `LNS14000000` (unemployment rate). CPI emits MoM + YoY percent changes; payrolls emit monthly change in thousands; unemployment is the official level. Local: `npm run catalyst:results:fetch` → gitignored `data/catalyst/results-latest.json`. An event becomes `released` only when official series data for its `referencePeriod` is linked — not merely because the schedule time has passed.
+BLS series (explicit registry): `CUSR0000SA0` (headline CPI SA), `CUSR0000SA0L1E` (core CPI SA — all items less food and energy), `CES0000000001` (payrolls), `LNS14000000` (unemployment rate). CPI emits MoM + YoY percent changes; payrolls emit monthly change in thousands; unemployment is the official level. Observations may include optional `inputs` (current / previous / year-ago source periods and raw values) for audit. Local: `npm run catalyst:results:fetch` → gitignored `data/catalyst/results-latest.json` (full period archive). The default Catalyst feed materializes scheduled events (strictly linked when possible) plus **at most one** latest independent observation per `releaseFamily` — historical archive rows are not expanded into dozens of top-level catalysts. An event becomes `released` only when official series data for its `referencePeriod` is linked — not merely because the schedule time has passed.
 
 ---
 
