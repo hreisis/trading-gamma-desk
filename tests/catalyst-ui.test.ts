@@ -41,11 +41,11 @@ describe("catalyst UI payload", () => {
     expect(feed.marketContext?.length).toBeGreaterThan(0);
     expect(feed.source.marketContext?.status).toBe("synthetic");
     expect(feed.disclaimer).toMatch(/causation/i);
-    for (const m of feed.marketContext ?? []) {
-      expect(m.synthetic).toBe(true);
-      expect(m.symbols.some((s) => s.instrumentLabel.includes("ETF"))).toBe(
-        true,
-      );
+    expect(feed.marketReactions?.length).toBeGreaterThan(0);
+    expect(feed.source.marketReactions?.status).toBe("synthetic");
+    for (const r of feed.marketReactions ?? []) {
+      expect(r.synthetic).toBe(true);
+      expect(r.observations.every((o) => o.ruleId.length > 0)).toBe(true);
     }
   });
 

@@ -8,6 +8,7 @@ import type {
   CatalystSourceType,
   CatalystStatus,
   EventMarketContext,
+  EventMarketReaction,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
@@ -184,6 +185,23 @@ export interface CatalystFeedResponse {
       readonly provider?: string;
       readonly feed?: string;
     };
+    readonly marketReactions?: {
+      readonly available: boolean;
+      readonly fetchedAt?: string;
+      readonly stale?: boolean;
+      readonly status?:
+        | "ok"
+        | "error"
+        | "missing"
+        | "synthetic"
+        | "partial"
+        | "failed"
+        | "unavailable";
+      readonly error?: string;
+      readonly archiveReactionCount?: number;
+      readonly feedReactionCount?: number;
+      readonly reactionRulesVersion?: string;
+    };
   };
   readonly count: number;
   readonly catalysts: Catalyst[];
@@ -198,6 +216,8 @@ export interface CatalystFeedResponse {
   readonly aiBriefs?: OfficialAiBrief[];
   /** Observed ETF moves around releases (M2-4A); never causation claims. */
   readonly marketContext?: EventMarketContext[];
+  /** Deterministic reaction patterns over M2-4A (M2-4B). */
+  readonly marketReactions?: EventMarketReaction[];
   readonly validationErrors: Array<{
     readonly index: number;
     readonly error: string;
@@ -248,6 +268,7 @@ export type {
   CatalystSourceType,
   CatalystStatus,
   EventMarketContext,
+  EventMarketReaction,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,

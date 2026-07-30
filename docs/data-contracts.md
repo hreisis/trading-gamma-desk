@@ -583,6 +583,22 @@ Independent canonical contract `EventMarketContext` (built offline into `data/ca
 
 Local: `npm run catalyst:market-context:fetch` (reads calendar + results caches only; Alpaca Historical Stock Bars via `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`; optional `CATALYST_MARKET_FEED`, default `sip`). Public demo uses synthetic fixtures only — never calls Alpaca.
 
+### Deterministic market reactions (M2-4B)
+
+Independent canonical contract `EventMarketReaction` (built offline into `data/catalyst/market-reactions-latest.json`):
+
+| Field | Notes |
+| --- | --- |
+| `marketContextId` / `marketContextIdentity` / `reactionRulesVersion` | Cache identity — excludes `generatedAt` |
+| `status` | `complete` \| `partial` \| `insufficient` |
+| `windows[]` | Per-window instrument directions, equity breadth/leadership, cross-asset signature, coverage |
+| `development` | Path classifications `extended` / `held` / `faded` / `reversed` / `mixed` / `unavailable` |
+| `observations[]` | 0–4 controlled templates with `ruleId` + replayable `sourceValues` |
+
+**Rules:** atomic directions use versioned **display deadbands** by proxy class × window (not statistical significance). Equity breadth uses SPY/QQQ/IWM only with an explicit majority rule (a lone QQQ up is never “broadly higher”). Leadership uses QQQ−SPY / IWM−SPY spreads vs an explicit threshold. Cross-asset signatures stay ETF/proxy language (never DXY / yields / risk-on). Development compares cumulative % vs the same baseline; invalid chronology → `unavailable` (no next-day fabrication).
+
+Local: `npm run catalyst:market-reactions:build` (reads `market-context-latest.json` only; offline). Public demo derives reactions from synthetic market-context fixtures via the same rules engine.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

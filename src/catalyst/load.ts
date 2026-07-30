@@ -7,6 +7,7 @@ import { isPublicDemoMode } from "@/desk/public-demo";
 import type {
   Catalyst,
   EventMarketContext,
+  EventMarketReaction,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
@@ -37,6 +38,10 @@ import {
 import { loadMarketContextCache } from "./market-context/cache";
 import { filterMarketContextForFeed } from "./market-context/materialize";
 import { MARKET_CONTEXT_CALCULATION_VERSION } from "./market-context/version";
+import { classifyMarketReaction } from "./market-reactions/classify";
+import { loadMarketReactionsCache } from "./market-reactions/cache";
+import { filterMarketReactionsForFeed } from "./market-reactions/materialize";
+import { REACTION_RULES_VERSION } from "./market-reactions/version";
 import { materializeResultsFeed } from "./results/link";
 import { loadResultsCache } from "./results/cache";
 import type { BuiltRelease } from "./results/types";
@@ -50,13 +55,13 @@ export const CATALYST_DEMO_BANNER =
   "Illustrative catalyst demo · synthetic events";
 
 export const CATALYST_DEMO_DISCLAIMER =
-  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results, documents, rule-based briefs, Demo AI briefs, and market-context ETF moves (when shown) are illustrative — Consensus unavailable · Surprise unavailable. AI briefs are narratives over cited synthetic facts, not live LLM calls. Observed ETF moves do not establish causation.";
+  "Synthetic catalyst fixtures for product demonstration — not actual news, calendar prints, or market observations. Synthetic release results, documents, rule-based briefs, Demo AI briefs, market-context ETF moves, and Demo reaction patterns (when shown) are illustrative — Consensus unavailable · Surprise unavailable. AI briefs are narratives over cited synthetic facts, not live LLM calls. Observed ETF moves and rule-based reaction patterns do not establish causation.";
 
 export const CATALYST_OFFICIAL_BANNER =
   "Official US macro calendar · schedules + BLS series results when linked";
 
 export const CATALYST_OFFICIAL_DISCLAIMER =
-  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Rule-based briefs are fact extracts with evidence offsets. AI briefs rewrite only those cited facts — not official prose; rejected/unavailable AI falls back to rule-based facts. Market context shows observed ETF proxy moves around the release — not causation. Unextracted ≠ agency omitted. A past schedule time alone does not mark an event released.";
+  "BLS, BEA, and Federal Reserve schedule sources list planned release times. BLS Public Data API values are official series observations only — Consensus unavailable · Surprise unavailable. Rule-based briefs are fact extracts with evidence offsets. AI briefs rewrite only those cited facts — not official prose; rejected/unavailable AI falls back to rule-based facts. Market context shows observed ETF proxy moves; reaction patterns are versioned rule-based classifications of those moves — not causation. Unextracted ≠ agency omitted. A past schedule time alone does not mark an event released.";
 
 export const CATALYST_STALE_BANNER =
   "Official US macro calendar · stale local cache";
@@ -89,6 +94,9 @@ export const OFFICIAL_AI_BRIEFS_CACHE_NAME =
 
 export const OFFICIAL_MARKET_CONTEXT_CACHE_NAME =
   "data/catalyst/market-context-latest.json";
+
+export const OFFICIAL_MARKET_REACTIONS_CACHE_NAME =
+  "data/catalyst/market-reactions-latest.json";
 
 export const SYNTHETIC_DOCUMENTS_FIXTURE_NAME =
   "fixtures/catalyst/synthetic-documents.json";
@@ -257,6 +265,17 @@ function loadSyntheticFeed(
     options.now,
     30,
   );
+  const synReactions = feedMctx.map((s) =>
+    classifyMarketReaction(s, {
+      generatedAt: options.now.toISOString(),
+    }),
+  );
+  const feedReactions = filterMarketReactionsForFeed(
+    synReactions,
+    feedMctx,
+    options.now,
+    30,
+  );
   const filtered = filterCatalysts(withDocs.catalysts, query);
   return {
     kind: "CatalystFeed",
@@ -319,6 +338,15 @@ function loadSyntheticFeed(
         provider: "synthetic_fixture",
         feed: "synthetic",
       },
+      marketReactions: {
+        available: true,
+        status: "synthetic",
+        fetchedAt: options.now.toISOString(),
+        stale: false,
+        archiveReactionCount: synReactions.length,
+        feedReactionCount: feedReactions.length,
+        reactionRulesVersion: REACTION_RULES_VERSION,
+      },
     },
     count: filtered.length,
     catalysts: filtered,
@@ -326,6 +354,7 @@ function loadSyntheticFeed(
     briefs: feedBriefs,
     aiBriefs: feedAi,
     marketContext: feedMctx,
+    marketReactions: feedReactions,
     validationErrors,
     linkingWarnings: linked.linkingWarnings,
     documentLinkingWarnings: withDocs.documentLinkingWarnings,
@@ -395,6 +424,10 @@ export function loadCatalystFeed(
     now,
   });
   const marketContextLoaded = loadMarketContextCache({
+    dataRoot: options.dataRoot,
+    now,
+  });
+  const marketReactionsLoaded = loadMarketReactionsCache({
     dataRoot: options.dataRoot,
     now,
   });
@@ -516,6 +549,42 @@ export function loadCatalystFeed(
     };
   }
 
+  function resolveFeedMarketReactions(
+    contexts: readonly EventMarketContext[] | undefined,
+  ): {
+    marketReactions: EventMarketReaction[] | undefined;
+    meta: NonNullable<CatalystFeedResponse["source"]["marketReactions"]>;
+  } {
+    if (!marketReactionsLoaded.ok) {
+      return {
+        marketReactions: undefined,
+        meta: {
+          available: false,
+          status: "missing",
+          error: marketReactionsLoaded.error,
+        },
+      };
+    }
+    const feed = filterMarketReactionsForFeed(
+      marketReactionsLoaded.cache.reactions,
+      contexts ?? [],
+      now,
+      30,
+    );
+    return {
+      marketReactions: feed,
+      meta: {
+        available: true,
+        status: marketReactionsLoaded.cache.buildStatus,
+        fetchedAt: marketReactionsLoaded.cache.generatedAt,
+        stale: marketReactionsLoaded.stale,
+        archiveReactionCount: marketReactionsLoaded.cache.reactions.length,
+        feedReactionCount: feed.length,
+        reactionRulesVersion: marketReactionsLoaded.cache.reactionRulesVersion,
+      },
+    };
+  }
+
   if (!loaded.ok) {
     // Calendar unavailable: still surface latest CPI/Employment observations.
     if (resultsLoaded.ok) {
@@ -535,6 +604,7 @@ export function loadCatalystFeed(
       );
       const aiPack = resolveFeedAiBriefs(briefPack.briefs);
       const mctxPack = resolveFeedMarketContext(catalysts);
+      const mrxnPack = resolveFeedMarketReactions(mctxPack.marketContext);
       return {
         kind: "CatalystFeed",
         schemaVersion: "0.1.0",
@@ -566,6 +636,7 @@ export function loadCatalystFeed(
           briefs: briefPack.meta,
           aiBriefs: aiPack.meta,
           marketContext: mctxPack.meta,
+          marketReactions: mrxnPack.meta,
         },
         count: filtered.length,
         catalysts: filtered,
@@ -573,6 +644,7 @@ export function loadCatalystFeed(
         briefs: briefPack.briefs,
         aiBriefs: aiPack.aiBriefs,
         marketContext: mctxPack.marketContext,
+        marketReactions: mrxnPack.marketReactions,
         validationErrors: [
           { index: -1, error: loaded.error },
         ],
@@ -690,6 +762,7 @@ export function loadCatalystFeed(
   );
   const aiPack = resolveFeedAiBriefs(briefPack.briefs);
   const mctxPack = resolveFeedMarketContext(catalysts);
+  const mrxnPack = resolveFeedMarketReactions(mctxPack.marketContext);
 
   const filtered = filterCatalysts(catalysts, query);
   const partialFailure = cache.partialFailure;
@@ -716,6 +789,9 @@ export function loadCatalystFeed(
   if (mctxPack.meta.stale) {
     banner = `${banner} · stale market context`;
   }
+  if (mrxnPack.meta.stale) {
+    banner = `${banner} · stale market reactions`;
+  }
 
   return {
     kind: "CatalystFeed",
@@ -739,6 +815,7 @@ export function loadCatalystFeed(
       briefs: briefPack.meta,
       aiBriefs: aiPack.meta,
       marketContext: mctxPack.meta,
+      marketReactions: mrxnPack.meta,
     },
     count: filtered.length,
     catalysts: filtered,
@@ -746,6 +823,7 @@ export function loadCatalystFeed(
     briefs: briefPack.briefs,
     aiBriefs: aiPack.aiBriefs,
     marketContext: mctxPack.marketContext,
+    marketReactions: mrxnPack.marketReactions,
     validationErrors: cache.validationErrors,
     linkingWarnings,
     documentLinkingWarnings,

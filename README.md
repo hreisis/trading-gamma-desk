@@ -84,6 +84,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run catalyst:briefs:build` | Build **rule-based evidence briefs** from local documents → `data/catalyst/briefs-latest.json` (offline) |
 | `npm run catalyst:briefs:enhance` | Rewrite eligible briefs via OpenAI Responses API → `data/catalyst/ai-briefs-latest.json` (reads briefs cache only) |
 | `npm run catalyst:market-context:fetch` | Fetch observed ETF moves around releases → `data/catalyst/market-context-latest.json` (Alpaca bars; reads calendar/results caches only) |
+| `npm run catalyst:market-reactions:build` | Classify M2-4A snapshots into reaction patterns → `data/catalyst/market-reactions-latest.json` (offline) |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -116,6 +117,8 @@ If any calendar provider fails, successful sources still write a usable cache wi
 **AI official briefs (M2-3C):** `npm run catalyst:briefs:enhance` reads `briefs-latest.json` only (no documents/calendar/results fetch) and writes `data/catalyst/ai-briefs-latest.json`. The LLM sees verified facts + evidence excerpts + controlled metadata — **not** full document text. Output is validated locally (citations, numbers, prohibited inference); `rejected` / `unavailable` falls back to the rule-based brief. Configure with `OPENAI_API_KEY` and optional `CATALYST_LLM_MODEL` (config default `gpt-5.6-luna`). ChatGPT/Cursor subscription credits are **not** API credits. Tests use an injected fake narrator — CI never calls OpenAI. Public demo serves checked-in synthetic AI fixtures labelled **Demo AI brief · Synthetic data**.
 
 **Event market context (M2-4A):** `npm run catalyst:market-context:fetch` reads local calendar + results caches only and writes `data/catalyst/market-context-latest.json`. Uses Alpaca Historical Stock Bars (`APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`, optional `CATALYST_MARKET_FEED`, default `sip`) for ETF proxies **SPY / QQQ / IWM / TLT / UUP / GLD** — labelled as ETF proxies, never as DXY, yields, or official index levels. Windows: baseline (last bar before event), +5m, +30m, +2h, regular-session close. UI states **Observed movement does not establish causation**. Missing credentials → unavailable (no fake prices). Public demo uses synthetic fixtures only — never calls Alpaca.
+
+**Deterministic market reactions (M2-4B):** `npm run catalyst:market-reactions:build` reads `market-context-latest.json` only (offline) and writes `data/catalyst/market-reactions-latest.json`. Versioned display deadbands classify each ETF proxy window as up/down/flat; equity breadth uses SPY/QQQ/IWM only; leadership uses QQQ−SPY / IWM−SPY spreads; cross-asset signatures stay ETF/proxy language. Deadbands are **not** statistical significance. `insufficient` / `mixed` are conservative classifications, not errors. Public demo derives reactions from synthetic M2-4A snapshots via the same rules engine.
 
 ### Desk URLs (local)
 
@@ -208,4 +211,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-4A** (schedules + BLS actuals + official documents + rule-based briefs + evidence-grounded AI briefs + event market-context ETF snapshots). Consensus/surprise, BEA results series, free-form LLM over full documents, and hawkish/dovish inference remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-4B** (schedules + BLS actuals + official documents + rule-based briefs + evidence-grounded AI briefs + event market-context ETF snapshots + deterministic reaction patterns). Consensus/surprise, BEA results series, free-form LLM over full documents, and hawkish/dovish inference remain out of scope. Market Temperature stays in the backlog.

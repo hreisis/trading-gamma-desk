@@ -2,10 +2,15 @@ import type {
   Catalyst,
   CatalystFeedResponse,
   EventMarketContext,
+  EventMarketReaction,
   OfficialAiBrief,
   OfficialBrief,
   OfficialDocument,
   ReleaseResult,
+} from "@/catalyst";
+import {
+  formatCrossAssetSignatureText,
+  formatLeadershipText,
 } from "@/catalyst";
 
 function formatWhen(iso: string): string {
@@ -416,17 +421,126 @@ function MarketContextBlock({
   );
 }
 
+function windowShort(w: string): string {
+  if (w === "5m") return "+5m";
+  if (w === "30m") return "+30m";
+  if (w === "2h") return "+2h";
+  if (w === "session_close") return "close";
+  return w;
+}
+
+function MarketReactionBlock({
+  reaction,
+  demo,
+}: {
+  reaction: EventMarketReaction;
+  demo?: boolean;
+}) {
+  return (
+    <div
+      className="catalyst-market-reaction"
+      data-testid="catalyst-market-reaction"
+    >
+      <p className="catalyst-release-meta">
+        {demo
+          ? "Demo reaction pattern · Synthetic data"
+          : "Observed reaction pattern · Rule-based classification of ETF proxy moves"}
+      </p>
+      <p className="catalyst-release-meta">
+        Status {reaction.status} · rules {reaction.reactionRulesVersion} ·{" "}
+        {reaction.provider}/{reaction.feed}
+      </p>
+      <p className="catalyst-release-meta">
+        Event {formatWhen(reaction.eventTimestamp)} (UTC)
+      </p>
+      <table className="catalyst-mctx-table" data-testid="catalyst-mrxn-table">
+        <thead>
+          <tr>
+            <th>Window</th>
+            <th>Equities</th>
+            <th>Leadership</th>
+            <th>Cross-asset signature</th>
+          </tr>
+        </thead>
+        <tbody>
+          {reaction.windows.map((w) => (
+            <tr key={w.window}>
+              <td>{windowShort(w.window)}</td>
+              <td>{w.equityBreadth.replace(/_/g, " ")}</td>
+              <td>{w.equityLeadership.status.replace(/_/g, " ")}</td>
+              <td className="catalyst-release-meta">
+                {formatCrossAssetSignatureText(w.crossAssetSignature)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="catalyst-release-meta">
+        Development: 5m→30m {reaction.development.from5mTo30m} · 30m→2h{" "}
+        {reaction.development.from30mTo2h} · into close{" "}
+        {reaction.development.intoSessionClose}
+      </p>
+      {reaction.observations.length > 0 ? (
+        <ul className="catalyst-release-obs" data-testid="catalyst-mrxn-obs">
+          {reaction.observations.map((o) => (
+            <li key={o.id}>
+              <span>{o.text}</span>
+              <span className="catalyst-release-meta"> · {o.ruleId}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <details data-testid="catalyst-mrxn-details">
+        <summary>Classification details (deadbands / pct / timestamps)</summary>
+        {reaction.windows.map((w) => (
+          <div key={w.window} className="catalyst-mrxn-detail">
+            <p className="catalyst-release-meta">
+              {windowShort(w.window)} · coverage {w.coverage.available}/
+              {w.coverage.expected}
+              {w.coverage.missingSymbols.length
+                ? ` · missing ${w.coverage.missingSymbols.join(",")}`
+                : ""}
+            </p>
+            <p className="catalyst-release-meta">
+              {formatLeadershipText(w.equityLeadership)}
+            </p>
+            <ul className="catalyst-release-obs">
+              {w.instruments.map((i) => (
+                <li key={i.symbol}>
+                  {i.symbol}: {i.direction}
+                  {i.changePct !== undefined
+                    ? ` ${formatPct(i.changePct)}`
+                    : ""}{" "}
+                  (deadband {i.deadbandPct}%) · {i.proxyLabel}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </details>
+      <p className="catalyst-release-meta" data-testid="catalyst-mrxn-disclaimer">
+        Deterministic display deadbands — not statistical significance. ETF
+        proxies ≠ index / DXY / yields. Observed movement does not establish
+        causation. Mixed/insufficient are conservative classifications, not
+        errors.
+      </p>
+    </div>
+  );
+}
+
 function CatalystRow({
   c,
   briefsByDocId,
   aiByBriefId,
   marketByCatalystId,
+  reactionByCatalystId,
   demo,
 }: {
   c: Catalyst;
   briefsByDocId: ReadonlyMap<string, OfficialBrief>;
   aiByBriefId: ReadonlyMap<string, OfficialAiBrief>;
   marketByCatalystId: ReadonlyMap<string, EventMarketContext>;
+  reactionByCatalystId: ReadonlyMap<string, EventMarketReaction>;
   demo?: boolean;
 }) {
   return (
@@ -455,6 +569,12 @@ function CatalystRow({
         {marketByCatalystId.get(c.id) ? (
           <MarketContextBlock
             ctx={marketByCatalystId.get(c.id)!}
+            demo={demo}
+          />
+        ) : null}
+        {reactionByCatalystId.get(c.id) ? (
+          <MarketReactionBlock
+            reaction={reactionByCatalystId.get(c.id)!}
             demo={demo}
           />
         ) : null}
@@ -506,6 +626,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
   const marketByCatalystId = new Map(
     (feed.marketContext ?? []).map((s) => [s.catalystId, s]),
   );
+  const reactionByCatalystId = new Map(
+    (feed.marketReactions ?? []).map((r) => [r.catalystId, r]),
+  );
   const demo = feed.mode === "synthetic_demo" || feed.isPublicDemo;
 
   return (
@@ -534,6 +657,9 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
           : ""}
         {feed.source.marketContext
           ? ` · mctx:${feed.source.marketContext.status ?? (feed.source.marketContext.available ? "ok" : "missing")}`
+          : ""}
+        {feed.source.marketReactions
+          ? ` · mrxn:${feed.source.marketReactions.status ?? (feed.source.marketReactions.available ? "ok" : "missing")}`
           : ""}
         {feed.source.sources && feed.source.sources.length > 0
           ? ` · ${feed.source.sources
@@ -572,6 +698,7 @@ export function CatalystFeed({ feed }: { feed: CatalystFeedResponse }) {
               briefsByDocId={briefsByDocId}
               aiByBriefId={aiByBriefId}
               marketByCatalystId={marketByCatalystId}
+              reactionByCatalystId={reactionByCatalystId}
               demo={demo}
             />
           ))}

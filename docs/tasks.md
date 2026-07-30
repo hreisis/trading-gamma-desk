@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 2 — Catalyst.** **M2-4A** event market-context snapshots (observed ETF moves). No LLM causation claims, hawkish/dovish, consensus/surprise, Market Temperature, or catalyst→regime linkage.
+**Milestone 2 — Catalyst.** **M2-4B** deterministic market-reaction classification over M2-4A ETF moves. No LLM, causation claims, risk-on/off, hawkish/dovish, Market Temperature, or catalyst→regime linkage.
 
 ### Queued (not started)
 
@@ -92,6 +92,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M2-3B | Evidence-grounded deterministic briefs | Per-document-type extractors; `OfficialBrief` with exact excerpt offsets; structured-result cross-check; `catalyst:briefs:build` → `briefs-latest.json` (offline); 30-day UI window; Rule-based summary label; no LLM / hawkish-dovish / trade advice — ✅ |
 | M2-3C | Evidence-grounded LLM briefs | `OfficialAiBrief` + `BriefNarrator`; OpenAI Responses API (`OPENAI_API_KEY` / `CATALYST_LLM_MODEL`); facts/excerpts only; local citation/number/prohibited validation; `catalyst:briefs:enhance` → `ai-briefs-latest.json`; rejected/unavailable → rule-based fallback; public-demo synthetic AI fixtures; tests use fake narrator — ✅ |
 | M2-4A | Event market-context snapshots | `EventMarketContext` + `MarketDataProvider`; Alpaca Historical Stock Bars (`APCA_*`, `CATALYST_MARKET_FEED`); ETF proxies SPY/QQQ/IWM/TLT/UUP/GLD; +5m/+30m/+2h/close; no look-ahead; `catalyst:market-context:fetch` → `market-context-latest.json`; causation disclaimer; public-demo synthetic fixtures; tests use fake provider — ✅ |
+| M2-4B | Deterministic market-reaction classification | `EventMarketReaction` + versioned deadbands/leadership/development rules; offline `catalyst:market-reactions:build` → `market-reactions-latest.json`; breadth/signature/observations with ruleIds; no LLM/causation/risk-on; public-demo derives from synthetic M2-4A — ✅ |
 | M2-2C | Consensus / surprise / BEA / more series | Deferred — PPI/JOLTS/ECI, BEA results, consensus, surprise, FOMC decision text parsing |
 | M2-2+ | News / X / free-form LLM over full docs | Deferred |
 

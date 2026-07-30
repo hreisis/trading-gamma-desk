@@ -7,3 +7,4 @@ export * from "./official-document";
 export * from "./official-brief";
 export * from "./ai-brief";
 export * from "./market-context";
+export * from "./market-reaction";
