@@ -86,6 +86,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run catalyst:market-context:fetch` | Fetch observed ETF moves around releases → `data/catalyst/market-context-latest.json` (Alpaca bars; reads calendar/results caches only) |
 | `npm run catalyst:market-reactions:build` | Classify M2-4A snapshots into reaction patterns → `data/catalyst/market-reactions-latest.json` (offline) |
 | `npm run catalyst:market-reactions:enhance` | Evidence-grounded AI narratives over 4A/4B → `data/catalyst/ai-market-reactions-latest.json` (reads context+reactions only) |
+| `npm run catalyst:integration:smoke` | M2-5A-Lite integration smoke (manual; see below) |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
@@ -124,6 +125,21 @@ If any calendar provider fails, successful sources still write a usable cache wi
 **AI market-reaction narratives (M2-4C):** `npm run catalyst:market-reactions:enhance` reads **only** `market-context-latest.json` + `market-reactions-latest.json` (no Alpaca, calendar, documents, briefs, or news) and writes `data/catalyst/ai-market-reactions-latest.json`. The LLM reorganizes cited 4A percentage changes + 4B rule classifications into a short observed-market narrative — **not** causation, hawkish/dovish, risk-on/off, or trade advice. Local hard validation (citations, numbers, entities, prohibited wording); `rejected` / `unavailable` falls back to the rule-based 4B pattern. Configure with `OPENAI_API_KEY` and optional `CATALYST_REACTION_LLM_MODEL` (config default `gpt-5.6-luna`). Tests use an injected fake narrator — CI never calls OpenAI. Public demo serves checked-in synthetic fixtures labelled **Demo AI reaction brief · Synthetic data**.
 
 **4A vs 4B vs 4C:** 4A stores objective ETF proxy price changes; 4B applies deterministic rule classification; 4C AI only organizes already-cited observed evidence. The validator can check citations, numbers, entities, and banned phrasing, but cannot mathematically prove every natural-language claim is entailed by the input — UI always keeps an expand-original-evidence path.
+
+**Integration smoke (M2-5A-Lite):** Manual validation of existing OpenAI adapters — **not** a daily pipeline (M2-5B not started).
+
+```bash
+npm run catalyst:integration:smoke -- --dry-run
+npm run catalyst:integration:smoke -- --live --max-events 2
+```
+
+- **Opt-in:** Without `--live`, zero OpenAI/Alpaca calls (plan + eligibility only). `--dry-run` forces the same.
+- **Cost control:** Max **2** events per OpenAI stage; default writes to an isolated temp dir (does not overwrite business AI caches unless `--update-cache` after a validated stage).
+- **Env (repo names):** `OPENAI_API_KEY`, optional `CATALYST_LLM_MODEL` (official briefs), optional `CATALYST_REACTION_LLM_MODEL` (reaction narratives). Alpaca: `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY` — when missing, stage is `awaiting_credentials` (no call, no empty 4A cache, not counted as adapter failure).
+- **Report:** gitignored `data/catalyst/integration-smoke-latest.json` (schema `0.1.0`) — statuses/counts/safe error codes only; keys/headers/prompt/response bodies redacted.
+- **Overall:** OpenAI success with Alpaca still awaiting → `partial` (full M2-5A not closed). `passed` requires all executable live stages including Alpaca.
+- **Tests vs live:** Vitest uses injected fake narrators and never hits the network even if `.env` has keys. Public demo never runs this command and never reads `.env` for providers.
+- **Alpaca:** Live market-context smoke remains **awaiting_credentials / awaiting_live_smoke** until valid credentials exist; do not invent or bypass Alpaca auth.
 
 ### Desk URLs (local)
 
@@ -216,4 +232,4 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-4C** (schedules + BLS actuals + official documents + rule-based briefs + evidence-grounded AI briefs + event market-context ETF snapshots + deterministic reaction patterns + evidence-grounded AI market-reaction narratives). Consensus/surprise, BEA results series, free-form LLM over full documents, and hawkish/dovish inference remain out of scope. Market Temperature stays in the backlog.
+Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-5A-Lite** (prior catalyst modules + OpenAI integration smoke; Alpaca live smoke deferred). Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and M2-5B unified update remain out of scope. Market Temperature stays in the backlog.

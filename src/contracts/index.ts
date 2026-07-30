@@ -9,3 +9,4 @@ export * from "./ai-brief";
 export * from "./market-context";
 export * from "./market-reaction";
 export * from "./ai-market-reaction";
+export * from "./integration-smoke";

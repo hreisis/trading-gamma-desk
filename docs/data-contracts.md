@@ -617,6 +617,19 @@ Independent canonical contract `AiMarketReactionNarrative` (enhanced offline int
 
 Local: `npm run catalyst:market-reactions:enhance` (reads market-context + market-reactions caches only; OpenAI Responses API via `OPENAI_API_KEY` / optional `CATALYST_REACTION_LLM_MODEL`, config default `gpt-5.6-luna`; reasoning `none`; max 12 events/run; concurrency 2; 800 max output tokens). Public demo uses synthetic fixtures only — never calls OpenAI.
 
+### Integration smoke report (M2-5A-Lite)
+
+Sanitized run report `CatalystIntegrationSmokeReport` written to gitignored `data/catalyst/integration-smoke-latest.json` by `npm run catalyst:integration:smoke`:
+
+| Field | Notes |
+| --- | --- |
+| `mode` | `live` only with explicit `--live`; otherwise `dry-run` |
+| `overallStatus` | `passed` \| `partial` \| `unavailable` \| `failed` |
+| `stages[]` | preflight → alpaca → openai official brief → openai reaction → cache integrity |
+| `errorCodes` | Safe categories only (`timeout`, `validation_rejected`, `missing_credentials`, …) — never keys/headers/bodies |
+
+**Status meanings:** `passed` = requested live stages that could run actually called the provider and passed validators; `partial` = at least one OpenAI stage passed while Alpaca remains `awaiting_credentials` (current expected M2-5A outcome); `unavailable` = no live provider stage could execute; `awaiting_credentials` = Alpaca keys absent — zero Alpaca calls, not an adapter failure. Automatic tests use fake narrators only; public demo never runs this smoke.
+
 ---
 
 ## 3. MarketStructureState (Gamma output)

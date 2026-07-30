@@ -127,3 +127,4 @@ export * from "./market-reactions/ai/openai-narrator";
 export * from "./market-reactions/ai/cache";
 export * from "./market-reactions/ai/enhance";
 export type { CatalystAiMarketReactionsCache } from "./market-reactions/ai/types";
+export * from "./integration-smoke";

@@ -52,11 +52,12 @@ export interface EnhanceOfficialBriefsResult {
   readonly path: string | null;
 }
 
-function isEligible(
+/** Shared eligibility for enhance + integration smoke (M2-5A-Lite). */
+export function isEligibleOfficialBrief(
   brief: OfficialBrief,
   publishedAt: string | undefined,
   now: Date,
-  days: number,
+  days: number = AI_BRIEF_FEED_DAYS,
 ): boolean {
   if (brief.status === "unavailable") return false;
   if (brief.facts.length === 0) return false;
@@ -137,7 +138,7 @@ export async function enhanceOfficialBriefs(
 
   const eligible = briefs
     .filter((b) =>
-      isEligible(
+      isEligibleOfficialBrief(
         b,
         publishedAtByDocumentId?.get(b.documentId),
         now,

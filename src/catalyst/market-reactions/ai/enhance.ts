@@ -83,11 +83,12 @@ async function mapPool<T, R>(
   return results;
 }
 
-function isEligiblePair(
+/** Shared eligibility for enhance + integration smoke (M2-5A-Lite). */
+export function isEligibleReactionPair(
   ctx: EventMarketContext,
   reaction: EventMarketReaction,
   now: Date,
-  days: number,
+  days: number = AI_REACTION_FEED_DAYS,
 ): boolean {
   if (reaction.status === "insufficient") return false;
   if (ctx.status === "unavailable") return false;
@@ -155,7 +156,8 @@ export async function enhanceMarketReactions(
       return ctx ? { ctx, reaction: r } : null;
     })
     .filter((p): p is { ctx: EventMarketContext; reaction: EventMarketReaction } =>
-      p !== null && isEligiblePair(p.ctx, p.reaction, now, AI_REACTION_FEED_DAYS),
+      p !== null &&
+      isEligibleReactionPair(p.ctx, p.reaction, now, AI_REACTION_FEED_DAYS),
     )
     .slice(0, options.maxPerRun ?? runtime.maxPerRun);
 
