@@ -448,6 +448,278 @@ code {
   font-weight: 500;
 }
 
+/* Catalyst feed (M3-1) — dense desk cards */
+.cf-feed {
+  margin-top: 2rem;
+}
+
+.cf-state {
+  margin: 1rem 0;
+}
+
+.cf-state-loading .desk-skeleton {
+  margin-bottom: 0.75rem;
+}
+
+.cf-state-banner {
+  margin: 0.75rem 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.88rem;
+}
+
+.cf-state-partial {
+  background: rgba(212, 160, 74, 0.12);
+  border: 1px solid rgba(212, 160, 74, 0.35);
+  color: var(--warn);
+}
+
+.cf-layer-strip {
+  margin: 0.35rem 0 0.75rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.cf-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1rem 0 0;
+}
+
+.cf-card {
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(42, 51, 64, 0.75);
+  border-radius: 6px;
+  background: rgba(18, 22, 28, 0.55);
+}
+
+.cf-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.55rem;
+}
+
+.cf-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.cf-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(42, 51, 64, 0.9);
+  color: var(--muted);
+}
+
+.cf-badge-category {
+  color: var(--text);
+}
+
+.cf-badge-importance.cf-importance-high {
+  border-color: rgba(212, 160, 74, 0.55);
+  color: var(--warn);
+}
+
+.cf-badge-importance.cf-importance-medium {
+  color: var(--text);
+}
+
+.cf-badge-status.cf-status-released {
+  border-color: rgba(96, 180, 130, 0.45);
+  color: #8fd4b0;
+}
+
+.cf-badge-status.cf-status-upcoming {
+  color: var(--muted);
+}
+
+.cf-badge-demo {
+  border-color: rgba(120, 140, 180, 0.45);
+  color: #9eb4d8;
+}
+
+.cf-scheduled {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cf-card-title {
+  margin: 0 0 0.45rem;
+  font-size: 1.02rem;
+  font-weight: 550;
+  line-height: 1.35;
+}
+
+.cf-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  margin: 0 0 0.85rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.cf-card-source {
+  flex-basis: 100%;
+  margin-top: 0.15rem;
+}
+
+.cf-card-footer {
+  margin-top: 0.65rem;
+}
+
+.cf-panel {
+  margin: 0.65rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(42, 51, 64, 0.55);
+  border-radius: 4px;
+  background: rgba(12, 15, 19, 0.35);
+}
+
+.cf-panel-compact {
+  padding: 0.55rem 0.65rem;
+}
+
+.cf-panel-muted {
+  opacity: 0.92;
+}
+
+.cf-panel-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.cf-panel-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.cf-brief-block + .cf-brief-block {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(42, 51, 64, 0.45);
+}
+
+.cf-brief-kicker {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.cf-brief-headline {
+  margin: 0 0 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.cf-citations {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.cf-citations li {
+  margin: 0.35rem 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.cf-citation-text {
+  display: block;
+}
+
+.cf-citation-refs {
+  margin: 0.25rem 0 0;
+  padding-left: 0.9rem;
+  list-style: circle;
+}
+
+.cf-citation-ref {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.cf-citation-ref q {
+  display: block;
+  margin-top: 0.15rem;
+  font-style: italic;
+  color: var(--text);
+}
+
+.cf-citation-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cf-mrxn-state {
+  margin: 0.25rem 0 0;
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+.cf-mrxn-awaiting {
+  color: var(--muted);
+}
+
+.cf-mrxn-unavailable {
+  color: var(--warn);
+}
+
+.cf-mrxn-core {
+  margin: 0.35rem 0 0.5rem;
+}
+
+.cf-mrxn-lede {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.cf-mrxn-ai {
+  margin-bottom: 0.55rem;
+}
+
+.cf-details {
+  margin-top: 0.55rem;
+  font-size: 0.84rem;
+}
+
+.cf-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  user-select: none;
+}
+
+.cf-details[open] summary {
+  margin-bottom: 0.45rem;
+}
+
 @media (max-width: 640px) {
   .desk {
     padding: 28px 16px 56px;
@@ -460,6 +732,21 @@ code {
 
   .catalyst-source {
     text-align: left;
+  }
+
+  .cf-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cf-scheduled {
+    white-space: normal;
+  }
+
+  .catalyst-mctx-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .desk-product {
