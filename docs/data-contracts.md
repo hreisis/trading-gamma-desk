@@ -704,7 +704,7 @@ OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positio
   },
   "byStrike": [{ "strike": 6450, "callGex": 3.1e8, "putGex": 0, "netGex": 3.1e8 }],
   "byExpiry": [{ "expiry": "2026-07-29", "status": "available", "netGex": 4e8 }],
-  "zeroDte": { "status": "available", "sessionDate": "2026-07-29", "netGex": 4e8 },
+  "zeroDte": { "status": "available", "sessionDate": "2026-07-29", "netGex": 4e8, "shareOfGrossGex": 0.35 },
   "coverage": { "contractsIn": 10, "contractsUsed": 8, "contractsSkipped": 2, "skipReasons": {} },
   "synthetic": true
 }

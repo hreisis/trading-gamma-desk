@@ -16,19 +16,23 @@ import {
 export const GEX_PCT_MOVE = 0.01;
 
 export const GEX_FORMULA =
-  "unsignedUnitGex = gamma * openInterest * multiplier * spot^2 * 0.01; callGex = +unsignedUnitGex; putGex = -unsignedUnitGex; totalGex = sum(callGex)+sum(putGex)";
+  "unsignedUnitGex = gamma * openInterest * multiplier * spot^2 * 0.01; callGex = +unsignedUnitGex; putGex = -unsignedUnitGex; totalGex = sum(callGex)+sum(putGex); grossGex = sum(|callGex|+|putGex|)";
 
 export const GEX_ASSUMPTIONS: readonly string[] = [
   "Puts are signed negative by convention in this OI-based proxy — not verified dealer positioning.",
   "Gamma and open interest are taken from the provider-neutral chain as reported; M4-1 does not recompute Black–Scholes gamma from IV.",
-  "Contracts missing OI or gamma, expired vs sessionDate, or with non-finite / non-positive OI/gamma/multiplier/strike are excluded.",
-  "Call wall = strike maximizing call GEX; put wall = strike minimizing put GEX (most negative put contribution).",
+  "OI=0 and gamma=0 are valid (contribute zero GEX). Missing, negative, or non-finite OI/gamma, expired contracts, and invalid strike/multiplier/spot are excluded.",
+  "Call wall = strike maximizing call GEX among strikes with callGex > 0; ties break to the lowest strike. Put wall = strike minimizing put GEX among strikes with putGex < 0; ties break to the highest strike. All-zero GEX does not fabricate walls.",
+  "Near-zero regime uses |totalGex| / grossGex where grossGex = Σ(|callGex|+|putGex|). 0DTE share = gross 0DTE GEX / gross total GEX (no clamping).",
   "Gamma Flip is not estimated via strike interpolation; requires a future path that recomputes gamma from spot, IV, rates, and time-to-expiry.",
   "GEX is an amplifier/compressor structure estimate — not a directional buy/sell signal for the underlying.",
 ];
 
-/** Relative |total| / sum(|strike net|) below this → near_zero regime. */
-export const NEAR_ZERO_ABS_SHARE = 0.02;
+/** Relative |total| / grossGex below this → near_zero regime. */
+export const NEAR_ZERO_GROSS_SHARE = 0.02;
+
+/** @deprecated Use NEAR_ZERO_GROSS_SHARE */
+export const NEAR_ZERO_ABS_SHARE = NEAR_ZERO_GROSS_SHARE;
 
 export function gexMethodology(): GammaMethodology {
   return {

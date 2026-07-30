@@ -5,6 +5,7 @@ import type {
   OptionsContract,
   OptionsChainSnapshot,
 } from "./types";
+import type { StrikeGexLevel } from "@/contracts";
 
 export interface ScoredContract {
   readonly ok: true;
@@ -49,8 +50,8 @@ export function scoreContract(
   if (!Number.isFinite(contract.openInterest)) {
     return { ok: false, contract, reason: "non_finite_oi" };
   }
-  if (contract.openInterest <= 0) {
-    return { ok: false, contract, reason: "non_positive_oi" };
+  if (contract.openInterest < 0) {
+    return { ok: false, contract, reason: "negative_oi" };
   }
   if (contract.gamma === null) {
     return { ok: false, contract, reason: "missing_gamma" };
@@ -58,8 +59,8 @@ export function scoreContract(
   if (!Number.isFinite(contract.gamma)) {
     return { ok: false, contract, reason: "non_finite_gamma" };
   }
-  if (contract.gamma <= 0) {
-    return { ok: false, contract, reason: "non_positive_gamma" };
+  if (contract.gamma < 0) {
+    return { ok: false, contract, reason: "negative_gamma" };
   }
 
   const unsignedUnitGex =
@@ -74,8 +75,10 @@ export function scoreContract(
     return { ok: false, contract, reason: "non_finite_gamma" };
   }
 
-  const gex =
+  const signed =
     contract.right === "put" ? -unsignedUnitGex : unsignedUnitGex;
+  // Normalize -0 from put×zero so downstream equality checks stay clean.
+  const gex = signed === 0 ? 0 : signed;
 
   return {
     ok: true,
@@ -113,6 +116,14 @@ export function scoreChain(
   }
 
   return { used, skipped, skipReasons };
+}
+
+/** Gross GEX mass: Σ(|callGex| + |putGex|) over strikes. */
+export function grossGex(byStrike: readonly StrikeGexLevel[]): number {
+  return byStrike.reduce(
+    (acc, r) => acc + Math.abs(r.callGex) + Math.abs(r.putGex),
+    0,
+  );
 }
 
 /** Pure: unsigned unit GEX for known-good numeric inputs (test helper). */

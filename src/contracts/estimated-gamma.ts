@@ -72,8 +72,11 @@ export const ZeroDteGexBreakdown = z.object({
   callGex: z.number().finite().nullable(),
   putGex: z.number().finite().nullable(),
   netGex: z.number().finite().nullable(),
-  /** |0DTE net| / sum(|strike net|) when both defined; else null. */
-  shareOfAbsStrikeGex: z.number().finite().min(0).max(1).nullable(),
+  /**
+   * Gross 0DTE GEX / gross total GEX, where gross = Σ(|callGex|+|putGex|).
+   * Null when gross total is 0 or 0DTE unavailable. Not clamped.
+   */
+  shareOfGrossGex: z.number().finite().nonnegative().nullable(),
   contractsUsed: z.number().int().nonnegative(),
   reason: z.string().optional(),
 });

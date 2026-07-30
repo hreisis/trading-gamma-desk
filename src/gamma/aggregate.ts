@@ -5,7 +5,8 @@ import type {
   WallLevel,
   ZeroDteGexBreakdown,
 } from "@/contracts";
-import { NEAR_ZERO_ABS_SHARE } from "./methodology";
+import { NEAR_ZERO_GROSS_SHARE } from "./methodology";
+import { grossGex } from "./gex";
 import type { ContractGexContribution } from "./types";
 
 export function aggregateByStrike(
@@ -113,27 +114,54 @@ export function aggregateByExpiry(
     });
 }
 
+/**
+ * Call wall: maximize callGex among strikes with callGex > 0.
+ * Tie-break: lowest strike (deterministic).
+ * All-zero / no positive call GEX → unavailable (never fabricate).
+ */
 export function deriveCallWall(byStrike: readonly StrikeGexLevel[]): WallLevel {
   let best: StrikeGexLevel | null = null;
   for (const row of byStrike) {
-    if (row.callContractsUsed === 0) continue;
-    if (!best || row.callGex > best.callGex) best = row;
+    if (!(row.callGex > 0)) continue;
+    if (
+      !best ||
+      row.callGex > best.callGex ||
+      (row.callGex === best.callGex && row.strike < best.strike)
+    ) {
+      best = row;
+    }
   }
   if (!best) {
-    return { status: "unavailable", reason: "No call GEX contributions" };
+    return {
+      status: "unavailable",
+      reason: "No positive call GEX at any strike",
+    };
   }
   return { status: "available", strike: best.strike, gex: best.callGex };
 }
 
+/**
+ * Put wall: minimize putGex among strikes with putGex < 0.
+ * Tie-break: highest strike (deterministic).
+ * All-zero / no negative put GEX → unavailable (never fabricate).
+ */
 export function derivePutWall(byStrike: readonly StrikeGexLevel[]): WallLevel {
   let best: StrikeGexLevel | null = null;
   for (const row of byStrike) {
-    if (row.putContractsUsed === 0) continue;
-    // Most negative put GEX (largest magnitude under put-negative convention).
-    if (!best || row.putGex < best.putGex) best = row;
+    if (!(row.putGex < 0)) continue;
+    if (
+      !best ||
+      row.putGex < best.putGex ||
+      (row.putGex === best.putGex && row.strike > best.strike)
+    ) {
+      best = row;
+    }
   }
   if (!best) {
-    return { status: "unavailable", reason: "No put GEX contributions" };
+    return {
+      status: "unavailable",
+      reason: "No negative put GEX at any strike",
+    };
   }
   return { status: "available", strike: best.strike, gex: best.putGex };
 }
@@ -143,9 +171,9 @@ export function deriveGammaRegime(
   byStrike: readonly StrikeGexLevel[],
 ): GammaRegime {
   if (totalGex === null || !Number.isFinite(totalGex)) return "unavailable";
-  const sumAbs = byStrike.reduce((acc, r) => acc + Math.abs(r.netGex), 0);
-  if (sumAbs === 0) return "near_zero";
-  if (Math.abs(totalGex) / sumAbs <= NEAR_ZERO_ABS_SHARE) return "near_zero";
+  const gross = grossGex(byStrike);
+  if (gross === 0) return "near_zero";
+  if (Math.abs(totalGex) / gross <= NEAR_ZERO_GROSS_SHARE) return "near_zero";
   return totalGex > 0 ? "positive" : "negative";
 }
 
@@ -162,12 +190,17 @@ export function deriveZeroDte(
       callGex: null,
       putGex: null,
       netGex: null,
-      shareOfAbsStrikeGex: null,
+      shareOfGrossGex: null,
       contractsUsed: 0,
       reason: "No contracts with expiry equal to sessionDate",
     };
   }
-  if (slice.status === "unavailable" || slice.netGex === null) {
+  if (
+    slice.status === "unavailable" ||
+    slice.callGex === null ||
+    slice.putGex === null ||
+    slice.netGex === null
+  ) {
     return {
       status: "unavailable",
       sessionDate,
@@ -175,15 +208,15 @@ export function deriveZeroDte(
       callGex: null,
       putGex: null,
       netGex: null,
-      shareOfAbsStrikeGex: null,
+      shareOfGrossGex: null,
       contractsUsed: slice.contractsUsed,
       reason: "0DTE expiry present but no usable GEX contributions",
     };
   }
 
-  const sumAbs = byStrike.reduce((acc, r) => acc + Math.abs(r.netGex), 0);
-  const share =
-    sumAbs > 0 ? Math.min(1, Math.abs(slice.netGex) / sumAbs) : null;
+  const grossTotal = grossGex(byStrike);
+  const grossZeroDte = Math.abs(slice.callGex) + Math.abs(slice.putGex);
+  const share = grossTotal > 0 ? grossZeroDte / grossTotal : null;
 
   return {
     status: slice.status,
@@ -192,7 +225,7 @@ export function deriveZeroDte(
     callGex: slice.callGex,
     putGex: slice.putGex,
     netGex: slice.netGex,
-    shareOfAbsStrikeGex: share,
+    shareOfGrossGex: share,
     contractsUsed: slice.contractsUsed,
   };
 }

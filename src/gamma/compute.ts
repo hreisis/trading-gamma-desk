@@ -38,6 +38,8 @@ export function computeEstimatedGammaStructure(
   const byStrike = aggregateByStrike(used);
   const skippedByExpiry = skippedCountByExpiry(skipped);
   const byExpiry = aggregateByExpiry(used, skippedByExpiry);
+  const callWall = deriveCallWall(byStrike);
+  const putWall = derivePutWall(byStrike);
 
   const limitations: string[] = [...methodology.assumptions];
 
@@ -52,6 +54,12 @@ export function computeEstimatedGammaStructure(
       `${skipped.length} contract(s) excluded (see coverage.skipReasons).`,
     );
   }
+  if (callWall.status === "unavailable") {
+    limitations.push(`Call wall unavailable: ${callWall.reason ?? "unknown"}`);
+  }
+  if (putWall.status === "unavailable") {
+    limitations.push(`Put wall unavailable: ${putWall.reason ?? "unknown"}`);
+  }
 
   let status: EstimatedGammaStructureDto["status"];
   let totalGex: number | null;
@@ -59,12 +67,12 @@ export function computeEstimatedGammaStructure(
   if (used.length === 0) {
     status = "unavailable";
     totalGex = null;
-  } else if (skipped.length > 0) {
-    status = "partial";
-    totalGex = used.reduce((acc, r) => acc + r.gex, 0);
   } else {
-    status = "available";
     totalGex = used.reduce((acc, r) => acc + r.gex, 0);
+    const wallGap =
+      callWall.status === "unavailable" || putWall.status === "unavailable";
+    status =
+      skipped.length > 0 || wallGap ? "partial" : "available";
   }
 
   const result: EstimatedGammaStructureDto = {
@@ -85,8 +93,8 @@ export function computeEstimatedGammaStructure(
     limitations,
     totalGex,
     gammaRegime: deriveGammaRegime(totalGex, byStrike),
-    callWall: deriveCallWall(byStrike),
-    putWall: derivePutWall(byStrike),
+    callWall,
+    putWall,
     gammaFlip: unavailableGammaFlip(),
     byStrike,
     byExpiry,

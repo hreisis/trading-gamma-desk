@@ -177,7 +177,7 @@ describe("scoreContract boundaries", () => {
           strike: 100,
           right: "call",
           expiry: "2026-07-29",
-          openInterest: 0,
+          openInterest: -1,
         }),
         base,
       ).ok,
@@ -334,7 +334,9 @@ describe("computeEstimatedGammaStructure", () => {
     );
     expect(out.zeroDte.status).toBe("unavailable");
     expect(out.zeroDte.reason).toMatch(/No contracts with expiry/i);
-    expect(out.status).toBe("available");
+    // Call-only chain → put wall unavailable → partial (M4-1A).
+    expect(out.status).toBe("partial");
+    expect(out.putWall.status).toBe("unavailable");
   });
 
   it("does not invent a gamma flip level", () => {
@@ -434,7 +436,7 @@ describe("walls and regime helpers", () => {
     );
   });
 
-  it("marks near_zero when net is tiny vs abs strike mass", () => {
+  it("marks near_zero when net is tiny vs gross GEX mass", () => {
     const byStrike = [
       {
         strike: 100,

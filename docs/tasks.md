@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 4 — Gamma structure.** **M4-1** Estimated Gamma Structure Engine (fixture chain → OI GEX proxy). No UI, no live options API, no Macro/Catalyst coupling.
+**Milestone 4 — Gamma structure.** **M4-1A** GEX correctness hardening on the M4-1 engine. No UI, no live options API, no Macro/Catalyst coupling.
 
 ### Queued (not started)
 
@@ -117,6 +117,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | ID | Task | Done when |
 | --- | --- | --- |
 | M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
+| M4-1A | GEX correctness hardening | OI=0/gamma=0 valid; gross GEX near-zero + 0DTE share; strict fixture parse; partial if wall missing; no fabricated all-zero walls; documented wall tie-break — ✅ |
 
 ### Deferred out of Milestone 1
 
