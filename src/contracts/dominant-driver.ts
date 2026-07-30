@@ -168,6 +168,7 @@ export const Interpretation = z.object({
   evidenceIds: z.array(z.string().min(1)).nonempty(),
   generator: InterpretationGenerator,
 });
+export type Interpretation = z.infer<typeof Interpretation>;
 
 export const Methodology = z.object({
   methodologyVersion: SemVer,

@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:tiingo": "node --env-file=.env scripts/verify-tiingo.mjs",
-    "ingest": "tsx --env-file=.env scripts/ingest-macro.ts"
+    "ingest": "tsx --env-file=.env scripts/ingest-macro.ts",
+    "interpret": "tsx --env-file=.env scripts/interpret-macro.ts"
   },
   "dependencies": {
     "next": "16.2.12",

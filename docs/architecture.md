@@ -20,7 +20,7 @@ Status: **stack locked for Milestone 1** (single TypeScript runtime). Data flow 
 | Schemas | **Zod**, generated from `docs/data-contracts.md` | One source of truth shared by API, compute and UI |
 | Tests | **Vitest** | Pure-function and property tests over fixtures |
 | Compute | Pure TS modules, no IO, no network | Deterministic and reproducible |
-| Interpretation | Template generator by default; LLM behind `MACRO_INTERPRETER=template\|llm` | Contract compliance beats prose |
+| Interpretation | Template generator by default (`npm run interpret`); LLM behind `MACRO_INTERPRETER=llm` later | Consumes compute snapshot only; never re-scores; polarity ≠ equity call; no band labels while uncalibrated |
 | Persistence (M1) | Files: cached bars + immutable snapshots | No database until history queries or concurrent writes exist |
 
 ---

@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 1 — Cross-Asset Macro.** M1-7 done; next is **M1-8** (template interpretation + guardrails). M1-6b stays deferred until joint calibration against scenarios + `fixtures/macro/history/`.
+**Milestone 1 — Cross-Asset Macro.** M1-8 landing; next is **M1-9** (macro desk UI). M1-6b stays deferred until joint calibration against scenarios + locally regenerated history (Tiingo EOD is not in the public freeze).
 
 > **M1-6b is deferred.** Do not calibrate `marginRef`, `ambiguityFloor`, `λ` or confidence bands against hand-tuned scenarios alone — that overfits placeholders. After M1-7 freezes a batch of real historical samples, calibrate jointly against scenario fixtures **and** the live distribution. Until then `confidenceParams.calibrated` stays `false` and no surface may render band labels.
 
@@ -57,7 +57,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M1-6 | Scenario fixtures | fed_rates easing, inflation, growth, risk-off, mixed_unresolved, single_asset_shock, insufficient_data — ✅ `fixtures/macro/scenarios.m1.json` + 8 scenario acceptance tests against `classifyDriver` |
 | M1-6b | Calibrate `confidenceParams` | Deferred until M1-7 freezes real historical samples; then jointly fit `marginRef`, `ambiguityFloor`, concentration threshold, `λ`, sigma floors and band cut-offs against scenarios **and** the live distribution; only then `calibrated: true` |
 | M1-7 | Ingest + snapshot writer | No forward-fill; gaps flagged; BTC snapped to equity sessions; year-boundary merge for Treasury; response validation rules enforced; immutable snapshot with versions — ✅ `src/ingest/*`, `npm run ingest`, offline parser tests; live bars in gitignored `data/`; public freeze keeps only Treasury/CBOE + summary (no Tiingo EOD redistribution) |
-| M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template |
+| M1-8 | Template interpretation + guardrails | Numeric guardrail rejects prose citing unreferenced numerals; LLM path falls back to template — ✅ `interpretSnapshot` reads compute snapshot only, copies confidence verbatim, template generator + equity-claim/band-label/number guardrails; no LLM on this path |
 | M1-9 | Macro desk UI | Normalized changes, z-scores, confirming/contradicting, regime, `confidence.score` with component breakdown, evidence, instrument/proxy labels, staleness banner; no high/medium/low band labels while `calibrated: false` |
 
 **Exit criteria:** fixtures and live sources both yield contract-valid `DominantDriver`; a stale or incomplete session renders as *Latest complete macro snapshot* rather than “Today”; compute has no network dependency; no Gamma or Close code exists.

@@ -198,6 +198,8 @@ Cross-asset prices alone cannot establish *cause*. Removed values and their gati
 - `contradictions` holds `evidence[].id` references, never free text, and each referenced asset’s `role` must actually be `contradicting`.
 - `interpretation.evidenceIds` must be a non-empty subset of `evidence[].id`.
 - `confidence` is derived only from its own components, deterministically. The interpretation layer may not alter it.
+- **Polarity is a signature-axis sign, not an equity recommendation.** `positive` means tightening / higher inflation / stronger growth / tighter liquidity / risk-on *in the template sense*. Template and LLM prose must not translate it into “bullish for stocks” (or the reverse). Prefer explicit disclaimers such as “not a call on equities” when the winning regime is inflation or rates.
+- While `confidence.calibrated` is `false`, interpretation and UI may show the numeric score (e.g. `68/100`) but must not attach high/medium/low band labels.
 
 **Input (conceptual):** per-asset daily changes plus a trailing volatility window that **ends at the prior session** (see 1.1). Credit spreads have a reserved slot and may be absent in Milestone 1.
 
