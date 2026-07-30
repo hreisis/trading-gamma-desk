@@ -1,4 +1,9 @@
-import { mkdtempSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -11,39 +16,187 @@ import {
   isFallbackRegime,
   loadMacroDesk,
   sessionBannerText,
+  writeJsonAtomic,
+  writePipelineError,
+  writePipelineOk,
 } from "@/desk";
+import { interpretAndWriteDriver } from "@/pipeline";
 
-describe("loadMacroDesk", () => {
-  it("falls back to the checked-in DominantDriver fixture", () => {
-    const emptyRoot = mkdtempSync(join(tmpdir(), "gammadesk-desk-"));
-    const payload = loadMacroDesk(emptyRoot, FIXTURE_DRIVER_PATH);
-    expect(payload.source).toBe("fixture");
-    expect(deskSourceLabel(payload.source)).toBe("fixture fallback");
-    expect(payload.snapshotPresent).toBe(false);
-    expect(payload.driver.schemaVersion).toBe("0.2.2");
-    expect(payload.driver.confidence.calibrated).toBe(false);
-    expect(payload.driver.interpretation.text.length).toBeGreaterThan(0);
+function tempRoot(): string {
+  return mkdtempSync(join(tmpdir(), "gammadesk-m110-"));
+}
+
+function copyFixtureDriver(root: string, session: string): string {
+  const dir = join(root, "drivers");
+  mkdirSync(dir, { recursive: true });
+  const raw = JSON.parse(readFileSync(FIXTURE_DRIVER_PATH, "utf8")) as {
+    marketSessionDate: string;
+  };
+  raw.marketSessionDate = session;
+  const path = join(dir, `${session}.json`);
+  writeFileSync(path, JSON.stringify(raw, null, 2) + "\n");
+  return path;
+}
+
+describe("loadMacroDesk provenance", () => {
+  it("uses demo fixture when no live drivers exist", () => {
+    const root = tempRoot();
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
+    expect(view.status).toBe("ready");
+    expect(view.source).toBe("fixture");
+    expect(view.isDemo).toBe(true);
+    expect(view.sourceLabel).toBe("demo · fixture fallback");
+    expect(view.driver?.confidence.calibrated).toBe(false);
   });
 
-  it("prefers a local driver when data/drivers is present", () => {
-    const payload = loadMacroDesk("data", FIXTURE_DRIVER_PATH);
-    // Local workspace has data/drivers; CI without data/ uses fixture.
-    if (payload.source === "local_driver") {
-      expect(payload.driverPath).toMatch(/data\/drivers\//);
-      expect(deskSourceLabel(payload.source)).toBe("live driver");
-      expect(payload.driver.confidence.calibrated).toBe(false);
-    } else {
-      expect(payload.source).toBe("fixture");
-      expect(deskSourceLabel(payload.source)).toBe("fixture fallback");
-    }
+  it("prefers live driver over fixture", () => {
+    const root = tempRoot();
+    copyFixtureDriver(root, "2026-07-28");
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
+    expect(view.source).toBe("local_driver");
+    expect(view.isDemo).toBe(false);
+    expect(view.sourceLabel).toBe("live driver");
+    expect(view.driverPath).toContain("2026-07-28.json");
+  });
+
+  it("never silently falls back to fixture when latest live driver is malformed", () => {
+    const root = tempRoot();
+    copyFixtureDriver(root, "2026-07-27");
+    const badPath = join(root, "drivers", "2026-07-28.json");
+    writeFileSync(badPath, "{ not-valid-dominant-driver\n");
+
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
+
+    expect(view.status).toBe("malformed");
+    expect(view.isDemo).toBe(false);
+    expect(view.source).toBe("local_driver");
+    expect(view.error?.code).toBe("malformed");
+    expect(view.driver?.marketSessionDate).toBe("2026-07-27");
+    expect(view.sessionStale).toBe(true);
+    expect(view.driverPath).toContain("2026-07-27.json");
+  });
+
+  it("reports empty when live-only and no drivers exist", () => {
+    const root = tempRoot();
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+      allowFixture: false,
+    });
+    expect(view.status).toBe("empty");
+    expect(view.driver).toBeNull();
+    expect(view.isDemo).toBe(false);
+  });
+
+  it("surfaces pipeline error while keeping the last good driver", () => {
+    const root = tempRoot();
+    const path = copyFixtureDriver(root, "2026-07-28");
+    writePipelineError({
+      dataRoot: root,
+      stage: "ingest",
+      error: "Tiingo timeout",
+      attemptedSession: "2026-07-29",
+      lastGoodSession: "2026-07-28",
+      lastGoodDriverPath: path,
+    });
+
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
+    expect(view.status).toBe("pipeline_error");
+    expect(view.driver).not.toBeNull();
+    expect(view.error?.code).toBe("pipeline");
+    expect(view.error?.message).toMatch(/Tiingo timeout/);
+    expect(view.sessionStale).toBe(true);
+    expect(view.isDemo).toBe(false);
+  });
+
+  it("honors preferFixture for manual demo acceptance", () => {
+    const root = tempRoot();
+    copyFixtureDriver(root, "2026-07-28");
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+      preferFixture: true,
+    });
+    expect(view.isDemo).toBe(true);
+    expect(view.source).toBe("fixture");
+    expect(deskSourceLabel("fixture")).toBe("demo · fixture fallback");
+  });
+});
+
+describe("atomic driver write", () => {
+  it("replaces a driver only after a full write", () => {
+    const root = tempRoot();
+    const path = join(root, "drivers", "2026-07-28.json");
+    writeJsonAtomic(path, { ok: true, n: 1 });
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ ok: true, n: 1 });
+    writeJsonAtomic(path, { ok: true, n: 2 });
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ ok: true, n: 2 });
+  });
+
+  it("leaves the previous driver intact when interpret fails", () => {
+    const root = tempRoot();
+    const good = copyFixtureDriver(root, "2026-07-28");
+    const before = readFileSync(good, "utf8");
+    mkdirSync(join(root, "snapshots"), { recursive: true });
+    writeFileSync(
+      join(root, "snapshots", "2026-07-29.json"),
+      JSON.stringify({ kind: "not-a-snapshot" }),
+    );
+
+    expect(() =>
+      interpretAndWriteDriver({
+        dataRoot: root,
+        session: "2026-07-29",
+        updatePipelineStatus: true,
+      }),
+    ).toThrow();
+
+    expect(readFileSync(good, "utf8")).toBe(before);
+    expect(
+      loadMacroDesk({ dataRoot: root, fixturePath: FIXTURE_DRIVER_PATH }).driver
+        ?.marketSessionDate,
+    ).toBe("2026-07-28");
+  });
+
+  it("records pipeline ok after a successful status write helper", () => {
+    const root = tempRoot();
+    const path = copyFixtureDriver(root, "2026-07-28");
+    writePipelineOk({
+      dataRoot: root,
+      stage: "interpret",
+      session: "2026-07-28",
+      driverPath: path,
+    });
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
+    expect(view.pipeline?.ok).toBe(true);
+    expect(view.status).toBe("ready");
   });
 });
 
 describe("desk confidence copy", () => {
   it("marks uncalibrated scores and never invents band labels", () => {
-    const emptyRoot = mkdtempSync(join(tmpdir(), "gammadesk-desk-"));
-    const { driver } = loadMacroDesk(emptyRoot, FIXTURE_DRIVER_PATH);
-    const text = formatConfidenceScore(driver.confidence);
+    const root = tempRoot();
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
+    expect(view.driver).not.toBeNull();
+    const text = formatConfidenceScore(view.driver!.confidence);
     expect(text).toBe("60/100 (uncalibrated)");
     expect(text.toLowerCase()).not.toMatch(/\b(high|medium|low)\b/);
   });
@@ -56,10 +209,13 @@ describe("desk confidence copy", () => {
   });
 
   it("uses the incomplete-session banner when alignment is not clean", () => {
-    const emptyRoot = mkdtempSync(join(tmpdir(), "gammadesk-desk-"));
-    const { driver } = loadMacroDesk(emptyRoot, FIXTURE_DRIVER_PATH);
+    const root = tempRoot();
+    const view = loadMacroDesk({
+      dataRoot: root,
+      fixturePath: FIXTURE_DRIVER_PATH,
+    });
     const incomplete = {
-      ...driver,
+      ...view.driver!,
       isCompleteSession: false,
       sessionAlignment: "partial" as const,
     };

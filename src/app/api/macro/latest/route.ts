@@ -1,25 +1,39 @@
 import { NextResponse } from "next/server";
-import { deskSourceLabel, loadMacroDesk } from "@/desk";
+import { loadMacroDesk } from "@/desk";
 
 /**
- * Serve the latest precomputed DominantDriver.
- * Does not ingest, classify, or interpret — filesystem read + Zod parse only.
+ * Serve the latest desk view model (read-only).
+ * Does not ingest, classify, or interpret.
  *
- * `source` is always `"local_driver"` (live) or `"fixture"` (fallback).
- * Clients must not treat fixture payloads as the live session.
+ * Query:
+ * - `?source=fixture` — force demo fixture (never silent when live is broken)
+ * - `?source=live` — live only; empty if no drivers (no fixture)
  */
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  const payload = loadMacroDesk();
-  const isLiveDriver = payload.source === "local_driver";
+export function GET(request: Request) {
+  const url = new URL(request.url);
+  const source = url.searchParams.get("source");
+  const preferFixture = source === "fixture";
+  const liveOnly = source === "live";
+
+  const view = loadMacroDesk({
+    preferFixture,
+    allowFixture: !liveOnly,
+  });
+
   return NextResponse.json({
-    source: payload.source,
-    sourceLabel: deskSourceLabel(payload.source),
-    isLiveDriver,
-    isFixtureFallback: !isLiveDriver,
-    snapshotPresent: payload.snapshotPresent,
-    driverPath: payload.driverPath,
-    driver: payload.driver,
+    status: view.status,
+    source: view.source,
+    sourceLabel: view.sourceLabel,
+    isLiveDriver: view.isLiveDriver,
+    isFixtureFallback: view.isDemo,
+    isDemo: view.isDemo,
+    sessionStale: view.sessionStale,
+    snapshotPresent: view.snapshotPresent,
+    driverPath: view.driverPath,
+    pipeline: view.pipeline,
+    error: view.error,
+    driver: view.driver,
   });
 }

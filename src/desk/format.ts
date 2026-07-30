@@ -64,8 +64,10 @@ export function sessionBannerText(driver: DominantDriver): string {
 /** Explicit payload provenance for banner + API consumers. */
 export function deskSourceLabel(
   source: "local_driver" | "fixture",
-): "live driver" | "fixture fallback" {
-  return source === "local_driver" ? "live driver" : "fixture fallback";
+): "live driver" | "demo · fixture fallback" {
+  return source === "local_driver"
+    ? "live driver"
+    : "demo · fixture fallback";
 }
 
 export function roleLabel(role: AssetObservation["role"]): string {

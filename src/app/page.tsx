@@ -4,14 +4,19 @@ import { loadMacroDesk } from "@/desk";
 /** Always read local artifacts at request time when present. */
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const payload = loadMacroDesk();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>;
+}) {
+  const params = await searchParams;
+  const preferFixture = params.source === "fixture";
+  const liveOnly = params.source === "live";
 
-  return (
-    <MacroDesk
-      driver={payload.driver}
-      source={payload.source}
-      snapshotPresent={payload.snapshotPresent}
-    />
-  );
+  const view = loadMacroDesk({
+    preferFixture,
+    allowFixture: !liveOnly,
+  });
+
+  return <MacroDesk view={view} />;
 }

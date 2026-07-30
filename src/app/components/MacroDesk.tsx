@@ -1,7 +1,7 @@
 import type { DominantDriver } from "@/contracts";
+import type { MacroDeskView } from "@/desk";
 import {
   assetDisplayName,
-  deskSourceLabel,
   formatConfidenceScore,
   formatSignedChange,
   formatZScore,
@@ -9,25 +9,20 @@ import {
   roleLabel,
   sessionBannerText,
 } from "@/desk";
-import type { DeskPayloadSource } from "@/desk";
+import { DeskChrome } from "./DeskChrome";
+import { DeskStatusBanners } from "./DeskStatusBanners";
 
-export function MacroDesk({
+function DriverBody({
   driver,
-  source,
-  snapshotPresent,
+  sourceLabel,
+  isDemo,
 }: {
   driver: DominantDriver;
-  source: DeskPayloadSource;
-  snapshotPresent: boolean;
+  sourceLabel: string;
+  isDemo: boolean;
 }) {
   const contradictionSet = new Set(driver.contradictions);
   const evidenceById = new Map(driver.evidence.map((e) => [e.id, e]));
-  const showStaleBanner =
-    !driver.isCompleteSession ||
-    driver.sessionAlignment !== "aligned" ||
-    Object.values(driver.staleDaysByAsset).some(
-      (days) => days !== undefined && days > 0,
-    );
 
   const sortedAssets = [...driver.assets].sort((a, b) => {
     const rank = (role: typeof a.role) =>
@@ -42,19 +37,8 @@ export function MacroDesk({
   });
 
   return (
-    <main className="desk">
-      <header className="desk-brand">
-        <p className="desk-product">GammaDesk</p>
-        <p className="desk-chain">
-          Driver → Catalyst → Structure → Confirmation → Updated View
-        </p>
-      </header>
-
-      <p
-        className={
-          showStaleBanner ? "desk-banner desk-banner-warn" : "desk-banner"
-        }
-      >
+    <>
+      <p className="desk-banner" data-testid="banner-session">
         {sessionBannerText(driver)}
         <span className="desk-banner-meta">
           · {driver.sessionAlignment}
@@ -62,17 +46,14 @@ export function MacroDesk({
           {" · "}
           <span
             className={
-              source === "fixture"
+              isDemo
                 ? "desk-source desk-source-fixture"
                 : "desk-source desk-source-live"
             }
-            data-desk-source={source}
+            data-desk-source={isDemo ? "fixture" : "local_driver"}
           >
-            {deskSourceLabel(source)}
+            {sourceLabel}
           </span>
-          {source === "local_driver" && !snapshotPresent
-            ? " · snapshot missing"
-            : ""}
         </span>
       </p>
 
@@ -200,6 +181,77 @@ export function MacroDesk({
           </p>
         ) : null}
       </section>
-    </main>
+    </>
+  );
+}
+
+export function MacroDesk({ view }: { view: MacroDeskView }) {
+  if (view.status === "empty" || (view.driver === null && !view.error)) {
+    return (
+      <DeskChrome>
+        <DeskStatusBanners view={view} />
+        <section className="desk-state" data-testid="state-empty">
+          <h1 className="desk-title">No macro driver</h1>
+          <p className="desk-interpretation">
+            {view.error?.message ??
+              "No live driver and fixture fallback is disabled. Run npm run daily after configuring .env."}
+          </p>
+        </section>
+      </DeskChrome>
+    );
+  }
+
+  if (view.driver === null) {
+    return (
+      <DeskChrome>
+        <DeskStatusBanners view={view} />
+        <section
+          className="desk-state"
+          data-testid={`state-${view.status}`}
+        >
+          <h1 className="desk-title">
+            {view.status === "malformed"
+              ? "Malformed live driver"
+              : "Pipeline error"}
+          </h1>
+          <p className="desk-interpretation">
+            {view.error?.message ??
+              "The desk cannot render a DominantDriver payload."}
+          </p>
+          <p className="desk-section-note">
+            UI does not classify or recompute confidence. Fix the pipeline or
+            restore a valid driver under data/drivers/.
+          </p>
+        </section>
+      </DeskChrome>
+    );
+  }
+
+  return (
+    <DeskChrome>
+      <DeskStatusBanners view={view} />
+      <div data-testid={`state-${view.status}`}>
+        <DriverBody
+          driver={view.driver}
+          sourceLabel={view.sourceLabel ?? "unknown"}
+          isDemo={view.isDemo}
+        />
+      </div>
+    </DeskChrome>
+  );
+}
+
+export function DeskLoading() {
+  return (
+    <DeskChrome>
+      <p className="desk-banner" data-testid="state-loading">
+        Loading macro desk…
+      </p>
+      <section className="desk-state">
+        <div className="desk-skeleton desk-skeleton-title" />
+        <div className="desk-skeleton desk-skeleton-line" />
+        <div className="desk-skeleton desk-skeleton-line short" />
+      </section>
+    </DeskChrome>
   );
 }

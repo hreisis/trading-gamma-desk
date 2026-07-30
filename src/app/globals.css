@@ -73,6 +73,16 @@ code {
   color: var(--warn);
 }
 
+.desk-banner-error {
+  color: var(--contra);
+  border-color: rgba(196, 122, 106, 0.45);
+}
+
+.desk-banner-demo {
+  color: var(--warn);
+  border-color: rgba(201, 162, 39, 0.45);
+}
+
 .desk-banner-meta {
   color: var(--muted);
 }
@@ -83,6 +93,47 @@ code {
 
 .desk-source-fixture {
   color: var(--warn);
+}
+
+.desk-state {
+  margin-top: 12px;
+}
+
+.desk-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-wash) 0%,
+    #1c2430 50%,
+    var(--bg-wash) 100%
+  );
+  background-size: 200% 100%;
+  animation: desk-shimmer 1.2s ease-in-out infinite;
+  border-radius: 2px;
+}
+
+.desk-skeleton-title {
+  height: 2rem;
+  width: min(18rem, 70%);
+  margin: 8px 0 16px;
+}
+
+.desk-skeleton-line {
+  height: 0.85rem;
+  width: min(36rem, 92%);
+  margin-bottom: 10px;
+}
+
+.desk-skeleton-line.short {
+  width: min(22rem, 60%);
+}
+
+@keyframes desk-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .desk-driver {

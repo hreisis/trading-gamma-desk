@@ -5,61 +5,24 @@
  *   npm run interpret -- 2026-07-29
  *
  * Reads data/snapshots/<session>.json, does not re-score, does not call an
- * LLM, and writes data/drivers/<session>.json as a contract-valid
- * DominantDriver. Requires a prior `npm run ingest`.
+ * LLM, and atomically writes data/drivers/<session>.json. Requires a prior
+ * `npm run ingest`. On failure the previous driver file is left untouched.
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
-import type { MacroSnapshot } from "../src/ingest";
-import { interpretSnapshot } from "../src/interpret";
-
-function latestSnapshotSession(root: string): string {
-  const dir = join(root, "snapshots");
-  if (!existsSync(dir)) {
-    throw new Error(`no snapshots under ${dir}; run npm run ingest first`);
-  }
-  const sessions = readdirSync(dir)
-    .filter((name) => name.endsWith(".json"))
-    .map((name) => name.replace(/\.json$/, ""))
-    .sort();
-  const latest = sessions.at(-1);
-  if (!latest) {
-    throw new Error(`no snapshots under ${dir}; run npm run ingest first`);
-  }
-  return latest;
-}
+import { interpretAndWriteDriver } from "../src/pipeline";
 
 function main(): void {
-  const root = "data";
   const arg = process.argv[2];
   const session =
-    arg && /^\d{4}-\d{2}-\d{2}$/.test(arg)
-      ? arg
-      : latestSnapshotSession(root);
+    arg && /^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : undefined;
 
-  const snapshotPath = join(root, "snapshots", `${session}.json`);
-  if (!existsSync(snapshotPath)) {
-    throw new Error(`missing snapshot ${snapshotPath}`);
-  }
+  const result = interpretAndWriteDriver({
+    dataRoot: "data",
+    session,
+    updatePipelineStatus: true,
+  });
 
-  const snapshot = JSON.parse(
-    readFileSync(snapshotPath, "utf8"),
-  ) as MacroSnapshot;
-
-  const driver = interpretSnapshot(snapshot);
-
-  const outDir = join(root, "drivers");
-  mkdirSync(outDir, { recursive: true });
-  const outPath = join(outDir, `${session}.json`);
-  writeFileSync(outPath, JSON.stringify(driver, null, 2) + "\n");
-
+  const { driver } = result;
   console.log(`session:        ${driver.marketSessionDate}`);
   console.log(
     `regime:         ${driver.primaryRegime}` +
@@ -71,7 +34,16 @@ function main(): void {
   );
   console.log(`generator:      ${driver.interpretation.generator}`);
   console.log(`interpretation: ${driver.interpretation.text}`);
-  console.log(`driver:         ${outPath}`);
+  console.log(`driver:         ${result.driverPath}`);
 }
 
-main();
+try {
+  main();
+} catch (error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(message);
+  console.error(
+    "Previous valid driver (if any) was kept. See data/pipeline/status.json.",
+  );
+  process.exit(1);
+}
