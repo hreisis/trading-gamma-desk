@@ -1,0 +1,132 @@
+{
+  "kind": "OptionsChainSnapshot",
+  "underlying": "SPX",
+  "asOf": "2026-07-29T14:30:00.000Z",
+  "sessionDate": "2026-07-29",
+  "spot": 6425,
+  "dataDelay": "fixture",
+  "source": {
+    "provider": "fixture",
+    "name": "fixtures/gamma/spx.2026-07-29.json",
+    "fetchedAt": "2026-07-29T14:30:00.000Z"
+  },
+  "synthetic": true,
+  "contracts": [
+    {
+      "symbol": "SPX260729C06400000",
+      "underlying": "SPX",
+      "expiry": "2026-07-29",
+      "strike": 6400,
+      "right": "call",
+      "openInterest": 1200,
+      "volume": 400,
+      "gamma": 0.0018,
+      "iv": 0.14,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260729P06400000",
+      "underlying": "SPX",
+      "expiry": "2026-07-29",
+      "strike": 6400,
+      "right": "put",
+      "openInterest": 900,
+      "volume": 300,
+      "gamma": 0.0018,
+      "iv": 0.14,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260729C06450000",
+      "underlying": "SPX",
+      "expiry": "2026-07-29",
+      "strike": 6450,
+      "right": "call",
+      "openInterest": 2500,
+      "volume": 800,
+      "gamma": 0.0022,
+      "iv": 0.13,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260729P06350000",
+      "underlying": "SPX",
+      "expiry": "2026-07-29",
+      "strike": 6350,
+      "right": "put",
+      "openInterest": 2100,
+      "volume": 500,
+      "gamma": 0.002,
+      "iv": 0.15,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260731C06450000",
+      "underlying": "SPX",
+      "expiry": "2026-07-31",
+      "strike": 6450,
+      "right": "call",
+      "openInterest": 1800,
+      "volume": 200,
+      "gamma": 0.0015,
+      "iv": 0.16,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260731P06350000",
+      "underlying": "SPX",
+      "expiry": "2026-07-31",
+      "strike": 6350,
+      "right": "put",
+      "openInterest": 1600,
+      "volume": 150,
+      "gamma": 0.0014,
+      "iv": 0.17,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260821C06500000",
+      "underlying": "SPX",
+      "expiry": "2026-08-21",
+      "strike": 6500,
+      "right": "call",
+      "openInterest": 3000,
+      "volume": 100,
+      "gamma": 0.0009,
+      "iv": 0.18,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260821P06300000",
+      "underlying": "SPX",
+      "expiry": "2026-08-21",
+      "strike": 6300,
+      "right": "put",
+      "openInterest": 2800,
+      "volume": 90,
+      "gamma": 0.00085,
+      "iv": 0.19,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260729C06425000",
+      "underlying": "SPX",
+      "expiry": "2026-07-29",
+      "strike": 6425,
+      "right": "call",
+      "openInterest": null,
+      "gamma": 0.0025,
+      "multiplier": 100
+    },
+    {
+      "symbol": "SPX260728C06400000",
+      "underlying": "SPX",
+      "expiry": "2026-07-28",
+      "strike": 6400,
+      "right": "call",
+      "openInterest": 5000,
+      "gamma": 0.003,
+      "multiplier": 100
+    }
+  ]
+}

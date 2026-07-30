@@ -85,6 +85,7 @@ Status: **stack locked for Milestone 1** (single TypeScript runtime). Data flow 
 | `data/` | Source clients, rate limits, raw bar cache | Idempotent pulls keyed by `sessionDate` |
 | `macro/` | Transforms, z-scores, signature scoring, driver assembly | Pure functions, no IO, unit + property tested |
 | `catalyst/` | Raw event → canonical Catalyst; dedupe; feed query; calendar + BLS results + documents + rule-based briefs + optional AI briefs + market-context ETF snapshots + deterministic reaction patterns + optional AI market-reaction narratives + integration smoke + unified incremental update | Normalize/extract/compute/classify are pure; fetch/build/enhance/smoke/update scripts are local-only; public demo never networks / never calls LLM or Alpaca; smoke requires `--live`; `catalyst:update` is manual orchestration with a run lock (no scheduler) |
+| `gamma/` | Provider-neutral options chain → OI-based Estimated GEX structure | Pure compute; fixture provider only in M4-1 (no paid / realtime API); Gamma Flip reserved unavailable without gamma recompute |
 | `interpret/` | Template generator, optional LLM + guardrails | Emits contract-shaped JSON only |
 | `contracts/` | Zod schemas | Mirrors `docs/data-contracts.md` |
 | `app/api/` | Serve latest snapshot + catalyst feed | Versioned payloads |

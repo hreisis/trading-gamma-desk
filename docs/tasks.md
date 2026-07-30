@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 3 — Catalyst UI.** **M3-1.5** UI densify + Risk Traffic Lights. No Detail route / This Week UI yet. No Market Temperature / consensus / causation.
+**Milestone 4 — Gamma structure.** **M4-1** Estimated Gamma Structure Engine (fixture chain → OI GEX proxy). No UI, no live options API, no Macro/Catalyst coupling.
 
 ### Queued (not started)
 
@@ -109,6 +109,14 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M3-0.5 | Contract hardening | Feed drops 4B/4C on `officialFactsIdentity` mismatch; Zod `CatalystFeed` public DTO strips paths/errors/usage/internal identities; docs align This Week field ownership (no new persisted fields); no Detail/This Week UI — ✅ |
 | M3-1 | Catalyst Feed UI | Card layout: title/category/importance/time/status, Official Brief + citations, market reaction core window or explicit awaiting/unavailable; loading/empty/error/partial states; public DTO only; tests — ✅ |
 | M3-1.5 | UI densify + Risk Traffic Lights | Merge demo banners; collapse Evidence/Confidence/Diagnostics; compact feed cards (ET time, brief/reaction summaries; details folded); four-state risk lights (Supportive / Caution / Warning / Unavailable) on Driver, Cross-Asset, released Catalysts — high-beta implication, gray when insufficient; pure functions + tests; no DTO/pipeline change — ✅ |
+
+---
+
+## Milestone 4 — Gamma / Positioning
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
 
 ### Deferred out of Milestone 1
 

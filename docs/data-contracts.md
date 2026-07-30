@@ -670,7 +670,61 @@ Public Zod contract `CatalystFeed` (`src/contracts/catalyst-feed.ts`, schemaVers
 
 ---
 
-## 3. MarketStructureState (Gamma output)
+## 3. EstimatedGammaStructure (M4-1 compute output)
+
+OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positioning truth and **not** a directional buy/sell signal. Zod: `src/contracts/estimated-gamma.ts`.
+
+```json
+{
+  "$id": "EstimatedGammaStructure",
+  "schemaVersion": "0.1.0",
+  "underlying": "SPX",
+  "asOf": "2026-07-29T14:30:00.000Z",
+  "sessionDate": "2026-07-29",
+  "spot": 6425,
+  "dataDelay": "fixture",
+  "source": { "provider": "fixture", "name": "…", "fetchedAt": "…" },
+  "methodology": {
+    "id": "oi_gex_proxy_v1",
+    "version": "0.1.0",
+    "formula": "unsignedUnitGex = gamma * openInterest * multiplier * spot^2 * 0.01; callGex = +unsignedUnitGex; putGex = -unsignedUnitGex; totalGex = sum(callGex)+sum(putGex)",
+    "assumptions": [
+      "Puts are signed negative by convention in this OI-based proxy — not verified dealer positioning."
+    ]
+  },
+  "status": "partial",
+  "limitations": [],
+  "totalGex": 1.2e9,
+  "gammaRegime": "positive",
+  "callWall": { "status": "available", "strike": 6450, "gex": 3.1e8 },
+  "putWall": { "status": "available", "strike": 6350, "gex": -2.8e8 },
+  "gammaFlip": {
+    "status": "unavailable",
+    "reason": "Requires recomputing gamma from spot, IV, rates, and time-to-expiry rather than interpolating strike GEX"
+  },
+  "byStrike": [{ "strike": 6450, "callGex": 3.1e8, "putGex": 0, "netGex": 3.1e8 }],
+  "byExpiry": [{ "expiry": "2026-07-29", "status": "available", "netGex": 4e8 }],
+  "zeroDte": { "status": "available", "sessionDate": "2026-07-29", "netGex": 4e8 },
+  "coverage": { "contractsIn": 10, "contractsUsed": 8, "contractsSkipped": 2, "skipReasons": {} },
+  "synthetic": true
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `dataDelay` | `realtime` \| `delayed_15m` \| `eod` \| `fixture` \| `unknown` |
+| `status` | `available` \| `partial` \| `unavailable` |
+| `gammaRegime` | `positive` \| `negative` \| `near_zero` \| `unavailable` |
+| `gammaFlip` | **Contract reserved.** M4-1 always `unavailable` — no strike-interpolation fake level |
+| `zeroDte` | `unavailable` when chain has no expiry equal to `sessionDate` |
+
+Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). Adapters (MarketData.app, Tradier, …) are out of M4-1; fixtures only.
+
+---
+
+## 3b. MarketStructureState (Gamma desk output — later)
+
+UI-facing structure state (badge, since-open, one-liner). **Not produced by M4-1**; will compose from `EstimatedGammaStructure` + interpretation in a later milestone.
 
 ```json
 {
