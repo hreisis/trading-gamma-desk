@@ -1,10 +1,14 @@
 # GammaDesk
 
-AI Market Structure Copilot.
+**Study-backed market decision agent.**
 
-Reasoning chain: **Driver → Catalyst → Structure → Confirmation → Updated View**
+Decision loop: **Observe → Research → Evaluate → Decide → Review**
 
-Milestone 1 ships a **read-only Macro Desk**: cross-asset regime, evidence, and an interpreted `DominantDriver`. Milestone 2 adds a **Catalyst feed** — synthetic fixtures in public demo; locally, an official US macro **release schedule** from BLS + BEA + Federal Reserve FOMC (scheduled times only). The UI never classifies markets or recomputes confidence — it only renders precomputed payloads.
+Module chain (deterministic compute → interpreted outputs): **Driver → Catalyst → Structure → Confirmation → Updated View**
+
+**Shipped (M1–M3):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC). UI renders precomputed payloads — it does not classify markets or recompute scores.
+
+**In progress (M4+):** gamma feature snapshots (M4), strategy replay/regime studies (M5), constrained LLM study agent (M6), private portfolio policy (M7), minimal decision interface (M8), shadow mode/review loop (M9). Deterministic calculations stay separate from LLM reasoning; **scores are not probabilities** until outcome-linked calibration. Public demo never includes private thresholds, portfolio data, or allocation rules.
 
 **Public portfolio demo:** synthetic macro + catalyst fixtures — illustrative, not live or historical market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
 
@@ -224,6 +228,7 @@ On failure:
 | Path | In git? | Notes |
 | --- | --- | --- |
 | `.env` / tokens | **No** | Local only; see `.env.example` |
+| Private portfolio policy / decision log | **No** | M7–M9; thresholds, holdings, allocation rules — never in public demo |
 | `data/bars/` (incl. Tiingo EOD) | **No** | gitignored raw cache |
 | `data/snapshots/`, `data/drivers/`, `data/pipeline/`, `data/calibration/`, `data/catalyst/` | **No** | Generated locally |
 | `fixtures/macro/**` | Yes | Contracts, scenarios, **synthetic public-demo fixture** — no Tiingo redistribution |
@@ -246,4 +251,16 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 
 ## Milestone status
 
-Milestone 1 Macro path through **M1-11**; Milestone 2 through **M2-5B** (prior catalyst modules + OpenAI integration smoke + unified incremental `catalyst:update`; Alpaca live smoke still deferred until valid credentials). Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope. Market Temperature stays in the backlog.
+| Milestone | Status |
+| --- | --- |
+| **M1** Macro (M1-11) | ✅ |
+| **M2** Catalyst / events (M2-5B; Alpaca live smoke deferred) | ✅ |
+| **M3** Catalyst UI + risk lights (M3-1.5) | ✅ |
+| **M4** Gamma snapshots / features (M4-1, M4-1A, M4-1B ✅; **M4-2 current**) | 🔄 |
+| **M5** Strategy research / replay / regime | Planned |
+| **M6** Constrained LLM study agent | Planned |
+| **M7** Private portfolio policy | Planned |
+| **M8** Minimal decision interface | Planned |
+| **M9** Shadow mode / review loop | Planned |
+
+Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope for the catalyst chain. Market Temperature stays in the backlog. See [product](docs/product.md) and [tasks](docs/tasks.md) for the full M4–M9 plan.

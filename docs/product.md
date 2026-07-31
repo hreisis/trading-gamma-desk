@@ -1,10 +1,24 @@
 # Product
 
-## Positioning
+## North Star
 
-**GammaDesk** is an **AI Market Structure Copilot**.
+**GammaDesk** is a **study-backed market decision agent**.
 
-It is not a stack of independent dashboards (macro page + gamma page + news page). It is a continuous reasoning loop:
+It helps a discretionary desk move through a repeatable loop:
+
+**Observe → Research → Evaluate → Decide → Review**
+
+| Stage | Role |
+| --- | --- |
+| **Observe** | What is the market showing now? (macro regime, catalysts, gamma structure, session context) |
+| **Research** | What historical or rule-based evidence applies? (replay, regime studies, documented methodology) |
+| **Evaluate** | What does the evidence support — and what does it not support? (scores, contradictions, guardrails) |
+| **Decide** | What action or stance follows under explicit policy? (private thresholds, sizing, allocation rules) |
+| **Review** | Did the decision hold up? Update beliefs, calibration, and policy from outcomes. |
+
+The product is **not** a stack of independent dashboards or a generic AI copilot. Modules serve the loop above and converge on an interpreted state — not a raw data dump.
+
+Internal module chain (still contractual):
 
 **Driver → Catalyst → Structure → Confirmation → Updated View**
 
@@ -14,26 +28,55 @@ Core logic:
 
 ---
 
+## Engineering split (non-negotiable)
+
+1. **Deterministic compute first.** Features, scores, GEX, replay statistics, and contract validation run as pure, auditable code — no LLM in the calculation path.
+2. **LLM is constrained interpretation.** Study narratives, briefs, and decision support consume **precomputed evidence** only; outputs are schema-validated and guardrailed; failures fall back to rule-based text.
+3. **Scores are not probabilities until calibrated.** Confidence and similar 0–100 outputs are audit numbers while `calibrated` is `false`; UI must not imply P(up) or high/medium/low bands without outcome-linked calibration.
+4. **Public vs private boundary.** The public repo/demo ships synthetic fixtures, methodology, and read-only desk surfaces. **Private thresholds, portfolio holdings, allocation rules, and policy weights never ship in the public bundle** — they live in gitignored local config and drive Decide/Review for the operator only.
+
+---
+
 ## Target users
 
 | Persona | Need |
 | --- | --- |
-| Discretionary equity / index trader | Intraday structure edge around gamma levels |
-| Macro / cross-asset trader | What the market is pricing today, with confirmation |
-| Desk / PM reviewing the session | Close validation and next-day watchlist |
+| Discretionary equity / index trader | Intraday structure edge around gamma levels; decision support under explicit policy |
+| Macro / cross-asset trader | What the market is pricing today, with confirmation and study context |
+| Desk / PM reviewing the session | Close validation, shadow outcomes, and next-day view |
 
 MVP assumes a single desk user (or small team), US session focus, English market language in AI outputs.
 
 ---
 
+## Roadmap milestones (M4–M9)
+
+Shipped work (M1–M3) established macro regime, catalyst evidence, and desk UI foundations. **Current and forward work:**
+
+| Milestone | Theme | Outcome |
+| --- | --- | --- |
+| **M4** | Gamma snapshots / features | Deterministic GEX engine, session gamma features, structure state for the desk |
+| **M5** | Strategy research / replay / regime | Historical replay, regime-conditioned studies, evidence tables — still deterministic |
+| **M6** | Constrained LLM study agent | LLM organizes cited evidence into study briefs and decision memos; no math in the model |
+| **M7** | Private portfolio policy | Gitignored policy: thresholds, sizing, allocation rules, instrument universe |
+| **M8** | Minimal decision interface | One surface for Evaluate → Decide: stance, constraints, evidence bullets, explicit uncertainty |
+| **M9** | Shadow mode / review loop | Log decisions vs outcomes; feed Review; optional calibration and policy adjustment |
+
+M4–M6 are **product path**, not post-MVP backlog. M7–M9 require the private boundary above.
+
+---
+
 ## Product pillars
 
-| Module | Core question | System role |
+| Module | Core question | Loop stage |
 | --- | --- | --- |
-| Cross-Asset Macro | What is the market trading today? | Direction + dominant driver |
-| Catalyst / Events | Why is it trading that *now*? | Causal bridge (lightweight in MVP) |
-| Gamma / Positioning | How will the path behave? | Pin vs expand, walls, intraday edge |
-| Close Intelligence | Was today’s thesis validated? | Replay, rotation, next-day view |
+| Cross-Asset Macro | What is the market trading today? | Observe |
+| Catalyst / Events | Why is it trading that *now*? | Observe → Research |
+| Gamma / Positioning | How will the path behave? | Observe → Evaluate |
+| Strategy research / replay | What happened in similar regimes? | Research |
+| Study agent (LLM) | What do the cited facts imply in plain language? | Evaluate (interpretation only) |
+| Portfolio policy | What are we allowed to do? | Decide (private) |
+| Close / review | Was the thesis validated? What changed? | Review |
 
 Non-negotiable product principles:
 
@@ -46,51 +89,34 @@ Non-negotiable product principles:
 
 ---
 
-## MVP scope
+## Scope boundaries
 
-### In
+### In (through M9)
 
-**Cross-Asset Macro**
+- Cross-asset macro, catalyst evidence chain (M1–M3, shipped)
+- Gamma structure engine and desk-ready features (M4)
+- Deterministic strategy replay and regime studies (M5)
+- Evidence-grounded, guardrailed LLM study agent (M6)
+- Private portfolio policy layer (M7)
+- Minimal decision UI (M8)
+- Shadow logging and review loop (M9)
 
-- Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD, VIX, Credit spreads
-- Output: `Dominant Driver` (regime + polarity + risk direction + confidence score + evidence + contradictions + interpretation)
-- Regimes: Fed/Rates, Inflation, Growth, Liquidity, Risk sentiment — with `mixed_unresolved`, `single_asset_shock` and `insufficient_data` as honest fallbacks
-
-Milestone 1 ships the first eight assets. Gold, Copper, Oil and USD use ETF proxies, always labelled with what they proxy; credit spreads keep a reserved contract slot and may be absent.
-
-**Attribution honesty.** Cross-asset prices can show *what pattern* the market is trading, not *why*. So macro alone never claims geopolitical causation (that needs the Catalyst module) and never claims positioning-driven moves (that needs the Gamma module). Risk-off is reported as risk sentiment with polarity, not as a cause.
-
-**Catalyst / Events (light)**
-
-- Fed & economic data, Treasury auctions, geopolitics, earnings/guidance, large issuance, ETF rebalance / OPEX / mechanical events
-
-**Gamma / Positioning**
-
-- Inputs: Net GEX, Gamma Flip, Call/Put Wall, zero-gamma, 0DTE concentration, expected move, GEX by strike, since-prior-close / since-open deltas
-- Underlyings: SPX, SPY, QQQ
-- Desktop primary UI: structure regime, spot/flip/walls/expected range, since-open changes, one-line AI interpretation
-- Output: `Market Structure State` + edge guidance
-
-**Close Intelligence**
-
-- Close quality, breadth/rotation, narrative validation vs morning thesis, view update for next day
-
-### Out (post-MVP)
+### Out (unless explicitly replanned)
 
 - 20Y yield as first-class macro input
-- Full news NLP pipeline / multi-source research agent
 - Live institutional order-flow / true ETF create-redeem as primary “flow”
-- Multi-user auth, portfolio accounting, order routing
+- Multi-user auth, order routing, hosted portfolio accounting
 - Non-US sessions as primary UX
+- Uncalibrated scores presented as probabilities or trade signals
 
 ---
 
-## Success criteria (MVP)
+## Success criteria
 
-- User can answer in one glance: **driver, structure state, and what to watch next**
-- AI outputs cite evidence bullets; no unsupported flow language
-- Gamma panel never presents directional forecasts without structure context
-- Close module can mark morning thesis as confirmed / partial / rejected with evidence
+- Operator can answer in one pass: **what we observe, what studies support, what policy allows, and what we decided**
+- AI outputs cite evidence bullets; no unsupported flow or causation language
+- Gamma never presented as a standalone directional forecast
+- Review loop can compare decision log to outcomes without contaminating public demo data
 
 ---
 

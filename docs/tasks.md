@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 4 — Gamma structure.** **M4-1B** contract cleanup (schema/methodology bump + fixture error semantics). No UI, no live options API.
+**Milestone 4 — Gamma snapshots / features.** **M4-2** gamma feature snapshots and desk-ready structure derivation from the M4-1 GEX engine. No UI, no live options API, no M5+ work.
 
 ### Queued (not started)
 
@@ -98,7 +98,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M2-5A-Lite | OpenAI live smoke + Alpaca deferred gate | `npm run catalyst:integration:smoke` (`--dry-run` / explicit `--live --max-events 2`); reuses M2-3C/M2-4C adapters; isolated output; sanitized report `integration-smoke-latest.json`; Alpaca = `awaiting_valid_credentials` / `awaiting_live_smoke`; CI/public-demo zero network — ✅ Lite; **Full M2-5A partial until Alpaca live smoke** |
 | M2-5B | Unified incremental catalyst update | `npm run catalyst:update` (`--dry-run` / `--max-events 2` / `--force`); stages official_facts→AI brief; official_facts+4A→4B→4C; 4B input identity includes official event/facts; identity incremental skip; run lock + stale recovery; atomic manifest `update-latest.json`; no scheduler — ✅ |
 | M2-2C | Consensus / surprise / BEA / more series | Deferred — PPI/JOLTS/ECI, BEA results, consensus, surprise, FOMC decision text parsing |
-| M2-2+ | News / X / free-form LLM over full docs | Deferred |
+| M2-2+ | Unconstrained news / X / full-document LLM | Deferred — M6 delivers constrained study agent over precomputed evidence only |
 
 ---
 
@@ -113,13 +113,82 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 ---
 
-## Milestone 4 — Gamma / Positioning
+## Milestone 4 — Gamma snapshots / features
 
 | ID | Task | Done when |
 | --- | --- | --- |
 | M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
 | M4-1A | GEX correctness hardening | OI=0/gamma=0 valid; gross GEX near-zero + 0DTE share; strict fixture parse; partial if wall missing; no fabricated all-zero walls; documented wall tie-break — ✅ |
 | M4-1B | Contract cleanup | Bump `EstimatedGammaStructure` / methodology to 0.1.1; `shareOfGrossGex` [0,1] + float tolerance; fixture missing→null / malformed→throw with path — ✅ |
+| M4-2 | Gamma feature snapshots | Session gamma feature snapshots + `MarketStructureState` derivation from M4-1 output; fixture path; contract-valid JSON; tests; no UI / no live options API |
+
+**Exit criteria (M4):** Fixture path produces versioned gamma snapshots and a desk-ready structure state; compute remains deterministic and separate from LLM.
+
+---
+
+## Milestone 5 — Strategy research / replay / regime
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M5-1 | Replay harness | Deterministic replay over stored macro/gamma/catalyst snapshots; no LLM |
+| M5-2 | Regime-conditioned studies | Rule-based regime buckets + summary statistics; explicit methodology version |
+| M5-3 | Study fixtures | Contract-valid replay outputs checked into `fixtures/` for tests |
+
+**Exit criteria (M5):** Operator can run deterministic regime/replay studies from fixtures without LLM or live vendors.
+
+---
+
+## Milestone 6 — Constrained LLM study agent
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M6-1 | Study-agent contract | Input = precomputed evidence only; output schema + guardrails (citations, banned inference) |
+| M6-2 | Narrator adapter | Injectable LLM path with reject/fallback to rule-based summary |
+| M6-3 | Integration tests | Fake narrator in CI; no network; public demo uses synthetic study fixtures |
+
+**Exit criteria (M6):** LLM produces study briefs/decision memos from cited deterministic inputs only; validation failures never silently pass.
+
+---
+
+## Milestone 7 — Private portfolio policy
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M7-1 | Policy contract (gitignored) | Thresholds, sizing, allocation rules, instrument universe — local only |
+| M7-2 | Policy evaluator | Pure function: evidence + policy → allowed stance/constraints; no LLM |
+| M7-3 | Public boundary tests | Public demo/build never bundles or reads private policy paths |
+
+**Exit criteria (M7):** Decide stage runs against gitignored policy; public repo remains portfolio-safe.
+
+---
+
+## Milestone 8 — Minimal decision interface
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M8-1 | Decision surface | Single viewport: Observe summary, study bullets, policy constraint, explicit stance |
+| M8-2 | Uncertainty display | Scores labelled uncalibrated; no probability bands without calibration |
+| M8-3 | Evidence path | Expand-original-evidence for every AI line |
+
+**Exit criteria (M8):** Operator can Evaluate → Decide from one minimal UI without dashboard clutter.
+
+---
+
+## Milestone 9 — Shadow mode / review loop
+
+| ID | Task | Done when |
+| --- | --- | --- |
+| M9-1 | Decision log | Append-only local log: inputs, stance, timestamp; gitignored |
+| M9-2 | Outcome compare | Review step compares log to subsequent snapshots; deterministic diff |
+| M9-3 | Calibration feed | Optional hooks for outcome-linked score review (does not auto-set `calibrated: true`) |
+
+**Exit criteria (M9):** Full Observe → … → Review loop demonstrable on fixtures + shadow log.
+
+---
+
+## Legacy phase map (superseded by M4–M9 for planning)
+
+Phases P1–P4 below remain as historical skeleton references. **Active planning uses M4–M9 above.**
 
 ### Deferred out of Milestone 1
 
@@ -193,6 +262,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 - Multi-user auth
 - True reported ETF create/redeem flows
 - Non-US primary session UX
+- Hosted portfolio accounting / order routing
 
 ---
 
