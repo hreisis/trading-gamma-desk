@@ -1,10 +1,11 @@
 import {
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
-  renameSync,
-  writeFileSync,
+  writeSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -12,7 +13,13 @@ import {
   type GammaHistoricalSnapshot as GammaHistoricalSnapshotDto,
 } from "@/contracts";
 import { deepEqualJson } from "./deep-equal";
-import { parseGammaSnapshotId } from "./snapshot-id";
+import {
+  encodeSnapshotFileStem,
+  encodeSnapshotPathSegment,
+  encodeSnapshotSessionDate,
+  parseGammaSnapshotId,
+} from "./snapshot-id";
+import { assertGammaSnapshotInvariants } from "./snapshot-integrity";
 
 export type AppendSnapshotResult =
   | { readonly outcome: "written"; readonly path: string }
@@ -32,37 +39,40 @@ export class GammaSnapshotConflictError extends Error {
   }
 }
 
+function isNodeError(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error && "code" in err;
+}
+
 /**
  * Append-only filesystem store for gamma historical snapshots.
  *
  * - same ID + same payload → idempotent
  * - same ID + different payload → reject (never overwrite)
+ * - exclusive create (O_EXCL) prevents concurrent overwrite races
  */
 export class FileGammaSnapshotStore {
   constructor(private readonly root: string) {}
 
   snapshotPath(snapshot: GammaHistoricalSnapshotDto): string {
-    const safeAsOf = snapshot.asOf.replace(/:/g, "");
     return join(
       this.root,
       "gamma",
       "snapshots",
-      snapshot.underlying,
-      snapshot.sessionDate,
-      `${snapshot.captureKind}_${safeAsOf}.json`,
+      encodeSnapshotPathSegment(snapshot.underlying),
+      encodeSnapshotSessionDate(snapshot.sessionDate),
+      `${encodeSnapshotFileStem(snapshot.captureKind, snapshot.asOf)}.json`,
     );
   }
 
   pathForId(snapshotId: string): string {
     const parts = parseGammaSnapshotId(snapshotId);
-    const safeAsOf = parts.asOf.replace(/:/g, "");
     return join(
       this.root,
       "gamma",
       "snapshots",
-      parts.underlying,
-      parts.sessionDate,
-      `${parts.captureKind}_${safeAsOf}.json`,
+      encodeSnapshotPathSegment(parts.underlying),
+      encodeSnapshotSessionDate(parts.sessionDate),
+      `${encodeSnapshotFileStem(parts.captureKind, parts.asOf)}.json`,
     );
   }
 
@@ -77,32 +87,31 @@ export class FileGammaSnapshotStore {
    */
   append(snapshot: GammaHistoricalSnapshotDto): AppendSnapshotResult {
     const parsed = GammaHistoricalSnapshot.parse(snapshot);
-    const expectedId = [
-      parsed.underlying,
-      parsed.sessionDate,
-      parsed.captureKind,
-      parsed.asOf,
-    ].join("|");
-    if (parsed.snapshotId !== expectedId) {
-      throw new Error(
-        `gamma snapshotId mismatch: got ${parsed.snapshotId}, expected ${expectedId}`,
-      );
-    }
+    assertGammaSnapshotInvariants(parsed);
 
     const path = this.snapshotPath(parsed);
-    if (existsSync(path)) {
-      const existing = this.readFile(path);
-      if (deepEqualJson(existing, parsed)) {
-        return { outcome: "idempotent", path };
-      }
-      throw new GammaSnapshotConflictError(parsed.snapshotId, path);
-    }
+    const payload = JSON.stringify(parsed, null, 2) + "\n";
 
     mkdirSync(dirname(path), { recursive: true });
-    const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-    writeFileSync(tmp, JSON.stringify(parsed, null, 2) + "\n");
-    renameSync(tmp, path);
-    return { outcome: "written", path };
+
+    try {
+      const fd = openSync(path, "wx");
+      try {
+        writeSync(fd, payload);
+      } finally {
+        closeSync(fd);
+      }
+      return { outcome: "written", path };
+    } catch (err) {
+      if (isNodeError(err) && err.code === "EEXIST") {
+        const existing = this.readFile(path);
+        if (deepEqualJson(existing, parsed)) {
+          return { outcome: "idempotent", path };
+        }
+        throw new GammaSnapshotConflictError(parsed.snapshotId, path);
+      }
+      throw err;
+    }
   }
 
   list(filter?: {
@@ -112,7 +121,7 @@ export class FileGammaSnapshotStore {
     if (!existsSync(base)) return [];
 
     const underlyings = filter?.underlying
-      ? [filter.underlying]
+      ? [encodeSnapshotPathSegment(filter.underlying)]
       : readdirSync(base, { withFileTypes: true })
           .filter((d) => d.isDirectory())
           .map((d) => d.name);
@@ -147,6 +156,7 @@ export class FileGammaSnapshotStore {
         `gamma snapshot ${path}: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
       );
     }
+    assertGammaSnapshotInvariants(parsed.data);
     return parsed.data;
   }
 }

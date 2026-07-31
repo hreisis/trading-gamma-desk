@@ -7,14 +7,24 @@ import {
   type GammaChangeSet as GammaChangeSetDto,
   type GammaHistoricalSnapshot,
   type GammaNumericChange,
+  type GammaPctChange,
   type GammaRegimeChange,
   type GammaWallChange,
   type WallLevel,
 } from "@/contracts";
+import { compareIsoInstants, parseIsoInstantMs } from "./instant";
 
-function pctChange(current: number, baseline: number): number | null {
-  if (baseline === 0) return null;
-  return ((current - baseline) / baseline) * 100;
+const ZERO_BASELINE_PCT_REASON =
+  "baseline is zero; percentage change undefined";
+
+function pctChangeField(current: number, baseline: number): GammaPctChange {
+  if (baseline === 0) {
+    return { status: "unavailable", reason: ZERO_BASELINE_PCT_REASON };
+  }
+  return {
+    status: "available",
+    value: ((current - baseline) / baseline) * 100,
+  };
 }
 
 function unavailableNumeric(
@@ -39,7 +49,7 @@ function availableNumeric(
     current,
     baseline,
     absoluteChange: current - baseline,
-    pctChange: pctChange(current, baseline),
+    pctChange: pctChangeField(current, baseline),
   };
 }
 
@@ -102,7 +112,7 @@ function compareWall(
     currentStrike: current.strike,
     baselineStrike: baseline.strike,
     absoluteChange: current.strike - baseline.strike,
-    pctChange: pctChange(current.strike, baseline.strike),
+    pctChange: pctChangeField(current.strike, baseline.strike),
   };
 }
 
@@ -175,14 +185,25 @@ function isCompatible(
   );
 }
 
-/** Lexicographic ISO-8601 comparison is valid for Z / offset forms we store. */
 function isNotFuture(
   candidate: GammaHistoricalSnapshot,
   current: GammaHistoricalSnapshot,
 ): boolean {
   if (candidate.sessionDate > current.sessionDate) return false;
-  if (candidate.asOf > current.asOf) return false;
+  if (compareIsoInstants(candidate.asOf, current.asOf) > 0) return false;
   return true;
+}
+
+function compareSnapshotRecency(
+  a: GammaHistoricalSnapshot,
+  b: GammaHistoricalSnapshot,
+): number {
+  if (a.sessionDate !== b.sessionDate) {
+    return a.sessionDate < b.sessionDate ? 1 : -1;
+  }
+  const byInstant = compareIsoInstants(b.asOf, a.asOf);
+  if (byInstant !== 0) return byInstant;
+  return a.snapshotId < b.snapshotId ? 1 : -1;
 }
 
 function baselineRef(snap: GammaHistoricalSnapshot): GammaBaselineRef {
@@ -231,15 +252,7 @@ export function selectPriorCloseBaseline(
   );
   if (eligible.length === 0) return null;
 
-  eligible.sort((a, b) => {
-    if (a.sessionDate !== b.sessionDate) {
-      return a.sessionDate < b.sessionDate ? 1 : -1;
-    }
-    if (a.asOf !== b.asOf) {
-      return a.asOf < b.asOf ? 1 : -1;
-    }
-    return a.snapshotId < b.snapshotId ? 1 : -1;
-  });
+  eligible.sort(compareSnapshotRecency);
   return eligible[0] ?? null;
 }
 
@@ -261,12 +274,7 @@ export function selectSessionOpenBaseline(
   );
   if (eligible.length === 0) return null;
 
-  eligible.sort((a, b) => {
-    if (a.asOf !== b.asOf) {
-      return a.asOf < b.asOf ? 1 : -1;
-    }
-    return a.snapshotId < b.snapshotId ? 1 : -1;
-  });
+  eligible.sort(compareSnapshotRecency);
   return eligible[0] ?? null;
 }
 
@@ -305,3 +313,5 @@ export function computeGammaChangeSet(
 
   return GammaChangeSet.parse(result);
 }
+
+export { parseIsoInstantMs, ZERO_BASELINE_PCT_REASON };

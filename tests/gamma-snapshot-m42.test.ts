@@ -240,7 +240,10 @@ describe("M4-2 change engine baselines", () => {
       current: 6425,
       baseline: 6400,
       absoluteChange: 25,
-      pctChange: (25 / 6400) * 100,
+      pctChange: {
+        status: "available",
+        value: (25 / 6400) * 100,
+      },
     });
     expect(change.versusSessionOpen.metrics.spot).toMatchObject({
       status: "available",
@@ -321,7 +324,10 @@ describe("M4-2 change engine baselines", () => {
       current: 100,
       baseline: 0,
       absoluteChange: 100,
-      pctChange: null,
+      pctChange: {
+        status: "unavailable",
+        reason: expect.stringMatching(/baseline is zero/i),
+      },
     });
   });
 

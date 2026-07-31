@@ -9,5 +9,7 @@ export * from "./compute";
 export * from "./snapshot-id";
 export * from "./capture";
 export * from "./deep-equal";
+export * from "./instant";
+export * from "./snapshot-integrity";
 export * from "./snapshot-store";
 export * from "./change";

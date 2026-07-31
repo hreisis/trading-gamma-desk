@@ -756,7 +756,7 @@ Immutable as-of gamma snapshots and deterministic change comparisons. Zod: `src/
 1. **latest earlier-session explicit close** (compatible underlying / schema / methodology; not future)
 2. **same-session explicit open** (same filters)
 
-Metrics: `spot`, `totalGex`, `gammaRegime`, `callWall`, `putWall`, `zeroDteShareOfGrossGex`. Missing baselines or values → `status: unavailable` + `reason`. `pctChange` is `null` when the baseline numeric value is 0.
+Metrics: `spot`, `totalGex`, `gammaRegime`, `callWall`, `putWall`, `zeroDteShareOfGrossGex`. Missing baselines or values → `status: unavailable` + `reason`. **0.1.1+** `pctChange` is a nested `{ status, value? | reason? }`; unavailable when baseline is zero (absolute change may still be available).
 
 ---
 

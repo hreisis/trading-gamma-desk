@@ -8,7 +8,18 @@ import {
 } from "./estimated-gamma";
 
 export const GAMMA_SNAPSHOT_SCHEMA_VERSION = "0.1.0";
-export const GAMMA_CHANGE_SET_SCHEMA_VERSION = "0.1.0";
+export const GAMMA_CHANGE_SET_SCHEMA_VERSION = "0.1.1";
+
+export const GammaPctChange = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("available"),
+    value: z.number().finite(),
+  }),
+  z.object({
+    status: z.literal("unavailable"),
+    reason: z.string().min(1),
+  }),
+]);
 
 /**
  * Explicit capture kind — never inferred from clock time.
@@ -25,21 +36,80 @@ export const GammaSnapshotCaptureKind = z.enum([
  * Embeds the full M4-1 EstimatedGammaStructure; identity is stable and
  * append-only in storage.
  */
-export const GammaHistoricalSnapshot = z.object({
-  kind: z.literal("GammaHistoricalSnapshot"),
-  schemaVersion: z.literal(GAMMA_SNAPSHOT_SCHEMA_VERSION),
-  /** Stable identity: underlying|sessionDate|captureKind|asOf */
-  snapshotId: z.string().min(1),
-  captureKind: GammaSnapshotCaptureKind,
-  capturedAt: IsoDateTime,
-  underlying: z.string().min(1),
-  sessionDate: IsoDate,
-  asOf: IsoDateTime,
-  structureSchemaVersion: z.string().min(1),
-  methodologyId: z.literal(GEX_METHODOLOGY_ID),
-  methodologyVersion: z.literal(GEX_METHODOLOGY_VERSION),
-  structure: EstimatedGammaStructure,
-});
+export const GammaHistoricalSnapshot = z
+  .object({
+    kind: z.literal("GammaHistoricalSnapshot"),
+    schemaVersion: z.literal(GAMMA_SNAPSHOT_SCHEMA_VERSION),
+    /** Stable identity: underlying|sessionDate|captureKind|asOf */
+    snapshotId: z.string().min(1),
+    captureKind: GammaSnapshotCaptureKind,
+    capturedAt: IsoDateTime,
+    underlying: z.string().min(1),
+    sessionDate: IsoDate,
+    asOf: IsoDateTime,
+    structureSchemaVersion: z.string().min(1),
+    methodologyId: z.literal(GEX_METHODOLOGY_ID),
+    methodologyVersion: z.literal(GEX_METHODOLOGY_VERSION),
+    structure: EstimatedGammaStructure,
+  })
+  .superRefine((snap, ctx) => {
+    const expectedId = [
+      snap.underlying,
+      snap.sessionDate,
+      snap.captureKind,
+      snap.asOf,
+    ].join("|");
+    if (snap.snapshotId !== expectedId) {
+      ctx.addIssue({
+        code: "custom",
+        message: `snapshotId must match underlying|sessionDate|captureKind|asOf (expected ${expectedId})`,
+        path: ["snapshotId"],
+      });
+    }
+    const s = snap.structure;
+    if (snap.underlying !== s.underlying) {
+      ctx.addIssue({
+        code: "custom",
+        message: "underlying must match structure.underlying",
+        path: ["underlying"],
+      });
+    }
+    if (snap.sessionDate !== s.sessionDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "sessionDate must match structure.sessionDate",
+        path: ["sessionDate"],
+      });
+    }
+    if (snap.asOf !== s.asOf) {
+      ctx.addIssue({
+        code: "custom",
+        message: "asOf must match structure.asOf",
+        path: ["asOf"],
+      });
+    }
+    if (snap.structureSchemaVersion !== s.schemaVersion) {
+      ctx.addIssue({
+        code: "custom",
+        message: "structureSchemaVersion must match structure.schemaVersion",
+        path: ["structureSchemaVersion"],
+      });
+    }
+    if (snap.methodologyId !== s.methodology.id) {
+      ctx.addIssue({
+        code: "custom",
+        message: "methodologyId must match structure.methodology.id",
+        path: ["methodologyId"],
+      });
+    }
+    if (snap.methodologyVersion !== s.methodology.version) {
+      ctx.addIssue({
+        code: "custom",
+        message: "methodologyVersion must match structure.methodology.version",
+        path: ["methodologyVersion"],
+      });
+    }
+  });
 
 export const GammaBaselineAvailability = z.enum(["available", "unavailable"]);
 
@@ -63,11 +133,8 @@ export const GammaNumericChange = z.discriminatedUnion("status", [
     current: z.number().finite(),
     baseline: z.number().finite(),
     absoluteChange: z.number().finite(),
-    /**
-     * Percent change vs baseline: ((current - baseline) / baseline) * 100.
-     * Null when baseline is exactly 0 (division undefined).
-     */
-    pctChange: z.number().finite().nullable(),
+    /** Percent change vs baseline; unavailable when baseline is zero. */
+    pctChange: GammaPctChange,
   }),
   z.object({
     status: z.literal("unavailable"),
@@ -98,8 +165,7 @@ export const GammaWallChange = z.discriminatedUnion("status", [
     currentStrike: z.number().finite().positive(),
     baselineStrike: z.number().finite().positive(),
     absoluteChange: z.number().finite(),
-    /** Null when baseline strike is 0 (should not occur for positive strikes). */
-    pctChange: z.number().finite().nullable(),
+    pctChange: GammaPctChange,
   }),
   z.object({
     status: z.literal("unavailable"),
@@ -143,6 +209,7 @@ export const GammaChangeSet = z.object({
 });
 
 export type GammaSnapshotCaptureKind = z.infer<typeof GammaSnapshotCaptureKind>;
+export type GammaPctChange = z.infer<typeof GammaPctChange>;
 export type GammaHistoricalSnapshot = z.infer<typeof GammaHistoricalSnapshot>;
 export type GammaBaselineRef = z.infer<typeof GammaBaselineRef>;
 export type GammaNumericChange = z.infer<typeof GammaNumericChange>;
