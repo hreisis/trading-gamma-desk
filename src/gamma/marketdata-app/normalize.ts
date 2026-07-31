@@ -1,8 +1,19 @@
 import type { GammaDataDelay } from "@/contracts";
-import type { OptionsChainSnapshot, OptionsContract, OptionRight } from "../types";
+import type {
+  ChainDataQuality,
+  ContractQualityAudit,
+  OptionsChainSnapshot,
+  OptionsContract,
+  OptionRight,
+} from "../types";
 import { MarketDataAppNormalizeError } from "./errors";
 import {
+  assessContractQuality,
+  buildChainDataQuality,
+} from "./quality";
+import {
   MARKETDATA_APP_CHAIN_ARRAY_FIELDS,
+  MARKETDATA_APP_OPTIONAL_ARRAY_FIELDS,
   type MarketDataAppChainArrayField,
 } from "./types";
 
@@ -156,6 +167,51 @@ function parseNullableNonNegativeFinite(
   return value;
 }
 
+function readOptionalArrayField(
+  body: Record<string, unknown>,
+  field: (typeof MARKETDATA_APP_OPTIONAL_ARRAY_FIELDS)[number],
+): unknown[] | null {
+  const value = body[field];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!Array.isArray(value)) {
+    throw new MarketDataAppNormalizeError(
+      "payload_shape",
+      `MarketData.app optional array must be an array: ${field}`,
+    );
+  }
+  return value;
+}
+
+function readOptionalArrayValue(
+  arrays: unknown[] | null,
+  index: number,
+): unknown {
+  if (!arrays || index >= arrays.length) {
+    return null;
+  }
+  return arrays[index];
+}
+
+function parseNullableFinite(
+  raw: unknown,
+  field: string,
+  index: number,
+): number | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new MarketDataAppNormalizeError(
+      "row_field",
+      `row[${index}].${field} must be null or finite`,
+    );
+  }
+  return value;
+}
+
 function parseSide(raw: unknown, index: number): OptionRight {
   if (raw === "call" || raw === "put") {
     return raw;
@@ -256,10 +312,29 @@ export function normalizeMarketDataAppChain(
     );
   }
 
+  const deltaArray = readOptionalArrayField(body, "delta");
+  const askArray = readOptionalArrayField(body, "ask");
+  for (const [label, arr] of [
+    ["delta", deltaArray],
+    ["ask", askArray],
+  ] as const) {
+    if (arr !== null && arr.length !== rowCount) {
+      throw new MarketDataAppNormalizeError(
+        "array_length",
+        `MarketData.app ${label} array length ${arr.length} != ${rowCount}`,
+      );
+    }
+  }
+
   const underlyings: string[] = [];
   const spots: number[] = [];
   const updatedInstants: number[] = [];
   const contracts: OptionsContract[] = [];
+  const qualityInputs: Array<{
+    contract: OptionsContract;
+    delta: number | null;
+    ask: number | null;
+  }> = [];
 
   for (let i = 0; i < rowCount; i++) {
     const underlying = parseUnderlying(arrays.underlying[i], i);
@@ -277,7 +352,7 @@ export function normalizeMarketDataAppChain(
 
     const expiration = parseUnixSeconds(arrays.expiration[i], "expiration", i);
 
-    contracts.push({
+    const contract: OptionsContract = {
       symbol: parseSymbol(arrays.optionSymbol[i], i),
       underlying,
       right: parseSide(arrays.side[i], i),
@@ -292,11 +367,35 @@ export function normalizeMarketDataAppChain(
       gamma: parseNullableNonNegativeFinite(arrays.gamma[i], "gamma", i),
       iv: parseNullableNonNegativeFinite(arrays.iv[i], "iv", i),
       multiplier: MARKETDATA_APP_OPTIONS_MULTIPLIER,
+    };
+    contracts.push(contract);
+    qualityInputs.push({
+      contract,
+      delta: parseNullableFinite(
+        readOptionalArrayValue(deltaArray, i),
+        "delta",
+        i,
+      ),
+      ask: parseNullableFinite(readOptionalArrayValue(askArray, i), "ask", i),
     });
   }
 
   const underlying = assertSingleUnderlying(underlyings);
   spotsMateriallyConsistent(spots);
+
+  const chainSpot = spots[0]!;
+  const audits: ContractQualityAudit[] = qualityInputs.map((row) =>
+    assessContractQuality({
+      contract: row.contract,
+      spot: chainSpot,
+      delta: row.delta,
+      ask: row.ask,
+    }),
+  );
+  const dataQuality: ChainDataQuality = buildChainDataQuality(
+    contracts,
+    audits,
+  );
 
   const asOf = unixSecToIso(Math.max(...updatedInstants));
 
@@ -305,7 +404,7 @@ export function normalizeMarketDataAppChain(
     underlying,
     asOf,
     sessionDate: input.sessionDate,
-    spot: spots[0]!,
+    spot: chainSpot,
     dataDelay: input.dataDelay ?? "unknown",
     source: {
       provider: "marketdata_app",
@@ -314,5 +413,6 @@ export function normalizeMarketDataAppChain(
     },
     contracts,
     synthetic: input.synthetic ?? false,
+    dataQuality,
   };
 }

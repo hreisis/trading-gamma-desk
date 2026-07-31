@@ -713,13 +713,24 @@ OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positio
 | Field | Notes |
 | --- | --- |
 | `dataDelay` | `realtime` \| `delayed_15m` \| `eod` \| `fixture` \| `unknown` |
-| `status` | `available` \| `partial` \| `unavailable` |
+| `status` | `available` (complete) \| `incomplete` (usable GEX with suspect vendor-Greek exclusions) \| `partial` (other skips) \| `unavailable` |
 | `gammaRegime` | `positive` \| `negative` \| `near_zero` \| `unavailable` |
 | `gammaFlip` | **Contract reserved.** M4-1 always `unavailable` — no strike-interpolation fake level |
 | `zeroDte.shareOfGrossGex` | Gross 0DTE / gross total; **0.1.1+** validated in `[0, 1]` (was `shareOfAbsStrikeGex` in 0.1.0) |
 | `zeroDte` | `unavailable` when chain has no expiry equal to `sessionDate` |
 
-Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). Adapters (MarketData.app, Tradier, …) are out of M4-1; fixtures only.
+Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). MarketData.app normalizer attaches `dataQuality` audit metadata; suspect collapsed Greeks are excluded from GEX with skip reason `suspect_vendor_greeks`.
+
+**MarketData.app Greek data-quality (pre-provider):**
+
+| Rule | Notes |
+| --- | --- |
+| `suspect_vendor_greeks` | `openInterest > 0` AND `gamma === 0` AND `|delta| >= 0.999` AND `iv <= 0.001` — excluded from usable GEX; original vendor values preserved in audit |
+| `quote_below_intrinsic` | Diagnostic when `ask < intrinsicValue`; does not alone exclude |
+| Coverage | `nonNullGammaCount`, `usableGammaCount`, coverage %s, `suspectVendorGreeksCount` on `coverage` when present |
+| Completeness | `incomplete` when suspect exclusions affect calculation; walls/aggregates marked `incomplete` on affected side/expiry |
+
+Fixtures: `fixtures/gamma/providers/marketdata-app/spy-greek-boundary.json`.
 
 ---
 

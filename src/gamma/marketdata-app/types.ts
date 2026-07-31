@@ -19,6 +19,13 @@ export const MARKETDATA_APP_CHAIN_ARRAY_FIELDS = [
 export type MarketDataAppChainArrayField =
   (typeof MARKETDATA_APP_CHAIN_ARRAY_FIELDS)[number];
 
+/** Optional parallel arrays used for Greek data-quality audit. */
+export const MARKETDATA_APP_OPTIONAL_ARRAY_FIELDS = [
+  "delta",
+  "ask",
+  "bid",
+] as const;
+
 export interface MarketDataAppChainResponse {
   readonly s: string;
   readonly errmsg?: string;

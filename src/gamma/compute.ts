@@ -2,6 +2,8 @@ import {
   EstimatedGammaStructure,
   ESTIMATED_GAMMA_SCHEMA_VERSION,
   type EstimatedGammaStructure as EstimatedGammaStructureDto,
+  type ExpiryGexBreakdown,
+  type WallLevel,
 } from "@/contracts";
 import {
   aggregateByExpiry,
@@ -13,11 +15,13 @@ import {
   unavailableGammaFlip,
 } from "./aggregate";
 import { scoreChain } from "./gex";
+import { suspectExcludedOnSide } from "./marketdata-app/quality";
 import { gexMethodology } from "./methodology";
 import type { OptionsChainSnapshot } from "./types";
+import type { SkippedContract } from "./gex";
 
 function skippedCountByExpiry(
-  skipped: ReturnType<typeof scoreChain>["skipped"],
+  skipped: readonly SkippedContract[],
 ): Map<string, number> {
   const map = new Map<string, number>();
   for (const s of skipped) {
@@ -25,6 +29,49 @@ function skippedCountByExpiry(
     map.set(exp, (map.get(exp) ?? 0) + 1);
   }
   return map;
+}
+
+function suspectCountByExpiry(
+  skipped: readonly SkippedContract[],
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const s of skipped) {
+    if (s.reason !== "suspect_vendor_greeks") continue;
+    const exp = s.contract.expiry;
+    map.set(exp, (map.get(exp) ?? 0) + 1);
+  }
+  return map;
+}
+
+function markExpiryIncompleteWhenSuspect(
+  byExpiry: readonly ExpiryGexBreakdown[],
+  suspectByExpiry: ReadonlyMap<string, number>,
+): ExpiryGexBreakdown[] {
+  return byExpiry.map((row) => {
+    if ((suspectByExpiry.get(row.expiry) ?? 0) === 0) {
+      return row;
+    }
+    if (row.status === "unavailable") {
+      return row;
+    }
+    return { ...row, status: "incomplete" as const };
+  });
+}
+
+function degradeWallWhenSuspect(
+  wall: WallLevel,
+  suspectOnSide: boolean,
+): WallLevel {
+  if (!suspectOnSide || wall.status === "unavailable") {
+    return wall;
+  }
+  return {
+    ...wall,
+    status: "incomplete",
+    reason:
+      wall.reason ??
+      "Suspect vendor Greeks excluded from this side — wall may be incomplete",
+  };
 }
 
 /**
@@ -38,9 +85,23 @@ export function computeEstimatedGammaStructure(
   const { used, skipped, skipReasons } = scoreChain(chain);
   const byStrike = aggregateByStrike(used);
   const skippedByExpiry = skippedCountByExpiry(skipped);
-  const byExpiry = aggregateByExpiry(used, skippedByExpiry);
-  const callWall = deriveCallWall(byStrike);
-  const putWall = derivePutWall(byStrike);
+  const suspectByExpiry = suspectCountByExpiry(skipped);
+  let byExpiry = aggregateByExpiry(used, skippedByExpiry);
+  byExpiry = markExpiryIncompleteWhenSuspect(byExpiry, suspectByExpiry);
+
+  let callWall = deriveCallWall(byStrike);
+  let putWall = derivePutWall(byStrike);
+  const suspectCount = chain.dataQuality?.suspectVendorGreeksCount ?? 0;
+  if (suspectCount > 0) {
+    callWall = degradeWallWhenSuspect(
+      callWall,
+      suspectExcludedOnSide(chain.dataQuality, "call"),
+    );
+    putWall = degradeWallWhenSuspect(
+      putWall,
+      suspectExcludedOnSide(chain.dataQuality, "put"),
+    );
+  }
 
   const limitations: string[] = [...methodology.assumptions];
 
@@ -55,11 +116,26 @@ export function computeEstimatedGammaStructure(
       `${skipped.length} contract(s) excluded (see coverage.skipReasons).`,
     );
   }
+  if (suspectCount > 0) {
+    limitations.push(
+      `${suspectCount} contract(s) with positive OI excluded as suspect_vendor_greeks (vendor gamma=0 with collapsed delta/IV). Original vendor Greeks preserved in chain.dataQuality audit.`,
+    );
+  }
   if (callWall.status === "unavailable") {
     limitations.push(`Call wall unavailable: ${callWall.reason ?? "unknown"}`);
   }
   if (putWall.status === "unavailable") {
     limitations.push(`Put wall unavailable: ${putWall.reason ?? "unknown"}`);
+  }
+  if (callWall.status === "incomplete") {
+    limitations.push(
+      `Call wall incomplete: ${callWall.reason ?? "suspect vendor Greek exclusions"}`,
+    );
+  }
+  if (putWall.status === "incomplete") {
+    limitations.push(
+      `Put wall incomplete: ${putWall.reason ?? "suspect vendor Greek exclusions"}`,
+    );
   }
 
   let status: EstimatedGammaStructureDto["status"];
@@ -72,9 +148,16 @@ export function computeEstimatedGammaStructure(
     totalGex = used.reduce((acc, r) => acc + r.gex, 0);
     const wallGap =
       callWall.status === "unavailable" || putWall.status === "unavailable";
-    status =
-      skipped.length > 0 || wallGap ? "partial" : "available";
+    if (suspectCount > 0) {
+      status = "incomplete";
+    } else if (skipped.length > 0 || wallGap) {
+      status = "partial";
+    } else {
+      status = "available";
+    }
   }
+
+  const dq = chain.dataQuality;
 
   const result: EstimatedGammaStructureDto = {
     kind: "EstimatedGammaStructure",
@@ -105,6 +188,15 @@ export function computeEstimatedGammaStructure(
       contractsUsed: used.length,
       contractsSkipped: skipped.length,
       skipReasons: { ...skipReasons },
+      ...(dq
+        ? {
+            nonNullGammaCount: dq.nonNullGammaCount,
+            usableGammaCount: dq.usableGammaCount,
+            nonNullGammaCoveragePct: dq.nonNullGammaCoveragePct,
+            usableGammaCoveragePct: dq.usableGammaCoveragePct,
+            suspectVendorGreeksCount: dq.suspectVendorGreeksCount,
+          }
+        : {}),
     },
     synthetic: chain.synthetic,
   };

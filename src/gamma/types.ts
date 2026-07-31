@@ -51,6 +51,32 @@ export interface OptionsChainSnapshot {
   readonly source: OptionsChainSource;
   readonly contracts: readonly OptionsContract[];
   readonly synthetic: boolean;
+  /** Present when a provider attaches Greek data-quality audit (MarketData.app). */
+  readonly dataQuality?: ChainDataQuality;
+}
+
+export type VendorGreekIssueCode =
+  | "suspect_vendor_greeks"
+  | "quote_below_intrinsic";
+
+export interface ContractQualityAudit {
+  readonly symbol: string;
+  readonly right: OptionRight;
+  readonly delta: number | null;
+  readonly ask: number | null;
+  readonly intrinsicValue: number;
+  readonly issueCodes: readonly VendorGreekIssueCode[];
+  /** True when suspect_vendor_greeks — excluded from usable GEX. */
+  readonly excludedFromGex: boolean;
+}
+
+export interface ChainDataQuality {
+  readonly nonNullGammaCount: number;
+  readonly usableGammaCount: number;
+  readonly nonNullGammaCoveragePct: number;
+  readonly usableGammaCoveragePct: number;
+  readonly suspectVendorGreeksCount: number;
+  readonly contractAudits: readonly ContractQualityAudit[];
 }
 
 export type ContractSkipReason =
@@ -64,7 +90,8 @@ export type ContractSkipReason =
   | "invalid_strike"
   | "invalid_multiplier"
   | "underlying_mismatch"
-  | "missing_spot";
+  | "missing_spot"
+  | "suspect_vendor_greeks";
 
 export interface ContractGexContribution {
   readonly contract: OptionsContract;

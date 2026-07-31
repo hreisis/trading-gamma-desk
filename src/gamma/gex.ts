@@ -1,4 +1,5 @@
 import { GEX_PCT_MOVE } from "./methodology";
+import { excludedSymbolsFromQuality } from "./marketdata-app/quality";
 import type {
   ContractGexContribution,
   ContractSkipReason,
@@ -27,8 +28,12 @@ export function scoreContract(
     readonly underlying: string;
     readonly sessionDate: string;
     readonly spot: number | null;
+    readonly excludedSymbols?: ReadonlySet<string>;
   },
 ): ContractScore {
+  if (options.excludedSymbols?.has(contract.symbol)) {
+    return { ok: false, contract, reason: "suspect_vendor_greeks" };
+  }
   if (contract.underlying !== options.underlying) {
     return { ok: false, contract, reason: "underlying_mismatch" };
   }
@@ -101,11 +106,14 @@ export function scoreChain(
   const skipped: SkippedContract[] = [];
   const skipReasons: Record<string, number> = {};
 
+  const excludedSymbols = excludedSymbolsFromQuality(chain.dataQuality);
+
   for (const contract of chain.contracts) {
     const scored = scoreContract(contract, {
       underlying: chain.underlying,
       sessionDate: chain.sessionDate,
       spot: chain.spot,
+      excludedSymbols,
     });
     if (scored.ok) {
       used.push(scored.contribution);

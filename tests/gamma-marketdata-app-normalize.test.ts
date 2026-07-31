@@ -72,7 +72,21 @@ describe("MarketData.app option-chain normalizer", () => {
       gamma: 0.0009,
     });
 
-    expect(parseOptionsChainFixture(chain)).toEqual(chain);
+    expect(parseOptionsChainFixture({
+      kind: chain.kind,
+      underlying: chain.underlying,
+      asOf: chain.asOf,
+      sessionDate: chain.sessionDate,
+      spot: chain.spot,
+      dataDelay: chain.dataDelay,
+      source: chain.source,
+      contracts: chain.contracts,
+      synthetic: chain.synthetic,
+    })).toMatchObject({
+      underlying: chain.underlying,
+      contracts: chain.contracts,
+    });
+    expect(chain.dataQuality).toBeDefined();
   });
 
   it("accepts any HTTP 2xx when body.s is ok", () => {

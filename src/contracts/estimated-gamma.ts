@@ -8,6 +8,7 @@ export const GEX_METHODOLOGY_VERSION = "0.1.1";
 export const GammaAvailability = z.enum([
   "available",
   "partial",
+  "incomplete",
   "unavailable",
 ]);
 
@@ -119,6 +120,11 @@ export const GexCoverage = z.object({
   contractsUsed: z.number().int().nonnegative(),
   contractsSkipped: z.number().int().nonnegative(),
   skipReasons: z.record(z.string(), z.number().int().nonnegative()),
+  nonNullGammaCount: z.number().int().nonnegative().optional(),
+  usableGammaCount: z.number().int().nonnegative().optional(),
+  nonNullGammaCoveragePct: z.number().finite().nonnegative().optional(),
+  usableGammaCoveragePct: z.number().finite().nonnegative().optional(),
+  suspectVendorGreeksCount: z.number().int().nonnegative().optional(),
 });
 
 /**
