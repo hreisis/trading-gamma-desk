@@ -14,3 +14,4 @@ export * from "./snapshot-integrity";
 export * from "./snapshot-publish";
 export * from "./snapshot-store";
 export * from "./change";
+export * from "./structure-state";

@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 4 — Gamma snapshots / features.** **M4-3** Gamma Feature Layer: deterministic desk-ready features and `MarketStructureState` derived from M4-1 + M4-2. No UI, no live options API, no M5+ work.
+**Milestone 5 — Strategy research / replay / regime.** Deterministic replay harness and regime-conditioned studies over stored macro/gamma/catalyst snapshots. No UI, no live options API, no LLM study agent (M6).
 
 ### Queued (not started)
 
@@ -48,6 +48,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.1 | `GammaChangeSet` (M4-2A) | Snapshot envelope/structure invariants; instant-ordered baselines; O_EXCL append; `pctChange` explicit unavailable when baseline is zero |
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2B) | Same-dir temp + fsync + hard-link publication; final visible only when complete; temp cleanup on success/failure |
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2C) | Collision-safe temp names; temp cleanup on write/fsync failure; async subprocess concurrency tests |
+| 0.1.0 | `MarketStructureState` (M4-3) | Desk-ready features from matched snapshot + change set; wall corridor; directed changes; no scores/signals |
 
 ---
 
@@ -128,7 +129,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-2A | Snapshot integrity hardening | Envelope/structure invariants; instant-ordered baselines; zero-baseline pct unavailable; safe ID/path encoding; focused tests — ✅ |
 | M4-2B | Atomic snapshot publication | Same-dir temp + fsync + hard-link; no partial visibility; temp cleanup on link/idempotency/conflict — ✅ |
 | M4-2C | Atomic-publication test/failure cleanup | Async subprocess writers; concurrent reader poll; either-wins conflict; injectable write failure cleanup — ✅ |
-| M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` derived from M4-1 + M4-2; contract-valid JSON; tests; no UI / no live options API |
+| M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` from matched snapshot + change set; wall corridor; directed changes; fixture + tests; no UI / scores / signals — ✅ |
 
 **Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.
 

@@ -13,7 +13,8 @@ Fixed `OptionsChainSnapshot` documents for the Estimated Gamma Structure Engine,
 | `snapshots/SPX/2026-07-28/close_*.json` | Prior-session explicit close baseline |
 | `snapshots/SPX/2026-07-29/open_*.json` | Same-session explicit open baseline |
 | `snapshots/SPX/2026-07-29/intraday_*.json` | Current intraday snapshot for change comparisons |
+| `structure/spx.2026-07-29.intraday.market-structure-state.json` | M4-3 `MarketStructureState` derived from the three SPX snapshots above |
 
-Load chains via `FixtureOptionsChainProvider` or `loadOptionsChainFixtureFile`. Load snapshots via `FileGammaSnapshotStore` with root `fixtures/`.
+Load chains via `FixtureOptionsChainProvider` or `loadOptionsChainFixtureFile`. Load snapshots via `FileGammaSnapshotStore` with root `fixtures/`. Build structure via `buildMarketStructureState(snapshot, changeSet)`.
 
 **Strict parse (M4-1A):** malformed contract rows, invalid `dataDelay`, or invalid `asOf` / `sessionDate` / `source.fetchedAt` throw — rows are never silently dropped.

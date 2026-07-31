@@ -725,7 +725,7 @@ Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). Adapters 
 
 ## 3a. GammaHistoricalSnapshot & GammaChangeSet (M4-2)
 
-Immutable as-of gamma snapshots and deterministic change comparisons. Zod: `src/contracts/gamma-snapshot.ts`. **No** `MarketStructureState`, scores, or UI features (those are M4-3).
+Immutable as-of gamma snapshots and deterministic change comparisons. Zod: `src/contracts/gamma-snapshot.ts`. Scores / UI interpretation remain out of scope here.
 
 ```json
 {
@@ -760,43 +760,76 @@ Metrics: `spot`, `totalGex`, `gammaRegime`, `callWall`, `putWall`, `zeroDteShare
 
 ---
 
-## 3b. MarketStructureState (Gamma desk output — M4-3)
+## 3b. MarketStructureState (Gamma feature layer — M4-3)
 
-UI-facing structure state (badge, since-open, one-liner). **Not produced by M4-1/M4-2**; M4-3 will compose from `EstimatedGammaStructure` + change sets + interpretation.
+Deterministic desk-ready features derived from **one** `GammaHistoricalSnapshot` + its matching `GammaChangeSet`. Zod: `src/contracts/market-structure-state.ts`. Builder: `buildMarketStructureState` in `src/gamma/structure-state.ts`.
+
+**Not** a directional forecast, compression/amplification claim, score, probability, or AI narrative. Pair mismatch → reject.
 
 ```json
 {
   "$id": "MarketStructureState",
   "schemaVersion": "0.1.0",
-  "asOf": "2026-07-29T10:15:00-04:00",
+  "snapshotId": "SPX|2026-07-29|intraday|2026-07-29T15:00:00.000Z",
   "underlying": "SPX",
-  "structure": "positive_compressed",
-  "spot": 6425,
-  "gammaFlip": 6385,
-  "callWall": 6450,
-  "putWall": 6350,
-  "zeroGamma": 6385,
-  "expectedRange": { "low": 6391, "high": 6459 },
-  "netGex": 1.2e9,
-  "zeroDteShare": 0.41,
-  "sinceOpen": {
-    "netGexDelta": -0.15e9,
-    "flipDelta": -5,
-    "callWallDelta": 0,
-    "putWallDelta": 10
+  "sessionDate": "2026-07-29",
+  "asOf": "2026-07-29T15:00:00.000Z",
+  "captureKind": "intraday",
+  "methodologyId": "oi_gex_proxy_v1",
+  "methodologyVersion": "0.1.1",
+  "featureMethodologyId": "gamma_feature_layer_v1",
+  "featureMethodologyVersion": "0.1.0",
+  "current": {
+    "gammaRegime": "positive",
+    "spotWallCorridor": {
+      "status": "available",
+      "position": "between_walls",
+      "putWallStrike": 6300,
+      "callWallStrike": 6500,
+      "spot": 6425
+    },
+    "distanceToCallWall": {
+      "status": "available",
+      "wallStrike": 6500,
+      "spot": 6425,
+      "points": -75,
+      "pct": { "status": "available", "value": -1.1538461538461537 }
+    },
+    "distanceToPutWall": { "status": "available", "points": 125 },
+    "zeroDteShareOfGrossGex": { "status": "available", "value": 0.3 },
+    "coverageRatio": {
+      "status": "available",
+      "contractsUsed": 2,
+      "contractsIn": 2,
+      "value": 1
+    },
+    "structureStatus": "available",
+    "dataDelay": "fixture",
+    "synthetic": true,
+    "limitations": []
   },
-  "edge": [
-    "Mean reversion remains favored while SPX holds above 6385.",
-    "A sustained break below the gamma flip could expand downside volatility.",
-    "Upside is likely to slow near the 6450 call wall."
-  ],
-  "oneLineInterpretation": "Positive gamma / compressed: fade extremes above flip; watch 6450 call wall."
+  "versusPriorClose": {
+    "baseline": { "status": "available", "snapshotId": "…" },
+    "gammaRegimeTransition": { "status": "available", "changed": false },
+    "totalGexDirection": { "status": "available", "direction": "higher" },
+    "callWallShiftDirection": { "status": "available", "direction": "higher" },
+    "putWallShiftDirection": { "status": "available", "direction": "lower" },
+    "zeroDteShareOfGrossGexDirection": { "status": "available", "direction": "lower" },
+    "metrics": { "$ref": "GammaChangeMetrics" }
+  },
+  "versusSessionOpen": { "…": "same shape as versusPriorClose" }
 }
 ```
 
-Desktop primary fields map 1:1: structure badge, spot/flip/walls/range, since-open changes, one-line interpretation.
+| Field | Notes |
+| --- | --- |
+| `spotWallCorridor.position` | Exact strike compare only: `below_put_wall` \| `at_put_wall` \| `between_walls` \| `at_call_wall` \| `above_call_wall`. Unavailable if spot/walls missing or `putWall >= callWall` |
+| Wall distances | Still reported per wall when that wall + spot are available, even if corridor is unavailable |
+| `coverageRatio` | `contractsUsed / contractsIn`; unavailable when `contractsIn === 0` |
+| Directions | From exact `absoluteChange` sign: `higher` / `lower` / `unchanged`; never invented when metric unavailable |
+| Pair integrity | `currentSnapshotId`, underlying, sessionDate, asOf, captureKind, methodology/version, and source schema versions must match |
 
-**Principle encoded:** `edge` describes path/behavior conditional on levels — not naked “SPX will rally.”
+Fixture: `fixtures/gamma/structure/spx.2026-07-29.intraday.market-structure-state.json`.
 
 ---
 
