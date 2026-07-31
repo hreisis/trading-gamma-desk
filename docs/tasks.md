@@ -47,6 +47,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.0 | `GammaHistoricalSnapshot` + `GammaChangeSet` (M4-2) | Immutable as-of snapshots with explicit `captureKind`; append-only store; prior-close / session-open change metrics with explicit unavailable |
 | 0.1.1 | `GammaChangeSet` (M4-2A) | Snapshot envelope/structure invariants; instant-ordered baselines; O_EXCL append; `pctChange` explicit unavailable when baseline is zero |
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2B) | Same-dir temp + fsync + hard-link publication; final visible only when complete; temp cleanup on success/failure |
+| 0.1.0 | `GammaHistoricalSnapshot` store (M4-2C) | Collision-safe temp names; temp cleanup on write/fsync failure; async subprocess concurrency tests |
 
 ---
 
@@ -125,7 +126,8 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-1B | Contract cleanup | Bump `EstimatedGammaStructure` / methodology to 0.1.1; `shareOfGrossGex` [0,1] + float tolerance; fixture missing→null / malformed→throw with path — ✅ |
 | M4-2 | Historical Snapshot & Change Engine | Immutable as-of gamma snapshots; prior-close and since-open comparisons; explicit `unavailable` when baseline missing; no overwrite of prior snapshots, no hindsight fill; fixture path + tests; no UI / no live options API — ✅ |
 | M4-2A | Snapshot integrity hardening | Envelope/structure invariants; instant-ordered baselines; zero-baseline pct unavailable; safe ID/path encoding; focused tests — ✅ |
-| M4-2B | Atomic snapshot publication | Same-dir temp + fsync + hard-link; no partial visibility; temp cleanup; worker-thread concurrency tests — ✅ |
+| M4-2B | Atomic snapshot publication | Same-dir temp + fsync + hard-link; no partial visibility; temp cleanup on link/idempotency/conflict — ✅ |
+| M4-2C | Atomic-publication test/failure cleanup | Async subprocess writers; concurrent reader poll; either-wins conflict; injectable write failure cleanup — ✅ |
 | M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` derived from M4-1 + M4-2; contract-valid JSON; tests; no UI / no live options API |
 
 **Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.

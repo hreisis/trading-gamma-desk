@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -15,10 +16,17 @@ export interface SnapshotPublishContext {
   readonly finalPath: string;
 }
 
+/** Injectable hooks for temp-file write failures (tests only). */
+export interface SnapshotTempWriteHooks {
+  afterOpen?: (ctx: { readonly tempPath: string; readonly fd: number }) => void;
+  beforeFsync?: (ctx: { readonly tempPath: string; readonly fd: number }) => void;
+}
+
 /** Test-only hooks; production callers omit. */
 export interface SnapshotPublishHooks {
   afterTempWrite?: (ctx: SnapshotPublishContext) => void;
   beforeLink?: (ctx: SnapshotPublishContext) => void;
+  tempWrite?: SnapshotTempWriteHooks;
 }
 
 export type AtomicPublishResult =
@@ -27,6 +35,18 @@ export type AtomicPublishResult =
 
 function isNodeError(err: unknown): err is NodeJS.ErrnoException {
   return err instanceof Error && "code" in err;
+}
+
+function uniqueTempSuffix(): string {
+  return `${process.pid}.${Date.now()}.${randomBytes(8).toString("hex")}`;
+}
+
+export function buildSnapshotTempPath(finalPath: string): string {
+  const dir = dirname(finalPath);
+  return join(
+    dir,
+    `.${basename(finalPath)}.tmp.${uniqueTempSuffix()}`,
+  );
 }
 
 export function cleanupSnapshotTempFile(tempPath: string): void {
@@ -39,26 +59,38 @@ export function cleanupSnapshotTempFile(tempPath: string): void {
 
 /**
  * Write the full payload to a same-directory exclusive temp file, fsync, and close.
+ * Removes the temp file when write/fsync/close fails before returning.
  */
 export function writeSnapshotTempFile(
   finalPath: string,
   payload: string,
+  hooks?: SnapshotTempWriteHooks,
 ): string {
   const dir = dirname(finalPath);
-  const tempPath = join(
-    dir,
-    `.${basename(finalPath)}.tmp.${process.pid}.${Date.now()}`,
-  );
+  const tempPath = buildSnapshotTempPath(finalPath);
   mkdirSync(dir, { recursive: true });
 
-  const fd = openSync(tempPath, "wx");
+  let fd: number | null = null;
   try {
+    fd = openSync(tempPath, "wx");
+    hooks?.afterOpen?.({ tempPath, fd });
     writeSync(fd, payload, undefined, "utf8");
+    hooks?.beforeFsync?.({ tempPath, fd });
     fsyncSync(fd);
-  } finally {
     closeSync(fd);
+    fd = null;
+    return tempPath;
+  } catch (err) {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        // ignore close errors during failure cleanup
+      }
+    }
+    cleanupSnapshotTempFile(tempPath);
+    throw err;
   }
-  return tempPath;
 }
 
 /**
@@ -74,7 +106,7 @@ export function publishSnapshotAtomically(
 
   let tempPath: string | null = null;
   try {
-    tempPath = writeSnapshotTempFile(finalPath, payload);
+    tempPath = writeSnapshotTempFile(finalPath, payload, hooks?.tempWrite);
     const ctx: SnapshotPublishContext = { tempPath, finalPath };
 
     hooks?.afterTempWrite?.(ctx);
