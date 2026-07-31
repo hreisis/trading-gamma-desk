@@ -33,7 +33,7 @@ Core logic:
 1. **Deterministic compute first.** Features, scores, GEX, replay statistics, and contract validation run as pure, auditable code — no LLM in the calculation path.
 2. **LLM is constrained interpretation.** Study narratives, briefs, and decision support consume **precomputed evidence** only; outputs are schema-validated and guardrailed; failures fall back to rule-based text.
 3. **Scores are not probabilities until calibrated.** Confidence and similar 0–100 outputs are audit numbers while `calibrated` is `false`; UI must not imply P(up) or high/medium/low bands without outcome-linked calibration.
-4. **Public vs private boundary.** The public repo/demo ships synthetic fixtures, methodology, and read-only desk surfaces. **Private thresholds, portfolio holdings, allocation rules, and policy weights never ship in the public bundle** — they live in gitignored local config and drive Decide/Review for the operator only.
+4. **Public vs private boundary.** This public repo contains **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio holdings, allocation policy, and decision logs live in a **separate private repository** — `.gitignore` here is secondary local protection, not the primary boundary.
 
 ---
 
@@ -55,14 +55,14 @@ Shipped work (M1–M3) established macro regime, catalyst evidence, and desk UI 
 
 | Milestone | Theme | Outcome |
 | --- | --- | --- |
-| **M4** | Gamma snapshots / features | Deterministic GEX engine, session gamma features, structure state for the desk |
+| **M4** | Gamma snapshots / features | M4-1 GEX engine (✅); M4-2 immutable as-of snapshots + prior-close/open change engine; M4-3 desk-ready features + `MarketStructureState` |
 | **M5** | Strategy research / replay / regime | Historical replay, regime-conditioned studies, evidence tables — still deterministic |
 | **M6** | Constrained LLM study agent | LLM organizes cited evidence into study briefs and decision memos; no math in the model |
-| **M7** | Private portfolio policy | Gitignored policy: thresholds, sizing, allocation rules, instrument universe |
+| **M7** | Private portfolio policy | Separate private repo: thresholds, sizing, allocation rules, instrument universe |
 | **M8** | Minimal decision interface | One surface for Evaluate → Decide: stance, constraints, evidence bullets, explicit uncertainty |
-| **M9** | Shadow mode / review loop | Log decisions vs outcomes; feed Review; optional calibration and policy adjustment |
+| **M9** | Shadow mode / review loop | Decision logs in private repo; compare to outcomes; optional calibration feed |
 
-M4–M6 are **product path**, not post-MVP backlog. M7–M9 require the private boundary above.
+M4–M6 are **product path**, not post-MVP backlog. M7–M9 require the **separate private repository** boundary above.
 
 ---
 
@@ -94,12 +94,12 @@ Non-negotiable product principles:
 ### In (through M9)
 
 - Cross-asset macro, catalyst evidence chain (M1–M3, shipped)
-- Gamma structure engine and desk-ready features (M4)
+- Gamma GEX engine, historical snapshots, change comparisons, and desk-ready features (M4)
 - Deterministic strategy replay and regime studies (M5)
 - Evidence-grounded, guardrailed LLM study agent (M6)
-- Private portfolio policy layer (M7)
+- Private portfolio policy layer (M7 — separate private repo)
 - Minimal decision UI (M8)
-- Shadow logging and review loop (M9)
+- Shadow logging and review loop (M9 — decision logs in private repo)
 
 ### Out (unless explicitly replanned)
 

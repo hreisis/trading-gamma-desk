@@ -4,12 +4,13 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 4 — Gamma snapshots / features.** **M4-2** gamma feature snapshots and desk-ready structure derivation from the M4-1 GEX engine. No UI, no live options API, no M5+ work.
+**Milestone 4 — Gamma snapshots / features.** **M4-2** Historical Snapshot & Change Engine: immutable as-of snapshots, prior-close/open comparisons, explicit unavailable baselines, no overwrite or hindsight. No UI, no live options API, no M5+ work.
 
 ### Queued (not started)
 
 | Item | Notes |
 | --- | --- |
+| **M4-3 Gamma Feature Layer** | Deterministic desk-ready features and `MarketStructureState` derived from M4-1 + M4-2; fixture path; no UI / no live options API |
 | **Market Temperature (experimental)** | Deterministic 0–100 risk-on/risk-off summary derived from the canonical snapshot, displayed separately from Signal Confidence, with a five-session trend. Spec only — do not implement until scheduled. |
 | **Catalyst → regime linkage** | Later milestone — do not mix catalyst direction into DominantDriver confidence in M2-1. |
 
@@ -120,9 +121,10 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
 | M4-1A | GEX correctness hardening | OI=0/gamma=0 valid; gross GEX near-zero + 0DTE share; strict fixture parse; partial if wall missing; no fabricated all-zero walls; documented wall tie-break — ✅ |
 | M4-1B | Contract cleanup | Bump `EstimatedGammaStructure` / methodology to 0.1.1; `shareOfGrossGex` [0,1] + float tolerance; fixture missing→null / malformed→throw with path — ✅ |
-| M4-2 | Gamma feature snapshots | Session gamma feature snapshots + `MarketStructureState` derivation from M4-1 output; fixture path; contract-valid JSON; tests; no UI / no live options API |
+| M4-2 | Historical Snapshot & Change Engine | Immutable as-of gamma snapshots; prior-close and since-open comparisons; explicit `unavailable` when baseline missing; no overwrite of prior snapshots, no hindsight fill; fixture path + tests; no UI / no live options API |
+| M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` derived from M4-1 + M4-2; contract-valid JSON; tests; no UI / no live options API |
 
-**Exit criteria (M4):** Fixture path produces versioned gamma snapshots and a desk-ready structure state; compute remains deterministic and separate from LLM.
+**Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.
 
 ---
 
@@ -154,11 +156,11 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| M7-1 | Policy contract (gitignored) | Thresholds, sizing, allocation rules, instrument universe — local only |
+| M7-1 | Policy contract (private repo) | Thresholds, sizing, allocation rules, instrument universe — separate private repository, not this repo |
 | M7-2 | Policy evaluator | Pure function: evidence + policy → allowed stance/constraints; no LLM |
-| M7-3 | Public boundary tests | Public demo/build never bundles or reads private policy paths |
+| M7-3 | Public boundary tests | Public repo/build contains only contracts, methodology, interfaces, synthetic examples; never bundles or reads private policy |
 
-**Exit criteria (M7):** Decide stage runs against gitignored policy; public repo remains portfolio-safe.
+**Exit criteria (M7):** Decide stage runs against policy in the private repo; public repo remains portfolio-safe.
 
 ---
 
@@ -178,11 +180,11 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| M9-1 | Decision log | Append-only local log: inputs, stance, timestamp; gitignored |
+| M9-1 | Decision log (private repo) | Append-only log in separate private repository: inputs, stance, timestamp |
 | M9-2 | Outcome compare | Review step compares log to subsequent snapshots; deterministic diff |
 | M9-3 | Calibration feed | Optional hooks for outcome-linked score review (does not auto-set `calibrated: true`) |
 
-**Exit criteria (M9):** Full Observe → … → Review loop demonstrable on fixtures + shadow log.
+**Exit criteria (M9):** Full Observe → … → Review loop demonstrable on fixtures + shadow log in private repo.
 
 ---
 
