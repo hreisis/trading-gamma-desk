@@ -8,7 +8,7 @@ Module chain (deterministic compute → interpreted outputs): **Driver → Catal
 
 **Shipped (M1–M3):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC). UI renders precomputed payloads — it does not classify markets or recompute scores.
 
-**In progress (M4+):** gamma snapshots and features (M4-1 ✅; **M4-2** historical snapshot & change engine; **M4-3** gamma feature layer queued), strategy replay/regime studies (M5), constrained LLM study agent (M6), private portfolio policy (M7), minimal decision interface (M8), shadow mode/review loop (M9). Deterministic calculations stay separate from LLM reasoning; **scores are not probabilities** until outcome-linked calibration.
+**In progress (M4+):** gamma snapshots and features (M4-1…M4-2 ✅; **M4-3** gamma feature layer current), strategy replay/regime studies (M5), constrained LLM study agent (M6), private portfolio policy (M7), minimal decision interface (M8), shadow mode/review loop (M9). Deterministic calculations stay separate from LLM reasoning; **scores are not probabilities** until outcome-linked calibration.
 
 **Public vs private:** this repo ships **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio data, allocation policy, and decision logs live in a **separate private repository** (`.gitignore` here is secondary local protection, not the primary boundary).
 
@@ -262,7 +262,7 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 | **M1** Macro (M1-11) | ✅ |
 | **M2** Catalyst / events (M2-5B; Alpaca live smoke deferred) | ✅ |
 | **M3** Catalyst UI + risk lights (M3-1.5) | ✅ |
-| **M4** Gamma snapshots / features (M4-1, M4-1A, M4-1B ✅; **M4-2 current**; M4-3 queued) | 🔄 |
+| **M4** Gamma snapshots / features (M4-1…M4-2 ✅; **M4-3 current**) | 🔄 |
 | **M5** Strategy research / replay / regime | Planned |
 | **M6** Constrained LLM study agent | Planned |
 | **M7** Private portfolio policy | Planned |

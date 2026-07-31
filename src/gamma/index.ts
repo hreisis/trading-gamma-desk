@@ -6,3 +6,8 @@ export * from "./gex";
 export * from "./aggregate";
 export * from "./share";
 export * from "./compute";
+export * from "./snapshot-id";
+export * from "./capture";
+export * from "./deep-equal";
+export * from "./snapshot-store";
+export * from "./change";

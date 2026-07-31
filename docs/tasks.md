@@ -4,13 +4,12 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 4 — Gamma snapshots / features.** **M4-2** Historical Snapshot & Change Engine: immutable as-of snapshots, prior-close/open comparisons, explicit unavailable baselines, no overwrite or hindsight. No UI, no live options API, no M5+ work.
+**Milestone 4 — Gamma snapshots / features.** **M4-3** Gamma Feature Layer: deterministic desk-ready features and `MarketStructureState` derived from M4-1 + M4-2. No UI, no live options API, no M5+ work.
 
 ### Queued (not started)
 
 | Item | Notes |
 | --- | --- |
-| **M4-3 Gamma Feature Layer** | Deterministic desk-ready features and `MarketStructureState` derived from M4-1 + M4-2; fixture path; no UI / no live options API |
 | **Market Temperature (experimental)** | Deterministic 0–100 risk-on/risk-off summary derived from the canonical snapshot, displayed separately from Signal Confidence, with a five-session trend. Spec only — do not implement until scheduled. |
 | **Catalyst → regime linkage** | Later milestone — do not mix catalyst direction into DominantDriver confidence in M2-1. |
 
@@ -45,6 +44,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.2.2 | Flags split into `insufficientHistory`, `missingAdjacentSession`, `repeatedPrints`, `invalidPrice`; `gapSkipped` removed | These fail for different reasons and need different fixes; `gapSkipped` also implied bridging a gap was acceptable |
 | 0.2.2 | `window.validCount` may be shorter than `length`, with `sessionDates` matching `validCount` | An insufficient-history feature was literally unrepresentable under 0.2.1, which surfaced while implementing M1-3 |
 | 0.1.1 | `EstimatedGammaStructure` + `oi_gex_proxy_v1` methodology | Renamed `zeroDte.shareOfAbsStrikeGex` → `shareOfGrossGex` (gross 0DTE / gross total); Zod validates [0, 1]; fixture provider returns null for missing files, throws on malformed parse |
+| 0.1.0 | `GammaHistoricalSnapshot` + `GammaChangeSet` (M4-2) | Immutable as-of snapshots with explicit `captureKind`; append-only store; prior-close / session-open change metrics with explicit unavailable |
 
 ---
 
@@ -121,7 +121,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
 | M4-1A | GEX correctness hardening | OI=0/gamma=0 valid; gross GEX near-zero + 0DTE share; strict fixture parse; partial if wall missing; no fabricated all-zero walls; documented wall tie-break — ✅ |
 | M4-1B | Contract cleanup | Bump `EstimatedGammaStructure` / methodology to 0.1.1; `shareOfGrossGex` [0,1] + float tolerance; fixture missing→null / malformed→throw with path — ✅ |
-| M4-2 | Historical Snapshot & Change Engine | Immutable as-of gamma snapshots; prior-close and since-open comparisons; explicit `unavailable` when baseline missing; no overwrite of prior snapshots, no hindsight fill; fixture path + tests; no UI / no live options API |
+| M4-2 | Historical Snapshot & Change Engine | Immutable as-of gamma snapshots; prior-close and since-open comparisons; explicit `unavailable` when baseline missing; no overwrite of prior snapshots, no hindsight fill; fixture path + tests; no UI / no live options API — ✅ |
 | M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` derived from M4-1 + M4-2; contract-valid JSON; tests; no UI / no live options API |
 
 **Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.

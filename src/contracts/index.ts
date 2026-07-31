@@ -13,3 +13,4 @@ export * from "./integration-smoke";
 export * from "./catalyst-update";
 export * from "./catalyst-feed";
 export * from "./estimated-gamma";
+export * from "./gamma-snapshot";

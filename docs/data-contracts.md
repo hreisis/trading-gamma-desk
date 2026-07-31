@@ -723,9 +723,46 @@ Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). Adapters 
 
 ---
 
-## 3b. MarketStructureState (Gamma desk output — later)
+## 3a. GammaHistoricalSnapshot & GammaChangeSet (M4-2)
 
-UI-facing structure state (badge, since-open, one-liner). **Not produced by M4-1**; will compose from `EstimatedGammaStructure` + interpretation in a later milestone.
+Immutable as-of gamma snapshots and deterministic change comparisons. Zod: `src/contracts/gamma-snapshot.ts`. **No** `MarketStructureState`, scores, or UI features (those are M4-3).
+
+```json
+{
+  "$id": "GammaHistoricalSnapshot",
+  "schemaVersion": "0.1.0",
+  "snapshotId": "SPX|2026-07-29|intraday|2026-07-29T15:00:00.000Z",
+  "captureKind": "intraday",
+  "capturedAt": "2026-07-29T15:00:00.000Z",
+  "underlying": "SPX",
+  "sessionDate": "2026-07-29",
+  "asOf": "2026-07-29T15:00:00.000Z",
+  "structureSchemaVersion": "0.1.1",
+  "methodologyId": "oi_gex_proxy_v1",
+  "methodologyVersion": "0.1.1",
+  "structure": { "$ref": "EstimatedGammaStructure" }
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `captureKind` | **Required explicit** `open` \| `intraday` \| `close` — never inferred from clock time |
+| `snapshotId` | Stable: `underlying\|sessionDate\|captureKind\|asOf` |
+| `structure` | Full M4-1 `EstimatedGammaStructure` payload |
+| Storage | Append-only: same ID + same payload → idempotent; same ID + different payload → reject; never overwrite |
+
+`GammaChangeSet` compares the current snapshot against:
+
+1. **latest earlier-session explicit close** (compatible underlying / schema / methodology; not future)
+2. **same-session explicit open** (same filters)
+
+Metrics: `spot`, `totalGex`, `gammaRegime`, `callWall`, `putWall`, `zeroDteShareOfGrossGex`. Missing baselines or values → `status: unavailable` + `reason`. `pctChange` is `null` when the baseline numeric value is 0.
+
+---
+
+## 3b. MarketStructureState (Gamma desk output — M4-3)
+
+UI-facing structure state (badge, since-open, one-liner). **Not produced by M4-1/M4-2**; M4-3 will compose from `EstimatedGammaStructure` + change sets + interpretation.
 
 ```json
 {

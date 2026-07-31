@@ -1,0 +1,95 @@
+{
+  "kind": "GammaHistoricalSnapshot",
+  "schemaVersion": "0.1.0",
+  "snapshotId": "SPX|2026-07-29|open|2026-07-29T13:30:00.000Z",
+  "captureKind": "open",
+  "capturedAt": "2026-07-29T13:30:00.000Z",
+  "underlying": "SPX",
+  "sessionDate": "2026-07-29",
+  "asOf": "2026-07-29T13:30:00.000Z",
+  "structureSchemaVersion": "0.1.1",
+  "methodologyId": "oi_gex_proxy_v1",
+  "methodologyVersion": "0.1.1",
+  "structure": {
+    "kind": "EstimatedGammaStructure",
+    "schemaVersion": "0.1.1",
+    "underlying": "SPX",
+    "asOf": "2026-07-29T13:30:00.000Z",
+    "sessionDate": "2026-07-29",
+    "spot": 6410,
+    "dataDelay": "fixture",
+    "source": {
+      "provider": "fixture",
+      "name": "fixtures/gamma/snapshots/session-open",
+      "fetchedAt": "2026-07-29T13:30:00.000Z"
+    },
+    "methodology": {
+      "id": "oi_gex_proxy_v1",
+      "version": "0.1.1",
+      "formula": "unsignedUnitGex = gamma * openInterest * multiplier * spot^2 * 0.01; callGex = +unsignedUnitGex; putGex = -unsignedUnitGex; totalGex = sum(callGex)+sum(putGex); grossGex = sum(|callGex|+|putGex|)",
+      "assumptions": [
+        "Puts are signed negative by convention in this OI-based proxy — not verified dealer positioning."
+      ]
+    },
+    "status": "available",
+    "limitations": [],
+    "totalGex": 1100000000,
+    "gammaRegime": "positive",
+    "callWall": { "status": "available", "strike": 6450, "gex": 420000000 },
+    "putWall": { "status": "available", "strike": 6350, "gex": -280000000 },
+    "gammaFlip": {
+      "status": "unavailable",
+      "reason": "Requires recomputing gamma from spot, IV, rates, and time-to-expiry rather than interpolating strike GEX"
+    },
+    "byStrike": [
+      {
+        "strike": 6350,
+        "callGex": 0,
+        "putGex": -280000000,
+        "netGex": -280000000,
+        "callOpenInterest": 0,
+        "putOpenInterest": 900,
+        "callContractsUsed": 0,
+        "putContractsUsed": 1
+      },
+      {
+        "strike": 6450,
+        "callGex": 420000000,
+        "putGex": 0,
+        "netGex": 420000000,
+        "callOpenInterest": 1300,
+        "putOpenInterest": 0,
+        "callContractsUsed": 1,
+        "putContractsUsed": 0
+      }
+    ],
+    "byExpiry": [
+      {
+        "expiry": "2026-07-29",
+        "status": "available",
+        "callGex": 420000000,
+        "putGex": -280000000,
+        "netGex": 140000000,
+        "contractsUsed": 2,
+        "contractsSkipped": 0
+      }
+    ],
+    "zeroDte": {
+      "status": "available",
+      "sessionDate": "2026-07-29",
+      "expiry": "2026-07-29",
+      "callGex": 420000000,
+      "putGex": -280000000,
+      "netGex": 140000000,
+      "shareOfGrossGex": 0.35,
+      "contractsUsed": 2
+    },
+    "coverage": {
+      "contractsIn": 2,
+      "contractsUsed": 2,
+      "contractsSkipped": 0,
+      "skipReasons": {}
+    },
+    "synthetic": true
+  }
+}
