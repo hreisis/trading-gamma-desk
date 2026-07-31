@@ -1,6 +1,6 @@
 import type { DominantDriver } from "@/contracts";
 import type { CatalystFeed as CatalystFeedDto } from "@/contracts";
-import type { MacroDeskView } from "@/desk";
+import type { BoundedGammaDeskView, MacroDeskView } from "@/desk";
 import {
   assetDisplayName,
   confidenceComponentLabel,
@@ -20,6 +20,7 @@ import {
 import { CatalystFeed } from "./CatalystFeed";
 import { DeskChrome } from "./DeskChrome";
 import { DeskStatusBanners } from "./DeskStatusBanners";
+import { GammaDesk } from "./gamma/GammaDesk";
 import { RiskTrafficLight } from "./RiskTrafficLight";
 
 function DriverBody({
@@ -250,9 +251,11 @@ function DriverBody({
 export function MacroDesk({
   view,
   catalystFeed,
+  gammaView,
 }: {
   view: MacroDeskView;
   catalystFeed?: CatalystFeedDto | null;
+  gammaView?: BoundedGammaDeskView | null;
 }) {
   if (view.status === "live_unavailable") {
     return (
@@ -279,6 +282,7 @@ export function MacroDesk({
     return (
       <DeskChrome>
         <DeskStatusBanners view={view} />
+        {gammaView ? <GammaDesk view={gammaView} /> : null}
         <section className="desk-state" data-testid="state-empty">
           <h1 className="desk-title">No macro driver</h1>
           <p className="desk-interpretation">
@@ -294,6 +298,7 @@ export function MacroDesk({
     return (
       <DeskChrome>
         <DeskStatusBanners view={view} />
+        {gammaView ? <GammaDesk view={gammaView} /> : null}
         <section
           className="desk-state"
           data-testid={`state-${view.status}`}
@@ -319,6 +324,7 @@ export function MacroDesk({
   return (
     <DeskChrome>
       <DeskStatusBanners view={view} />
+      {gammaView ? <GammaDesk view={gammaView} /> : null}
       <div data-testid={`state-${view.status}`}>
         <DriverBody
           driver={view.driver}

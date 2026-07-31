@@ -8,7 +8,7 @@ Module chain (deterministic compute → interpreted outputs): **Driver → Catal
 
 **Shipped (M1–M3):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC). UI renders precomputed payloads — it does not classify markets or recompute scores.
 
-**In progress (M4+):** gamma snapshots and features (M4-1…M4-3 ✅); bounded MarketData.app gamma provider (`npm run gamma:fetch`, M4-3B ✅ — no UI yet); strategy research / replay (M5-1A ✅; **M5-1B** current), constrained LLM study agent (M6), private portfolio policy (M7), minimal decision interface (M8), shadow mode/review loop (M9). Deterministic calculations stay separate from LLM reasoning; **scores are not probabilities** until outcome-linked calibration.
+**In progress (M4+):** gamma snapshots and features (M4-1…M4-3 ✅); bounded MarketData.app gamma provider (`npm run gamma:fetch`, M4-3B ✅) + Gamma Desk UI v1 (M4-4 ✅); strategy research / replay (M5-1A ✅; **M5-1B** current), constrained LLM study agent (M6), private portfolio policy (M7), minimal decision interface (M8), shadow mode/review loop (M9). Deterministic calculations stay separate from LLM reasoning; **scores are not probabilities** until outcome-linked calibration.
 
 **Public vs private:** this repo ships **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio data, allocation policy, and decision logs live in a **separate private repository** (`.gitignore` here is secondary local protection, not the primary boundary).
 

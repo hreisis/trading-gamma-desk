@@ -748,6 +748,8 @@ Credit-bounded, single-expiry MarketData.app → Gamma Engine derived snapshot f
 
 Env: `MARKETDATA_API_TOKEN` (alias `MARKETDATA_APP_TOKEN`). Default safety cap: estimated contracts `strikeCount × 2` ≤ **250** unless `--allow-above-cap`.
 
+**Desk UI (M4-4):** read-only Structure·Gamma section loads this snapshot via `loadBoundedGammaDeskView` (filesystem or `fixtures/gamma/providers/marketdata-app/spy-bounded-ui.json`). Never calls MarketData.app; walls labeled **Bounded Call/Put Wall** only.
+
 ---
 
 ## 3a. GammaHistoricalSnapshot & GammaChangeSet (M4-2)

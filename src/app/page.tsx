@@ -1,6 +1,6 @@
 import { MacroDesk } from "@/app/components/MacroDesk";
 import { loadCatalystFeed, toPublicCatalystFeed } from "@/catalyst";
-import { resolveDeskRequest } from "@/desk";
+import { loadBoundedGammaDeskView, resolveDeskRequest } from "@/desk";
 
 /** Always resolve at request time (env + query). */
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; gamma?: string }>;
 }) {
   const params = await searchParams;
   const view = resolveDeskRequest({ source: params.source });
@@ -19,5 +19,13 @@ export default async function Home({
       ? null
       : toPublicCatalystFeed(loadCatalystFeed());
 
-  return <MacroDesk view={view} catalystFeed={catalystFeed} />;
+  const gammaView = loadBoundedGammaDeskView({
+    symbol: "SPY",
+    forceFixture: params.gamma === "fixture",
+    publicDemo: view.isPublicDemo,
+  });
+
+  return (
+    <MacroDesk view={view} catalystFeed={catalystFeed} gammaView={gammaView} />
+  );
 }

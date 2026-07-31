@@ -5,4 +5,6 @@ export * from "./atomic-write";
 export * from "./pipeline-status";
 export * from "./public-demo";
 export * from "./load-macro-desk";
+export * from "./load-bounded-gamma";
+export * from "./format-gamma";
 export * from "./resolve-desk-request";

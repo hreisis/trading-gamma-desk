@@ -1,0 +1,912 @@
+{
+  "kind": "BoundedGammaProviderSnapshot",
+  "schemaVersion": "0.1.0",
+  "symbol": "SPY",
+  "source": {
+    "provider": "marketdata_app",
+    "name": "fixtures/gamma/providers/marketdata-app/spy-bounded-ui.json",
+    "fetchedAt": "2026-07-30T20:05:00.000Z"
+  },
+  "generatedAt": "2026-07-30T20:05:00.000Z",
+  "vendorAsOf": "2026-07-30T20:00:00.000Z",
+  "vendorUpdatedMin": "2026-07-30T20:00:00.000Z",
+  "vendorUpdatedMax": "2026-07-30T20:00:00.000Z",
+  "sessionDate": "2026-07-30",
+  "expiration": "2026-07-31",
+  "dte": 1,
+  "zeroDte": {
+    "status": "unavailable",
+    "sessionDate": "2026-07-30",
+    "callGex": null,
+    "putGex": null,
+    "netGex": null,
+    "shareOfGrossGex": null,
+    "contractsUsed": 0,
+    "reason": "No contracts with expiry equal to sessionDate"
+  },
+  "spot": 741.63,
+  "strikeRequest": {
+    "min": 700,
+    "max": 780,
+    "step": 1,
+    "strikeCount": 81,
+    "estimatedMaxContracts": 162
+  },
+  "strikeReturned": {
+    "min": 700,
+    "max": 780
+  },
+  "scope": "bounded_single_expiry",
+  "httpStatus": 203,
+  "credits": {
+    "consumed": null,
+    "remaining": null
+  },
+  "status": "incomplete",
+  "limitations": [
+    "BOUNDED single-expiry strike sample — not full-chain market walls. Call/Put walls are boundedCallWall/boundedPutWall only.",
+    "Puts are signed negative by convention in this OI-based proxy — not verified dealer positioning.",
+    "Gamma and open interest are taken from the provider-neutral chain as reported; M4-1 does not recompute Black–Scholes gamma from IV.",
+    "OI=0 and gamma=0 are valid (contribute zero GEX). Missing, negative, or non-finite OI/gamma, expired contracts, and invalid strike/multiplier/spot are excluded.",
+    "Call wall = strike maximizing call GEX among strikes with callGex > 0; ties break to the lowest strike. Put wall = strike minimizing put GEX among strikes with putGex < 0; ties break to the highest strike. All-zero GEX does not fabricate walls.",
+    "Near-zero regime uses |totalGex| / grossGex where grossGex = Σ(|callGex|+|putGex|). 0DTE share = gross 0DTE GEX / gross total GEX (no clamping).",
+    "Gamma Flip is not estimated via strike interpolation; requires a future path that recomputes gamma from spot, IV, rates, and time-to-expiry.",
+    "GEX is an amplifier/compressor structure estimate — not a directional buy/sell signal for the underlying.",
+    "22 contract(s) excluded (see coverage.skipReasons).",
+    "22 contract(s) with positive OI excluded as suspect_vendor_greeks (vendor gamma=0 with collapsed delta/IV). Original vendor Greeks preserved in chain.dataQuality audit.",
+    "Put wall incomplete: Suspect vendor Greeks excluded from this side — wall may be incomplete"
+  ],
+  "totalGex": -4035998112.1934204,
+  "grossGex": 11491294134.14556,
+  "gammaRegime": "negative",
+  "boundedCallWall": {
+    "status": "available",
+    "strike": 745,
+    "gex": 561655025.5491747,
+    "scope": "bounded_single_expiry"
+  },
+  "boundedPutWall": {
+    "status": "incomplete",
+    "strike": 743,
+    "gex": -2349942630.695592,
+    "reason": "Suspect vendor Greeks excluded from this side — wall may be incomplete",
+    "scope": "bounded_single_expiry"
+  },
+  "byStrike": [
+    {
+      "strike": 700,
+      "callGex": 18356422.51500336,
+      "putGex": -14321732.063607719,
+      "netGex": 4034690.451395642,
+      "callOpenInterest": 6544,
+      "putOpenInterest": 43398,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 701,
+      "callGex": 982381.89312909,
+      "putGex": -752750.60687334,
+      "netGex": 229631.28625575,
+      "callOpenInterest": 337,
+      "putOpenInterest": 2281,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 702,
+      "callGex": 1076929.4814101998,
+      "putGex": -2450977.09655778,
+      "netGex": -1374047.6151475804,
+      "callOpenInterest": 356,
+      "putOpenInterest": 6366,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 703,
+      "callGex": 729979.9835176801,
+      "putGex": -5541181.692244741,
+      "netGex": -4811201.708727061,
+      "callOpenInterest": 237,
+      "putOpenInterest": 11194,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 704,
+      "callGex": 685868.7759542998,
+      "putGex": -4785681.010086901,
+      "netGex": -4099812.234132601,
+      "callOpenInterest": 215,
+      "putOpenInterest": 8701,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 705,
+      "callGex": 3026182.8430637997,
+      "putGex": -10024024.4120025,
+      "netGex": -6997841.5689387005,
+      "callOpenInterest": 917,
+      "putOpenInterest": 18225,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 706,
+      "callGex": 1386037.9433880001,
+      "putGex": -4660442.581630771,
+      "netGex": -3274404.638242771,
+      "callOpenInterest": 400,
+      "putOpenInterest": 7703,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 707,
+      "callGex": 940250.73977055,
+      "putGex": -3637964.59085367,
+      "netGex": -2697713.8510831203,
+      "callOpenInterest": 263,
+      "putOpenInterest": 6013,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 708,
+      "callGex": 1415078.73839232,
+      "putGex": -1738487.5918495199,
+      "netGex": -323408.8534571999,
+      "callOpenInterest": 384,
+      "putOpenInterest": 2634,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 709,
+      "callGex": 595831.31113977,
+      "putGex": -7902396.33151644,
+      "netGex": -7306565.02037667,
+      "callOpenInterest": 157,
+      "putOpenInterest": 11052,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 710,
+      "callGex": 4658792.53646007,
+      "putGex": -25045705.637021165,
+      "netGex": -20386913.100561097,
+      "callOpenInterest": 1193,
+      "putOpenInterest": 35028,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 711,
+      "callGex": 1591413.5656344602,
+      "putGex": -4306727.89853838,
+      "netGex": -2715314.3329039197,
+      "callOpenInterest": 391,
+      "putOpenInterest": 5593,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 712,
+      "callGex": 1537347.0855411899,
+      "putGex": -13728375.820224,
+      "netGex": -12191028.73468281,
+      "callOpenInterest": 363,
+      "putOpenInterest": 16640,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 713,
+      "callGex": 1716046.977528,
+      "putGex": -2435961.68550441,
+      "netGex": -719914.7079764099,
+      "callOpenInterest": 390,
+      "putOpenInterest": 2331,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 714,
+      "callGex": 2077131.86238285,
+      "putGex": -15808532.7654198,
+      "netGex": -13731400.90303695,
+      "callOpenInterest": 455,
+      "putOpenInterest": 14371,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 715,
+      "callGex": 3780253.4860737,
+      "putGex": -64484260.28450721,
+      "netGex": -60704006.798433505,
+      "callOpenInterest": 790,
+      "putOpenInterest": 55829,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 716,
+      "callGex": 2682973.4475581995,
+      "putGex": -21427266.58068744,
+      "netGex": -18744293.133129243,
+      "callOpenInterest": 542,
+      "putOpenInterest": 17708,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 717,
+      "callGex": 3265714.40034375,
+      "putGex": -6622621.29712152,
+      "netGex": -3356906.89677777,
+      "callOpenInterest": 625,
+      "putOpenInterest": 5017,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 718,
+      "callGex": 958346.23514256,
+      "putGex": -16873031.90654406,
+      "netGex": -15914685.671401499,
+      "callOpenInterest": 176,
+      "putOpenInterest": 11799,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 719,
+      "callGex": 6577245.054927271,
+      "putGex": -23219325.63907902,
+      "netGex": -16642080.584151749,
+      "callOpenInterest": 1161,
+      "putOpenInterest": 13618,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 720,
+      "callGex": 21027680.64184959,
+      "putGex": -106456404.29009743,
+      "netGex": -85428723.64824784,
+      "callOpenInterest": 3573,
+      "putOpenInterest": 56927,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 721,
+      "callGex": 4132043.11646694,
+      "putGex": -7730131.615695358,
+      "netGex": -3598088.4992284183,
+      "callOpenInterest": 659,
+      "putOpenInterest": 3904,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 722,
+      "callGex": 2996482.0299912,
+      "putGex": -18648535.511722952,
+      "netGex": -15652053.481731752,
+      "callOpenInterest": 454,
+      "putOpenInterest": 7885,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 723,
+      "callGex": 2127568.2431005803,
+      "putGex": -8990876.129121542,
+      "netGex": -6863307.886020962,
+      "callOpenInterest": 307,
+      "putOpenInterest": 3478,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 724,
+      "callGex": 2004694.8793891198,
+      "putGex": -60591418.71628608,
+      "netGex": -58586723.836896956,
+      "callOpenInterest": 272,
+      "putOpenInterest": 19672,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 725,
+      "callGex": 15473903.60480184,
+      "putGex": -167607738.3343077,
+      "netGex": -152133834.72950587,
+      "callOpenInterest": 2024,
+      "putOpenInterest": 46882,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 726,
+      "callGex": 4914494.53641288,
+      "putGex": -46679777.879103,
+      "netGex": -41765283.34269012,
+      "callOpenInterest": 612,
+      "putOpenInterest": 11316,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 727,
+      "callGex": 3136405.8604665603,
+      "putGex": -21499428.55615272,
+      "netGex": -18363022.69568616,
+      "callOpenInterest": 352,
+      "putOpenInterest": 4392,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 728,
+      "callGex": 6089876.713008179,
+      "putGex": -26020002.308813814,
+      "netGex": -19930125.595805634,
+      "callOpenInterest": 667,
+      "putOpenInterest": 4463,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 729,
+      "callGex": 6497217.86414832,
+      "putGex": -42812237.00349926,
+      "netGex": -36315019.13935094,
+      "callOpenInterest": 642,
+      "putOpenInterest": 6129,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 730,
+      "callGex": 40999002.36541703,
+      "putGex": -254978785.15449223,
+      "netGex": -213979782.7890752,
+      "callOpenInterest": 3672,
+      "putOpenInterest": 30701,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 731,
+      "callGex": 15887019.914039433,
+      "putGex": -29298367.055466272,
+      "netGex": -13411347.141426839,
+      "callOpenInterest": 1307,
+      "putOpenInterest": 2943,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 732,
+      "callGex": 49751776.976406574,
+      "putGex": -39430799.43518376,
+      "netGex": 10320977.54122281,
+      "callOpenInterest": 4093,
+      "putOpenInterest": 3319,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 733,
+      "callGex": 22494955.80914172,
+      "putGex": -361063324.2646195,
+      "netGex": -338568368.45547783,
+      "callOpenInterest": 1733,
+      "putOpenInterest": 25643,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 734,
+      "callGex": 42422771.341708384,
+      "putGex": -109992011.078862,
+      "netGex": -67569239.73715362,
+      "callOpenInterest": 2978,
+      "putOpenInterest": 6600,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 735,
+      "callGex": 98193088.0782432,
+      "putGex": -442013220.303025,
+      "netGex": -343820132.2247818,
+      "callOpenInterest": 6376,
+      "putOpenInterest": 22448,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 736,
+      "callGex": 60893926.99758108,
+      "putGex": -99833672.9899645,
+      "netGex": -38939745.99238342,
+      "callOpenInterest": 3666,
+      "putOpenInterest": 4332,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 737,
+      "callGex": 57391706.12277033,
+      "putGex": -99954896.30850527,
+      "netGex": -42563190.185734935,
+      "callOpenInterest": 3191,
+      "putOpenInterest": 3724,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 738,
+      "callGex": 104630299.2996837,
+      "putGex": -164782750.9990579,
+      "netGex": -60152451.699374184,
+      "callOpenInterest": 5389,
+      "putOpenInterest": 5312,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 739,
+      "callGex": 121118815.679949,
+      "putGex": -176719947.78498134,
+      "netGex": -55601132.10503234,
+      "callOpenInterest": 5795,
+      "putOpenInterest": 4966,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 740,
+      "callGex": 461648317.8223095,
+      "putGex": -2056399814.8340843,
+      "netGex": -1594751497.0117748,
+      "callOpenInterest": 20572,
+      "putOpenInterest": 50799,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 741,
+      "callGex": 129057017.99166964,
+      "putGex": -199593643.9623044,
+      "netGex": -70536625.97063477,
+      "callOpenInterest": 5419,
+      "putOpenInterest": 4388,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 742,
+      "callGex": 217122073.81065053,
+      "putGex": -451688315.1629301,
+      "netGex": -234566241.35227954,
+      "callOpenInterest": 8638,
+      "putOpenInterest": 8985,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 743,
+      "callGex": 111659436.72536004,
+      "putGex": -2349942630.695592,
+      "netGex": -2238283193.970232,
+      "callOpenInterest": 4292,
+      "putOpenInterest": 43597,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 744,
+      "callGex": 163823964.75186983,
+      "putGex": -171149945.30375507,
+      "netGex": -7325980.551885247,
+      "callOpenInterest": 6154,
+      "putOpenInterest": 3172,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 745,
+      "callGex": 561655025.5491747,
+      "putGex": 0,
+      "netGex": 561655025.5491747,
+      "callOpenInterest": 21230,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 746,
+      "callGex": 163070664.1299396,
+      "putGex": 0,
+      "netGex": 163070664.1299396,
+      "callOpenInterest": 6376,
+      "putOpenInterest": 2411,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 747,
+      "callGex": 126342033.66779983,
+      "putGex": 0,
+      "netGex": 126342033.66779983,
+      "callOpenInterest": 5305,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 748,
+      "callGex": 161479800.57936206,
+      "putGex": 0,
+      "netGex": 161479800.57936206,
+      "callOpenInterest": 7606,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 749,
+      "callGex": 102239658.85486786,
+      "putGex": 0,
+      "netGex": 102239658.85486786,
+      "callOpenInterest": 5702,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 750,
+      "callGex": 311033844.68598413,
+      "putGex": 0,
+      "netGex": 311033844.68598413,
+      "callOpenInterest": 21834,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 751,
+      "callGex": 64686720.8269521,
+      "putGex": 0,
+      "netGex": 64686720.8269521,
+      "callOpenInterest": 5970,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 752,
+      "callGex": 59654413.06535125,
+      "putGex": 0,
+      "netGex": 59654413.06535125,
+      "callOpenInterest": 7638,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 753,
+      "callGex": 24195877.37260497,
+      "putGex": 0,
+      "netGex": 24195877.37260497,
+      "callOpenInterest": 4271,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 754,
+      "callGex": 31904063.387530018,
+      "putGex": 0,
+      "netGex": 31904063.387530018,
+      "callOpenInterest": 7946,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 755,
+      "callGex": 170907388.6636622,
+      "putGex": 0,
+      "netGex": 170907388.6636622,
+      "callOpenInterest": 57543,
+      "putOpenInterest": 325,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 756,
+      "callGex": 17194185.69826797,
+      "putGex": 0,
+      "netGex": 17194185.69826797,
+      "callOpenInterest": 8449,
+      "putOpenInterest": 161,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 757,
+      "callGex": 15130254.197250722,
+      "putGex": 0,
+      "netGex": 15130254.197250722,
+      "callOpenInterest": 8336,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 758,
+      "callGex": 10193979.0645846,
+      "putGex": 0,
+      "netGex": 10193979.0645846,
+      "callOpenInterest": 6178,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 759,
+      "callGex": 9783447.826114442,
+      "putGex": 0,
+      "netGex": 9783447.826114442,
+      "callOpenInterest": 6588,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 760,
+      "callGex": 23178734.527879804,
+      "putGex": 0,
+      "netGex": 23178734.527879804,
+      "callOpenInterest": 22180,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 761,
+      "callGex": 8424140.61449178,
+      "putGex": 0,
+      "netGex": 8424140.61449178,
+      "callOpenInterest": 8509,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 762,
+      "callGex": 7874455.566625921,
+      "putGex": 0,
+      "netGex": 7874455.566625921,
+      "callOpenInterest": 8948,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 763,
+      "callGex": 2299337.94537045,
+      "putGex": 0,
+      "netGex": 2299337.94537045,
+      "callOpenInterest": 2787,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 764,
+      "callGex": 3182497.12223478,
+      "putGex": 0,
+      "netGex": 3182497.12223478,
+      "callOpenInterest": 4133,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 765,
+      "callGex": 8859092.5214883,
+      "putGex": 0,
+      "netGex": 8859092.5214883,
+      "callOpenInterest": 12390,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 766,
+      "callGex": 2012395.09018572,
+      "putGex": 0,
+      "netGex": 2012395.09018572,
+      "callOpenInterest": 3049,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 767,
+      "callGex": 1120490.67391668,
+      "putGex": 0,
+      "netGex": 1120490.67391668,
+      "callOpenInterest": 1852,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 768,
+      "callGex": 1275374.91393972,
+      "putGex": 0,
+      "netGex": 1275374.91393972,
+      "callOpenInterest": 2108,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 769,
+      "callGex": 656717.9779385999,
+      "putGex": 0,
+      "netGex": 656717.9779385999,
+      "callOpenInterest": 1194,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 770,
+      "callGex": 5522701.186332899,
+      "putGex": 0,
+      "netGex": 5522701.186332899,
+      "callOpenInterest": 10041,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 771,
+      "callGex": 1895901.9011343,
+      "putGex": 0,
+      "netGex": 1895901.9011343,
+      "callOpenInterest": 3830,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 772,
+      "callGex": 1103385.20564709,
+      "putGex": 0,
+      "netGex": 1103385.20564709,
+      "callOpenInterest": 2229,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 773,
+      "callGex": 444852.17802072,
+      "putGex": 0,
+      "netGex": 444852.17802072,
+      "callOpenInterest": 1011,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 774,
+      "callGex": 544734.91235376,
+      "putGex": 0,
+      "netGex": 544734.91235376,
+      "callOpenInterest": 1238,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 775,
+      "callGex": 2104082.60017095,
+      "putGex": 0,
+      "netGex": 2104082.60017095,
+      "callOpenInterest": 5465,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 776,
+      "callGex": 370765.14985629,
+      "putGex": 0,
+      "netGex": 370765.14985629,
+      "callOpenInterest": 963,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 777,
+      "callGex": 442762.1208045,
+      "putGex": 0,
+      "netGex": 442762.1208045,
+      "callOpenInterest": 1150,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    },
+    {
+      "strike": 778,
+      "callGex": 259387.10083403997,
+      "putGex": 0,
+      "netGex": 259387.10083403997,
+      "callOpenInterest": 786,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 779,
+      "callGex": 868253.76882234,
+      "putGex": 0,
+      "netGex": 868253.76882234,
+      "callOpenInterest": 2631,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 1
+    },
+    {
+      "strike": 780,
+      "callGex": 2201820.27578208,
+      "putGex": 0,
+      "netGex": 2201820.27578208,
+      "callOpenInterest": 6672,
+      "putOpenInterest": 0,
+      "callContractsUsed": 1,
+      "putContractsUsed": 0
+    }
+  ],
+  "byExpiry": [
+    {
+      "expiry": "2026-07-31",
+      "status": "incomplete",
+      "callGex": 3727648010.9760737,
+      "putGex": -7763646123.169494,
+      "netGex": -4035998112.19342,
+      "contractsUsed": 140,
+      "contractsSkipped": 22
+    }
+  ],
+  "coverage": {
+    "contractsIn": 162,
+    "contractsUsed": 140,
+    "contractsSkipped": 22,
+    "skipReasons": {
+      "suspect_vendor_greeks": 22
+    },
+    "nonNullGammaCount": 162,
+    "usableGammaCount": 140,
+    "nonNullGammaCoveragePct": 100,
+    "usableGammaCoveragePct": 86.42,
+    "suspectVendorGreeksCount": 22
+  },
+  "synthetic": true
+}
