@@ -6,11 +6,13 @@ import {
   MarketStructureState,
   ReplayCorpus,
   ReplayRun,
+  type Catalyst,
   type ReplayCorpus as ReplayCorpusDto,
   type ReplayMacroArtifact,
 } from "@/contracts";
 import {
   ReplayCorpusError,
+  ReplayCatalystAdapterError,
   buildReplayRun,
   catalystArtifactFromCatalyst,
   macroArtifactFromDominantDriver,
@@ -173,7 +175,7 @@ describe("M5-1A point-in-time replay foundation", () => {
     });
   });
 
-  it("rejects duplicate identities with conflicting payloads", () => {
+  it("rejects duplicate identities including identical payloads", () => {
     const corpus = loadCorpus();
     const conflicting: ReplayMacroArtifact = {
       ...corpus.macro[0]!,
@@ -184,14 +186,14 @@ describe("M5-1A point-in-time replay foundation", () => {
         ...corpus,
         macro: [...corpus.macro, conflicting],
       }),
-    ).toThrow(ReplayCorpusError);
+    ).toThrow(/macro conflict: artifactId .* has conflicting payloads/);
 
     expect(() =>
       validateReplayCorpus({
         ...corpus,
         macro: [...corpus.macro, { ...corpus.macro[0]! }],
       }),
-    ).not.toThrow();
+    ).toThrow(/macro duplicate: artifactId .* appears more than once/);
   });
 
   it("is deterministic and does not mutate inputs", () => {
@@ -279,31 +281,35 @@ describe("M5-1A point-in-time replay foundation", () => {
 });
 
 describe("M5-1A catalyst adapter publication time", () => {
+  const baseCatalyst = {
+    schemaVersion: "0.1.0" as const,
+    id: "c1",
+    occurredAt: "2026-07-15T08:30:00-04:00",
+    observedAt: "2026-07-15T08:31:00-04:00",
+    sourceType: "calendar" as const,
+    sourceName: "test",
+    sourceUrl: null,
+    headline: "h",
+    summary: "s",
+    category: "inflation" as const,
+    importance: "high" as const,
+    status: "released" as const,
+    affectedAssets: ["US10Y" as const],
+    macroChannels: ["inflation" as const],
+    direction: "unclear" as const,
+    confidence: {
+      score: 50,
+      calibrated: false,
+      note: "classification clarity only — not a market direction probability",
+    },
+    evidence: [{ id: "e1", statement: "st", basis: "b" }],
+    dedupeKey: "d1",
+    synthetic: true,
+  } satisfies Catalyst;
+
   it("uses releaseResult.observedAt when present", () => {
     const artifact = catalystArtifactFromCatalyst({
-      schemaVersion: "0.1.0",
-      id: "c1",
-      occurredAt: "2026-07-15T08:30:00-04:00",
-      observedAt: "2026-07-15T08:31:00-04:00",
-      sourceType: "calendar",
-      sourceName: "test",
-      sourceUrl: null,
-      headline: "h",
-      summary: "s",
-      category: "inflation",
-      importance: "high",
-      status: "released",
-      affectedAssets: ["US10Y"],
-      macroChannels: ["inflation"],
-      direction: "unclear",
-      confidence: {
-        score: 50,
-        calibrated: false,
-        note: "classification clarity only — not a market direction probability",
-      },
-      evidence: [{ id: "e1", statement: "st", basis: "b" }],
-      dedupeKey: "d1",
-      synthetic: true,
+      ...baseCatalyst,
       releaseResult: {
         referencePeriod: "2026-06",
         observedAt: "2026-07-15T12:30:00.000Z",
@@ -325,5 +331,51 @@ describe("M5-1A catalyst adapter publication time", () => {
       },
     });
     expect(artifact.publishedAt).toBe("2026-07-15T12:30:00.000Z");
+  });
+
+  it("rejects upcoming scheduled-only catalysts without released evidence", () => {
+    expect(() =>
+      catalystArtifactFromCatalyst({
+        ...baseCatalyst,
+        status: "upcoming",
+      }),
+    ).toThrow(ReplayCatalystAdapterError);
+    expect(() =>
+      catalystArtifactFromCatalyst({
+        ...baseCatalyst,
+        status: "upcoming",
+      }),
+    ).toThrow(/upcoming\/scheduled-only catalyst lacks explicit released evidence/);
+  });
+
+  it("requires explicit publishedAt for non-release catalyst types", () => {
+    const newsCatalyst = {
+      ...baseCatalyst,
+      id: "news-1",
+      sourceType: "news" as const,
+      status: "released" as const,
+    };
+
+    expect(() => catalystArtifactFromCatalyst(newsCatalyst)).toThrow(
+      ReplayCatalystAdapterError,
+    );
+    expect(() => catalystArtifactFromCatalyst(newsCatalyst)).toThrow(
+      /explicit publication timestamp required/,
+    );
+
+    const artifact = catalystArtifactFromCatalyst(newsCatalyst, {
+      publishedAt: "2026-07-15T14:00:00.000Z",
+    });
+    expect(artifact.publishedAt).toBe("2026-07-15T14:00:00.000Z");
+  });
+
+  it("never derives publishedAt from occurredAt or observedAt", () => {
+    expect(() =>
+      catalystArtifactFromCatalyst({
+        ...baseCatalyst,
+        occurredAt: "2026-07-15T08:30:00-04:00",
+        observedAt: "2026-07-15T09:00:00-04:00",
+      }),
+    ).toThrow(/explicit publication timestamp required/);
   });
 });

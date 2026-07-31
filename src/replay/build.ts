@@ -35,22 +35,14 @@ function assertUniqueArtifacts<T extends { artifactId: string }>(
       continue;
     }
     if (deepEqualJson(prior, artifact)) {
-      continue;
+      throw new ReplayCorpusError(
+        `${label} duplicate: artifactId ${artifact.artifactId} appears more than once`,
+      );
     }
     throw new ReplayCorpusError(
       `${label} conflict: artifactId ${artifact.artifactId} has conflicting payloads`,
     );
   }
-}
-
-function dedupeById<T extends { artifactId: string }>(
-  artifacts: readonly T[],
-): T[] {
-  const map = new Map<string, T>();
-  for (const a of artifacts) {
-    map.set(a.artifactId, a);
-  }
-  return [...map.values()];
 }
 
 /**
@@ -61,12 +53,7 @@ export function validateReplayCorpus(corpus: ReplayCorpusDto): ReplayCorpusDto {
   assertUniqueArtifacts("macro", parsed.macro);
   assertUniqueArtifacts("marketStructure", parsed.marketStructure);
   assertUniqueArtifacts("catalystEvidence", parsed.catalystEvidence);
-  return {
-    ...parsed,
-    macro: dedupeById(parsed.macro),
-    marketStructure: dedupeById(parsed.marketStructure),
-    catalystEvidence: dedupeById(parsed.catalystEvidence),
-  };
+  return parsed;
 }
 
 function isMacroCompatible(

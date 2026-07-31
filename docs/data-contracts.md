@@ -879,10 +879,11 @@ Point-in-time frames over **stored** macro, market-structure, and catalyst-evide
 | --- | --- |
 | Eligibility | Artifact instant ≤ `evaluationAt` (parsed UTC ms — never ISO string order) |
 | Macro / structure | `availableAt` |
-| Catalyst | `publishedAt` only (release/publication — future catalysts excluded) |
+| Catalyst | `publishedAt` only (explicit release/publication — never `occurredAt` or ingestion time) |
 | Selection | Latest compatible eligible artifact; ties break by `artifactId` |
 | Missing / incompatible | Explicit `unavailable` + reason |
-| Identities | Duplicate id + different payload → reject; same payload → idempotent dedupe |
+| Identities | Duplicate `artifactId` in any source collection → reject (identical or conflicting payloads; errors are distinct) |
+| Catalyst adapter | `releaseResult.observedAt` when present; else explicit adapter `publishedAt`; reject upcoming/scheduled-only without released evidence |
 | Output | Frames in chronological `evaluationAt` order; deterministic; inputs not mutated |
 
 Fixtures: `fixtures/replay/corpus.m51a.json`, `fixtures/replay/run.m51a.json`.
