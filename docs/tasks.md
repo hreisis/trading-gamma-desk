@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 4 — Gamma structure.** **M4-1A** GEX correctness hardening on the M4-1 engine. No UI, no live options API, no Macro/Catalyst coupling.
+**Milestone 4 — Gamma structure.** **M4-1B** contract cleanup (schema/methodology bump + fixture error semantics). No UI, no live options API.
 
 ### Queued (not started)
 
@@ -43,6 +43,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.2.2 | `effectiveBreadth` denominator is exposure-weighted over scored blocks, never a fixed block count; `confidenceDetail` gains `blocksScored` and `exposureTotal` | Charging a signature for blocks it places no weight on penalised evidence it never claimed, and missing data was being counted twice |
 | 0.2.2 | Flags split into `insufficientHistory`, `missingAdjacentSession`, `repeatedPrints`, `invalidPrice`; `gapSkipped` removed | These fail for different reasons and need different fixes; `gapSkipped` also implied bridging a gap was acceptable |
 | 0.2.2 | `window.validCount` may be shorter than `length`, with `sessionDates` matching `validCount` | An insufficient-history feature was literally unrepresentable under 0.2.1, which surfaced while implementing M1-3 |
+| 0.1.1 | `EstimatedGammaStructure` + `oi_gex_proxy_v1` methodology | Renamed `zeroDte.shareOfAbsStrikeGex` → `shareOfGrossGex` (gross 0DTE / gross total); Zod validates [0, 1]; fixture provider returns null for missing files, throws on malformed parse |
 
 ---
 
@@ -118,6 +119,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | --- | --- | --- |
 | M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
 | M4-1A | GEX correctness hardening | OI=0/gamma=0 valid; gross GEX near-zero + 0DTE share; strict fixture parse; partial if wall missing; no fabricated all-zero walls; documented wall tie-break — ✅ |
+| M4-1B | Contract cleanup | Bump `EstimatedGammaStructure` / methodology to 0.1.1; `shareOfGrossGex` [0,1] + float tolerance; fixture missing→null / malformed→throw with path — ✅ |
 
 ### Deferred out of Milestone 1
 

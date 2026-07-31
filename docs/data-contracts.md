@@ -677,7 +677,7 @@ OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positio
 ```json
 {
   "$id": "EstimatedGammaStructure",
-  "schemaVersion": "0.1.0",
+  "schemaVersion": "0.1.1",
   "underlying": "SPX",
   "asOf": "2026-07-29T14:30:00.000Z",
   "sessionDate": "2026-07-29",
@@ -686,7 +686,7 @@ OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positio
   "source": { "provider": "fixture", "name": "…", "fetchedAt": "…" },
   "methodology": {
     "id": "oi_gex_proxy_v1",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "formula": "unsignedUnitGex = gamma * openInterest * multiplier * spot^2 * 0.01; callGex = +unsignedUnitGex; putGex = -unsignedUnitGex; totalGex = sum(callGex)+sum(putGex)",
     "assumptions": [
       "Puts are signed negative by convention in this OI-based proxy — not verified dealer positioning."
@@ -716,6 +716,7 @@ OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positio
 | `status` | `available` \| `partial` \| `unavailable` |
 | `gammaRegime` | `positive` \| `negative` \| `near_zero` \| `unavailable` |
 | `gammaFlip` | **Contract reserved.** M4-1 always `unavailable` — no strike-interpolation fake level |
+| `zeroDte.shareOfGrossGex` | Gross 0DTE / gross total; **0.1.1+** validated in `[0, 1]` (was `shareOfAbsStrikeGex` in 0.1.0) |
 | `zeroDte` | `unavailable` when chain has no expiry equal to `sessionDate` |
 
 Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). Adapters (MarketData.app, Tradier, …) are out of M4-1; fixtures only.

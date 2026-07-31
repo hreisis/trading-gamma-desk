@@ -4,4 +4,5 @@ export * from "./fixture-provider";
 export * from "./methodology";
 export * from "./gex";
 export * from "./aggregate";
+export * from "./share";
 export * from "./compute";

@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { IsoDate, IsoDateTime } from "./common";
 
-export const ESTIMATED_GAMMA_SCHEMA_VERSION = "0.1.0";
+export const ESTIMATED_GAMMA_SCHEMA_VERSION = "0.1.1";
 export const GEX_METHODOLOGY_ID = "oi_gex_proxy_v1";
-export const GEX_METHODOLOGY_VERSION = "0.1.0";
+export const GEX_METHODOLOGY_VERSION = "0.1.1";
 
 export const GammaAvailability = z.enum([
   "available",
@@ -74,9 +74,21 @@ export const ZeroDteGexBreakdown = z.object({
   netGex: z.number().finite().nullable(),
   /**
    * Gross 0DTE GEX / gross total GEX, where gross = Σ(|callGex|+|putGex|).
-   * Null when gross total is 0 or 0DTE unavailable. Not clamped.
+   * Null when gross total is 0 or 0DTE unavailable. Validated in [0, 1].
    */
-  shareOfGrossGex: z.number().finite().nonnegative().nullable(),
+  shareOfGrossGex: z
+    .number()
+    .finite()
+    .nullable()
+    .superRefine((v, ctx) => {
+      if (v === null) return;
+      if (v < 0 || v > 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: "shareOfGrossGex must be in [0, 1]",
+        });
+      }
+    }),
   contractsUsed: z.number().int().nonnegative(),
   reason: z.string().optional(),
 });

@@ -243,6 +243,8 @@ describe("computeEstimatedGammaStructure", () => {
     expect(out.gammaFlip.status).toBe("unavailable");
     expect(out.dataDelay).toBe("fixture");
     expect(out.methodology.id).toBe("oi_gex_proxy_v1");
+    expect(out.methodology.version).toBe("0.1.1");
+    expect(out.schemaVersion).toBe("0.1.1");
     expect(EstimatedGammaStructure.safeParse(out).success).toBe(true);
   });
 

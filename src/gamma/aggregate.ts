@@ -7,6 +7,7 @@ import type {
 } from "@/contracts";
 import { NEAR_ZERO_GROSS_SHARE } from "./methodology";
 import { grossGex } from "./gex";
+import { normalizeShareOfGrossGex } from "./share";
 import type { ContractGexContribution } from "./types";
 
 export function aggregateByStrike(
@@ -216,7 +217,8 @@ export function deriveZeroDte(
 
   const grossTotal = grossGex(byStrike);
   const grossZeroDte = Math.abs(slice.callGex) + Math.abs(slice.putGex);
-  const share = grossTotal > 0 ? grossZeroDte / grossTotal : null;
+  const shareRaw = grossTotal > 0 ? grossZeroDte / grossTotal : null;
+  const share = shareRaw === null ? null : normalizeShareOfGrossGex(shareRaw);
 
   return {
     status: slice.status,

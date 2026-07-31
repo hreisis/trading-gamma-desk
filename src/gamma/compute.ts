@@ -1,5 +1,6 @@
 import {
   EstimatedGammaStructure,
+  ESTIMATED_GAMMA_SCHEMA_VERSION,
   type EstimatedGammaStructure as EstimatedGammaStructureDto,
 } from "@/contracts";
 import {
@@ -77,7 +78,7 @@ export function computeEstimatedGammaStructure(
 
   const result: EstimatedGammaStructureDto = {
     kind: "EstimatedGammaStructure",
-    schemaVersion: "0.1.0",
+    schemaVersion: ESTIMATED_GAMMA_SCHEMA_VERSION,
     underlying: chain.underlying,
     asOf: chain.asOf,
     sessionDate: chain.sessionDate,
