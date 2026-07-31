@@ -732,6 +732,22 @@ Provider-neutral input: `OptionsChainSnapshot` (`src/gamma/types.ts`). MarketDat
 
 Fixtures: `fixtures/gamma/providers/marketdata-app/spy-greek-boundary.json`.
 
+### BoundedGammaProviderSnapshot (MarketData.app CLI provider)
+
+Credit-bounded, single-expiry MarketData.app → Gamma Engine derived snapshot for upcoming Structure UI. Zod: `src/contracts/bounded-gamma-provider.ts`. CLI: `npm run gamma:fetch`. **Not** part of `npm run daily`. **Not** full-chain walls.
+
+| Field | Notes |
+| --- | --- |
+| `scope` | Always `bounded_single_expiry` |
+| `vendorAsOf` / `vendorUpdatedMin` / `vendorUpdatedMax` | From vendor `updated` unix timestamps — never wall-clock evaluation time |
+| `sessionDate` / `dte` | Derived from vendor asOf (America/New_York) vs requested `expiration` |
+| `boundedCallWall` / `boundedPutWall` | Engine walls + `scope: bounded_single_expiry` — not unqualified market walls |
+| `status` | Same engine semantics: `available` \| `incomplete` \| `partial` \| `unavailable` |
+| Credits | `credits.consumed` / `credits.remaining` from vendor rate-limit headers when present |
+| Persistence | `data/gamma/providers/marketdata-app/{SYMBOL}-bounded-latest.json` (gitignored); write only on success |
+
+Env: `MARKETDATA_API_TOKEN` (alias `MARKETDATA_APP_TOKEN`). Default safety cap: estimated contracts `strikeCount × 2` ≤ **250** unless `--allow-above-cap`.
+
 ---
 
 ## 3a. GammaHistoricalSnapshot & GammaChangeSet (M4-2)

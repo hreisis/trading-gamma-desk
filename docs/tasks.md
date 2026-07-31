@@ -131,6 +131,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-2B | Atomic snapshot publication | Same-dir temp + fsync + hard-link; no partial visibility; temp cleanup on link/idempotency/conflict — ✅ |
 | M4-2C | Atomic-publication test/failure cleanup | Async subprocess writers; concurrent reader poll; either-wins conflict; injectable write failure cleanup — ✅ |
 | M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` from matched snapshot + change set; wall corridor; directed changes; fixture + tests; no UI / scores / signals — ✅ |
+| M4-3B | Bounded MarketData.app Gamma provider | Credit-capped CLI `npm run gamma:fetch` (one symbol / one expiry / explicit strikes); normalize + Greek quality + engine → `BoundedGammaProviderSnapshot`; mocked tests only; no UI / no daily integration — ✅ |
 
 **Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.
 
