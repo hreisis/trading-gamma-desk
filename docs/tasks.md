@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 5 — Strategy research / replay / regime.** Deterministic replay harness and regime-conditioned studies over stored macro/gamma/catalyst snapshots. No UI, no live options API, no LLM study agent (M6).
+**Milestone 5 — Strategy research / replay / regime.** **M5-1B** replay integrity hardening (follow-on to M5-1A PIT frames). No returns/outcomes, no regime studies (M5-2), no UI / live API / LLM.
 
 ### Queued (not started)
 
@@ -49,6 +49,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2B) | Same-dir temp + fsync + hard-link publication; final visible only when complete; temp cleanup on success/failure |
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2C) | Collision-safe temp names; temp cleanup on write/fsync failure; async subprocess concurrency tests |
 | 0.1.0 | `MarketStructureState` (M4-3) | Desk-ready features from matched snapshot + change set; wall corridor; directed changes; no scores/signals |
+| 0.1.0 | `ReplayCorpus` + `ReplayRun` (M5-1A) | Point-in-time frames from stored macro/structure/catalyst artifacts; instant-ordered eligibility; no lookahead |
 
 ---
 
@@ -139,7 +140,9 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| M5-1 | Replay harness | Deterministic replay over stored macro/gamma/catalyst snapshots; no LLM |
+| M5-1A | Point-in-time replay foundation | Versioned `ReplayCorpus` / `ReplayFrame` / `ReplayRun`; latest compatible eligible artifact per source; catalyst only after publishedAt; instant ordering; no lookahead; fixture + tests — ✅ |
+| M5-1B | Replay integrity hardening | Follow-on hardening for PIT frames (current) |
+| M5-1 | Replay harness | Parent track — M5-1A ✅; remaining via M5-1B |
 | M5-2 | Regime-conditioned studies | Rule-based regime buckets + summary statistics; explicit methodology version |
 | M5-3 | Study fixtures | Contract-valid replay outputs checked into `fixtures/` for tests |
 

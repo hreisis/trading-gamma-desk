@@ -833,6 +833,62 @@ Fixture: `fixtures/gamma/structure/spx.2026-07-29.intraday.market-structure-stat
 
 ---
 
+## 3c. ReplayCorpus & ReplayRun (M5-1A)
+
+Point-in-time frames over **stored** macro, market-structure, and catalyst-evidence artifacts. Zod: `src/contracts/replay.ts`. Builder: `buildReplayRun` in `src/replay/build.ts`.
+
+**No** returns, outcomes, regime buckets, scores, or strategy conclusions.
+
+```json
+{
+  "$id": "ReplayRun",
+  "schemaVersion": "0.1.0",
+  "methodologyId": "pit_replay_v1",
+  "methodologyVersion": "0.1.0",
+  "runId": "m51a-fixture",
+  "frames": [
+    {
+      "kind": "ReplayFrame",
+      "frameId": "frame|m51a-fixture|2026-07-29T12:30:00.000Z",
+      "evaluationAt": "2026-07-29T12:30:00.000Z",
+      "macro": {
+        "status": "available",
+        "artifactId": "macro|2026-07-28|2026-07-29T08:15:00-04:00",
+        "availableAt": "2026-07-29T08:15:00-04:00",
+        "schemaVersion": "0.2.2",
+        "synthetic": true,
+        "sourceStatus": "fed_rates",
+        "limitations": []
+      },
+      "marketStructure": {
+        "status": "unavailable",
+        "reason": "market_structure: no artifact available at or before evaluationAt"
+      },
+      "catalystEvidence": {
+        "status": "available",
+        "artifactId": "catalyst|syn-cpi-2026-07-15",
+        "availableAt": "2026-07-15T08:30:00-04:00",
+        "catalystId": "syn-cpi-2026-07-15"
+      }
+    }
+  ]
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| Eligibility | Artifact instant ≤ `evaluationAt` (parsed UTC ms — never ISO string order) |
+| Macro / structure | `availableAt` |
+| Catalyst | `publishedAt` only (release/publication — future catalysts excluded) |
+| Selection | Latest compatible eligible artifact; ties break by `artifactId` |
+| Missing / incompatible | Explicit `unavailable` + reason |
+| Identities | Duplicate id + different payload → reject; same payload → idempotent dedupe |
+| Output | Frames in chronological `evaluationAt` order; deterministic; inputs not mutated |
+
+Fixtures: `fixtures/replay/corpus.m51a.json`, `fixtures/replay/run.m51a.json`.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json
