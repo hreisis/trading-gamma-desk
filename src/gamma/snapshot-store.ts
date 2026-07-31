@@ -1,13 +1,9 @@
 import {
-  closeSync,
   existsSync,
-  mkdirSync,
-  openSync,
   readdirSync,
   readFileSync,
-  writeSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import {
   GammaHistoricalSnapshot,
   type GammaHistoricalSnapshot as GammaHistoricalSnapshotDto,
@@ -20,6 +16,10 @@ import {
   parseGammaSnapshotId,
 } from "./snapshot-id";
 import { assertGammaSnapshotInvariants } from "./snapshot-integrity";
+import {
+  publishSnapshotAtomically,
+  type SnapshotPublishHooks,
+} from "./snapshot-publish";
 
 export type AppendSnapshotResult =
   | { readonly outcome: "written"; readonly path: string }
@@ -39,19 +39,18 @@ export class GammaSnapshotConflictError extends Error {
   }
 }
 
-function isNodeError(err: unknown): err is NodeJS.ErrnoException {
-  return err instanceof Error && "code" in err;
-}
-
 /**
  * Append-only filesystem store for gamma historical snapshots.
  *
  * - same ID + same payload → idempotent
  * - same ID + different payload → reject (never overwrite)
- * - exclusive create (O_EXCL) prevents concurrent overwrite races
+ * - temp write + fsync + hard-link publication (final visible only when complete)
  */
 export class FileGammaSnapshotStore {
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    private readonly hooks?: SnapshotPublishHooks,
+  ) {}
 
   snapshotPath(snapshot: GammaHistoricalSnapshotDto): string {
     return join(
@@ -92,26 +91,16 @@ export class FileGammaSnapshotStore {
     const path = this.snapshotPath(parsed);
     const payload = JSON.stringify(parsed, null, 2) + "\n";
 
-    mkdirSync(dirname(path), { recursive: true });
-
-    try {
-      const fd = openSync(path, "wx");
-      try {
-        writeSync(fd, payload);
-      } finally {
-        closeSync(fd);
-      }
+    const published = publishSnapshotAtomically(path, payload, this.hooks);
+    if (published.outcome === "published") {
       return { outcome: "written", path };
-    } catch (err) {
-      if (isNodeError(err) && err.code === "EEXIST") {
-        const existing = this.readFile(path);
-        if (deepEqualJson(existing, parsed)) {
-          return { outcome: "idempotent", path };
-        }
-        throw new GammaSnapshotConflictError(parsed.snapshotId, path);
-      }
-      throw err;
     }
+
+    const existing = this.readFile(path);
+    if (deepEqualJson(existing, parsed)) {
+      return { outcome: "idempotent", path };
+    }
+    throw new GammaSnapshotConflictError(parsed.snapshotId, path);
   }
 
   list(filter?: {
@@ -134,7 +123,7 @@ export class FileGammaSnapshotStore {
         if (!session.isDirectory()) continue;
         const sDir = join(uDir, session.name);
         for (const file of readdirSync(sDir)) {
-          if (!file.endsWith(".json")) continue;
+          if (!file.endsWith(".json") || file.startsWith(".")) continue;
           out.push(this.readFile(join(sDir, file)));
         }
       }

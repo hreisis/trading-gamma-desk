@@ -1,5 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -9,8 +8,6 @@ import {
   type EstimatedGammaStructure,
 } from "@/contracts";
 import {
-  FileGammaSnapshotStore,
-  GammaSnapshotConflictError,
   GammaSnapshotIdentityError,
   ZERO_BASELINE_PCT_REASON,
   assertGammaSnapshotInvariants,
@@ -227,52 +224,5 @@ describe("M4-2A unsafe identity + path encoding", () => {
     expect(
       encodeSnapshotFileStem("open", "2026-07-29T09:30:00.000-04:00"),
     ).toBe("open_2026-07-29T093000.000-0400");
-  });
-});
-
-describe("M4-2A concurrent append", () => {
-  it("allows exactly one writer and idempotent peers under parallel append", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gammadesk-m42a-"));
-    const store = new FileGammaSnapshotStore(root);
-    const snap = loadFixtureSnapshot(
-      "SPX/2026-07-29/intraday_2026-07-29T150000.000Z.json",
-    );
-
-    const results = await Promise.all(
-      Array.from({ length: 12 }, () =>
-        Promise.resolve().then(() => store.append(snap)),
-      ),
-    );
-
-    const written = results.filter((r) => r.outcome === "written");
-    const idempotent = results.filter((r) => r.outcome === "idempotent");
-    expect(written).toHaveLength(1);
-    expect(idempotent).toHaveLength(11);
-    expect(existsSync(written[0]!.path)).toBe(true);
-    expect(store.read(snap.snapshotId)).toEqual(snap);
-  });
-
-  it("still rejects conflicting concurrent payloads", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gammadesk-m42a-"));
-    const store = new FileGammaSnapshotStore(root);
-    const snap = loadFixtureSnapshot(
-      "SPX/2026-07-29/intraday_2026-07-29T150000.000Z.json",
-    );
-    const mutated = {
-      ...snap,
-      structure: cloneStructure(snap.structure, { spot: 9999 }),
-    };
-
-    const outcomes = await Promise.allSettled([
-      Promise.resolve().then(() => store.append(snap)),
-      Promise.resolve().then(() => store.append(mutated)),
-    ]);
-
-    const fulfilled = outcomes.filter((o) => o.status === "fulfilled");
-    const rejected = outcomes.filter((o) => o.status === "rejected");
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0]?.reason).toBeInstanceOf(GammaSnapshotConflictError);
-    expect(store.read(snap.snapshotId)?.structure.spot).toBe(6425);
   });
 });

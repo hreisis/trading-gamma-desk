@@ -11,5 +11,6 @@ export * from "./capture";
 export * from "./deep-equal";
 export * from "./instant";
 export * from "./snapshot-integrity";
+export * from "./snapshot-publish";
 export * from "./snapshot-store";
 export * from "./change";

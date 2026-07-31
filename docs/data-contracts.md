@@ -749,7 +749,7 @@ Immutable as-of gamma snapshots and deterministic change comparisons. Zod: `src/
 | `captureKind` | **Required explicit** `open` \| `intraday` \| `close` — never inferred from clock time |
 | `snapshotId` | Stable: `underlying\|sessionDate\|captureKind\|asOf` |
 | `structure` | Full M4-1 `EstimatedGammaStructure` payload |
-| Storage | Append-only: same ID + same payload → idempotent; same ID + different payload → reject; never overwrite |
+| Storage | Append-only: same ID + same payload → idempotent; same ID + different payload → reject; never overwrite. **M4-2B:** same-directory temp + fsync + hard-link publication — final path visible only when payload is complete |
 
 `GammaChangeSet` compares the current snapshot against:
 
