@@ -15,4 +15,5 @@ export * from "./snapshot-publish";
 export * from "./snapshot-store";
 export * from "./change";
 export * from "./structure-state";
+export * from "./structure-state-v2";
 export * from "./marketdata-app";

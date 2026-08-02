@@ -55,7 +55,7 @@ Shipped work (M1–M3) established macro regime, catalyst evidence, and desk UI 
 
 | Milestone | Theme | Outcome |
 | --- | --- | --- |
-| **M4** | Gamma snapshots / features | M4-1 GEX engine (✅); M4-2 immutable as-of snapshots + prior-close/open change engine; M4-3 desk-ready features + `MarketStructureState` |
+| **M4** | Gamma snapshots / features | M4-1 GEX engine (✅); M4-2 immutable as-of snapshots + prior-close/open change engine; M4-3/M4-3C desk-ready `MarketStructureState` (0.1.0 historical + 0.2.0 bounded interpretation); M4-3B bounded provider; M4-4 Desk UI v1 |
 | **M5** | Strategy research / replay / regime | Historical replay, regime-conditioned studies, evidence tables — still deterministic |
 | **M6** | Constrained LLM study agent | LLM organizes cited evidence into study briefs and decision memos; no math in the model |
 | **M7** | Private portfolio policy | Separate private repo: thresholds, sizing, allocation rules, instrument universe |

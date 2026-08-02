@@ -16,4 +16,5 @@ export * from "./estimated-gamma";
 export * from "./gamma-snapshot";
 export * from "./bounded-gamma-provider";
 export * from "./market-structure-state";
+export * from "./market-structure-state-v2";
 export * from "./replay";

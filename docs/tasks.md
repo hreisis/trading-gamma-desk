@@ -49,6 +49,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2B) | Same-dir temp + fsync + hard-link publication; final visible only when complete; temp cleanup on success/failure |
 | 0.1.0 | `GammaHistoricalSnapshot` store (M4-2C) | Collision-safe temp names; temp cleanup on write/fsync failure; async subprocess concurrency tests |
 | 0.1.0 | `MarketStructureState` (M4-3) | Desk-ready features from matched snapshot + change set; wall corridor; directed changes; no scores/signals |
+| 0.2.0 | `MarketStructureState` (M4-3C) | Bounded-aware interpretation layer from `BoundedGammaProviderSnapshot` + optional `GammaChangeSet`; condition taxonomy; evidence + plain-English interpretation; flip never fabricated |
 | 0.1.0 | `ReplayCorpus` + `ReplayRun` (M5-1A) | Point-in-time frames from stored macro/structure/catalyst artifacts; instant-ordered eligibility; no lookahead |
 
 ---
@@ -130,8 +131,9 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-2A | Snapshot integrity hardening | Envelope/structure invariants; instant-ordered baselines; zero-baseline pct unavailable; safe ID/path encoding; focused tests — ✅ |
 | M4-2B | Atomic snapshot publication | Same-dir temp + fsync + hard-link; no partial visibility; temp cleanup on link/idempotency/conflict — ✅ |
 | M4-2C | Atomic-publication test/failure cleanup | Async subprocess writers; concurrent reader poll; either-wins conflict; injectable write failure cleanup — ✅ |
-| M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` from matched snapshot + change set; wall corridor; directed changes; fixture + tests; no UI / scores / signals — ✅ |
+| M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` 0.1.0 from matched snapshot + change set; wall corridor; directed changes; fixture + tests; no UI / scores / signals — ✅ |
 | M4-3B | Bounded MarketData.app Gamma provider | Credit-capped CLI `npm run gamma:fetch` (one symbol / one expiry / explicit strikes); normalize + Greek quality + engine → `BoundedGammaProviderSnapshot`; mocked tests only; no UI / no daily integration — ✅ |
+| M4-3C | Gamma Feature Layer (bounded interpretation) | Deterministic `MarketStructureState` 0.2.0 from bounded provider snapshot + optional compatible `GammaChangeSet`; condition taxonomy; evidence + interpretation; preserve bounded wall scope; no flip fabrication; no live API / no UI redesign — ✅ |
 | M4-4 | Gamma Desk UI v1 | Read-only Structure·Gamma section from bounded snapshot; empty/malformed states; bounded wall labeling; strike GEX chart; fixture + SSR tests; no live API / no daily integration — ✅ |
 
 **Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.

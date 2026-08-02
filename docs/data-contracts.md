@@ -860,6 +860,59 @@ Deterministic desk-ready features derived from **one** `GammaHistoricalSnapshot`
 
 Fixture: `fixtures/gamma/structure/spx.2026-07-29.intraday.market-structure-state.json`.
 
+### 3b-2. MarketStructureState schemaVersion 0.2.0 (bounded interpretation — M4-3C)
+
+Deterministic, contract-valid **conditional structure interpretation** derived from one `BoundedGammaProviderSnapshot` plus an optional compatible `GammaChangeSet`. Zod: `src/contracts/market-structure-state-v2.ts`. Builder: `buildMarketStructureStateV2` in `src/gamma/structure-state-v2.ts`.
+
+Coexists with **0.1.0** (historical snapshot + required change set). Does **not** replace 0.1.0. Does **not** call live APIs, change GEX math, or fabricate Flip / full-chain walls.
+
+**Semantics:** Gamma is a conditional amplifier/compressor for the **bounded single-expiry** sample — not a directional predictor. Walls remain `boundedCallWall` / `boundedPutWall` with `scope: "bounded_single_expiry"`.
+
+```json
+{
+  "$id": "MarketStructureState",
+  "schemaVersion": "0.2.0",
+  "symbol": "SPY",
+  "generatedAt": "2026-07-30T20:05:00.000Z",
+  "asOf": "2026-07-30T20:00:00.000Z",
+  "vendorAsOf": "2026-07-30T20:00:00.000Z",
+  "sessionDate": "2026-07-30",
+  "source": { "provider": "marketdata_app", "name": "…", "fetchedAt": "…" },
+  "methodology": {
+    "id": "oi_gex_proxy_v1",
+    "version": "0.1.1",
+    "featureMethodologyId": "gamma_feature_layer_v1",
+    "featureMethodologyVersion": "0.2.0"
+  },
+  "scope": "bounded_single_expiry",
+  "expiration": "2026-07-31",
+  "dte": 1,
+  "availability": "incomplete",
+  "regime": "negative",
+  "spot": 741.63,
+  "totalGex": -4035998112.1934204,
+  "grossGex": 11491294134.14556,
+  "boundedCallWall": { "status": "available", "strike": 745, "scope": "bounded_single_expiry" },
+  "boundedPutWall": { "status": "incomplete", "strike": 743, "scope": "bounded_single_expiry" },
+  "flip": { "status": "unavailable", "reason": "…" },
+  "condition": "incomplete_structure",
+  "evidence": [{ "id": "total_gex", "statement": "…", "basis": "…" }],
+  "interpretation": { "summary": "…", "bullets": ["…"] },
+  "changeContext": { "status": "unavailable", "reason": "…" }
+}
+```
+
+| Field / rule | Notes |
+| --- | --- |
+| `condition` | `positive_gamma_stabilizing` \| `negative_gamma_amplifying` \| `near_zero_transition` \| `incomplete_structure` \| `unavailable` |
+| Condition priority | `unavailable` (availability or regime) → `incomplete_structure` (`incomplete`/`partial`) → regime label when `available` |
+| `flip` | Always `unavailable` unless a future supported input supplies it — never interpolated |
+| Walls | Retain `scope: bounded_single_expiry`; never relabeled as market Call/Put walls |
+| `changeContext` | Optional `GammaChangeSet`; missing or mismatched symbol / sessionDate / methodology → `unavailable` + reason (no fabrication) |
+| Interpretation | Plain English, conditional on spot/levels/regime/scope/quality; no buy/sell, bullish/bearish prediction, flow claims, or full-chain wall language |
+
+Fixture input: `fixtures/gamma/providers/marketdata-app/spy-bounded-ui.json`.
+
 ---
 
 ## 3c. ReplayCorpus & ReplayRun (M5-1A)
