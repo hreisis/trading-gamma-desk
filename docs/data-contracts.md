@@ -1019,6 +1019,51 @@ Fixtures: `fixtures/studies/sources.m51b.json`, `fixtures/studies/archive/2026-0
 
 ---
 
+## 3e. StudyDefinition & StudyForwardOutcome (M5-2)
+
+PIT study anchor + **separate** forward outcome artifacts. Zod: `src/contracts/study-outcome.ts`. Builders: `buildStudyDefinition`, `buildStudyForwardOutcome` in `src/studies/`.
+
+**Critical:** `StudyForwardOutcome` must **never** be merged into `DailyResearchArchive`, `ReplayCorpus`, or replay inputs. Future price data labels matured studies only.
+
+```json
+{
+  "kind": "StudyDefinition",
+  "schemaVersion": "0.1.0",
+  "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+  "archiveId": "research|2026-07-29|0.1.0",
+  "sessionDate": "2026-07-29",
+  "symbol": "SPY",
+  "archiveRef": { "relativePath": "fixtures/studies/archive/2026-07-29/daily-research.json", "schemaVersion": "0.1.0" }
+}
+```
+
+```json
+{
+  "kind": "StudyForwardOutcome",
+  "schemaVersion": "0.1.0",
+  "outcomeId": "outcome|study|…|2026-08-29",
+  "priceSeriesAsOfSessionDate": "2026-08-29",
+  "maturity": [{ "horizon": "5D", "status": "mature", "requiredSessions": 5 }],
+  "returns": { "d1": { "status": "available", "value": 0.0095 }, "d5": { "…": "…" }, "d20": { "…": "…" } },
+  "excursion": { "d5": { "status": "available", "mfe": 0.038, "mae": -0.0095 } },
+  "pitIsolation": true
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| Horizons | **Trading sessions** from sparse bar calendar (weekends/holidays omitted): 1D=+1, 5D=+5, 20D=+20 |
+| Returns / MFE / MAE | All use **adjClose** consistently; return = `exitAdjClose/entryAdjClose - 1` |
+| MFE / MAE | Max/min `(adjClose/entryAdjClose - 1)` over forward window `(entry, exit]` |
+| Maturity | `mature` / `immature` / `unavailable`; immature → explicit unavailable metrics |
+| `priceSeriesAsOfSessionDate` | Hard cap — no latest-fallback beyond explicit asOf |
+| Leakage | Reject when entry session > asOf; truncate series at asOf before compute |
+| IDs | `studyId = study\|{archiveId}\|{symbol}\|{methodologyVersion}`; `outcomeId = outcome\|{studyId}\|{asOf}` |
+
+Fixtures: `fixtures/studies/prices/spy.m52.json`.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json
