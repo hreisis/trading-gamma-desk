@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 5 — Strategy research / replay / regime.** **M5-1B** replay integrity hardening (follow-on to M5-1A PIT frames). No returns/outcomes, no regime studies (M5-2), no UI / live API / LLM.
+**Milestone 5 — Strategy research / replay / regime.** **M5-1B** PIT research archive + exact-date offline replay (✅). Next: **M5-2** regime-conditioned studies. No returns/outcomes, no UI / live API / LLM.
 
 ### Queued (not started)
 
@@ -51,6 +51,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.0 | `MarketStructureState` (M4-3) | Desk-ready features from matched snapshot + change set; wall corridor; directed changes; no scores/signals |
 | 0.2.0 | `MarketStructureState` (M4-3C) | Bounded-aware interpretation layer from `BoundedGammaProviderSnapshot` + optional `GammaChangeSet`; condition taxonomy; evidence + plain-English interpretation; flip never fabricated |
 | 0.1.0 | `ReplayCorpus` + `ReplayRun` (M5-1A) | Point-in-time frames from stored macro/structure/catalyst artifacts; instant-ordered eligibility; no lookahead |
+| 0.1.0 | `DailyResearchArchive` (M5-1B) | Exact-date PIT archive with component provenance, conservative eligibility, embedded corpus+replayRun; atomic gitignored store |
 
 ---
 
@@ -145,8 +146,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | ID | Task | Done when |
 | --- | --- | --- |
 | M5-1A | Point-in-time replay foundation | Versioned `ReplayCorpus` / `ReplayFrame` / `ReplayRun`; latest compatible eligible artifact per source; catalyst only after publishedAt; instant ordering; no lookahead; fixture + tests — ✅ |
-| M5-1B | Replay integrity hardening | Follow-on hardening for PIT frames (current) |
-| M5-1 | Replay harness | Parent track — M5-1A ✅; remaining via M5-1B |
+| M5-1B | PIT research archive + exact-date offline replay | `DailyResearchArchive` + `StudySourcesManifest`; component provenance; conservative eligibility; atomic write to `data/studies/archive/{date}/daily-research.json`; `studies:build` / `studies:replay` CLIs; reuses M5-1A `ReplayCorpus`/`ReplayRun`; fixture + tests; no network / no latest-fallback — ✅ |
 | M5-2 | Regime-conditioned studies | Rule-based regime buckets + summary statistics; explicit methodology version |
 | M5-3 | Study fixtures | Contract-valid replay outputs checked into `fixtures/` for tests |
 

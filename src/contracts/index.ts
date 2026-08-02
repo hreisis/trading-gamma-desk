@@ -18,3 +18,4 @@ export * from "./bounded-gamma-provider";
 export * from "./market-structure-state";
 export * from "./market-structure-state-v2";
 export * from "./replay";
+export * from "./research-archive";

@@ -26,6 +26,8 @@
     "catalyst:integration:smoke": "tsx --env-file=.env scripts/catalyst-integration-smoke.ts",
     "catalyst:update": "tsx --env-file=.env scripts/update-catalyst.ts",
     "gamma:fetch": "tsx --env-file=.env scripts/fetch-gamma-marketdata.ts",
+    "studies:build": "tsx scripts/build-daily-research.ts",
+    "studies:replay": "tsx scripts/replay-daily-research.ts",
     "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts",
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },

@@ -972,6 +972,53 @@ Fixtures: `fixtures/replay/corpus.m51a.json`, `fixtures/replay/run.m51a.json`.
 
 ---
 
+## 3d. DailyResearchArchive (M5-1B PIT research archive)
+
+Immutable, exact-date research archive for offline replay. Zod: `src/contracts/research-archive.ts`. Builder: `buildDailyResearchArchive` in `src/studies/build-archive.ts`. Store: `writeDailyResearchArchive` → `data/studies/archive/{sessionDate}/daily-research.json` (gitignored).
+
+Embeds validated `ReplayCorpus` + `ReplayRun`. **No** network, latest-fallback, fabricated history, returns, LLM, or similarity scores.
+
+```json
+{
+  "kind": "DailyResearchArchive",
+  "schemaVersion": "0.1.0",
+  "archiveId": "research|2026-07-29|0.1.0",
+  "sessionDate": "2026-07-29",
+  "builtAt": "2026-07-30T12:00:00.000Z",
+  "methodologyId": "pit_research_archive_v1",
+  "methodologyVersion": "0.1.0",
+  "components": {
+    "macro": { "status": "available", "kind": "macro", "provenance": { "…": "…" } },
+    "marketStructure": { "status": "available", "kind": "market_structure", "sessionDate": "2026-07-29" },
+    "boundedStructure": { "status": "available", "kind": "bounded_structure", "scope": "bounded_single_expiry", "dte": 1 },
+    "catalystEvidence": []
+  },
+  "eligibility": {
+    "status": "partial",
+    "requiredKinds": ["macro", "market_structure"],
+    "conservativeRulesApplied": ["…"]
+  },
+  "evaluationInstants": ["2026-07-29T12:30:00.000Z"],
+  "corpus": { "$ref": "ReplayCorpus" },
+  "replayRun": { "$ref": "ReplayRun" }
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| `archiveId` | Deterministic: `research\|{sessionDate}\|{methodologyVersion}` |
+| Component resolution | Exact manifest IDs only — no latest-fallback across sessions |
+| `boundedStructure` | When present: retain `scope: bounded_single_expiry`, `dte`, `gammaAvailability`, limitations |
+| `eligibility` | `eligible` / `partial` / `ineligible`; incomplete bounded → `partial` |
+| `evaluationInstants` | Must fall on `sessionDate` |
+| Publication | Atomic write; refuse overwrite when payload differs |
+
+CLIs: `npm run studies:build -- --date YYYY-MM-DD --manifest …`; `npm run studies:replay -- --date YYYY-MM-DD`.
+
+Fixtures: `fixtures/studies/sources.m51b.json`, `fixtures/studies/archive/2026-07-29/daily-research.json`.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json
