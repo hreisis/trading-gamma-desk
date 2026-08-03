@@ -5,3 +5,5 @@ export * from "./archive-store";
 export * from "./sessions";
 export * from "./build-definition";
 export * from "./build-outcome";
+export * from "./match-profile";
+export * from "./build-similar-regime-study";

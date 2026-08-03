@@ -1064,6 +1064,66 @@ Fixtures: `fixtures/studies/prices/spy.m52.json`.
 
 ---
 
+## 3f. StudyMatchProfile & SimilarRegimeStudy (M5-3)
+
+PIT-only match profiles + deterministic similar-regime aggregation. Zod: `src/contracts/similar-regime-study.ts`. Builders: `buildStudyMatchProfile`, `buildSimilarRegimeStudy` in `src/studies/`.
+
+**Critical:** Matching uses **explicit macro / catalyst / gamma fields only**. Forward outcomes are aggregated **after** match selection and **never** influence which studies match.
+
+```json
+{
+  "kind": "StudyMatchProfile",
+  "schemaVersion": "0.1.0",
+  "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+  "sessionDate": "2026-07-29",
+  "fields": {
+    "macro_regime": { "status": "available", "value": "fed_rates" },
+    "gamma_regime": { "status": "available", "value": "positive" },
+    "structure_status": { "status": "available", "value": "available" },
+    "bounded_gamma_availability": { "status": "available", "value": "incomplete" },
+    "bounded_scope": { "status": "available", "value": "bounded_single_expiry" },
+    "catalyst_ids": { "status": "available", "value": "syn-cpi-2026-07-15|syn-fomc-2026-07-30" }
+  }
+}
+```
+
+```json
+{
+  "kind": "SimilarRegimeStudy",
+  "schemaVersion": "0.1.0",
+  "methodologyId": "similar_regime_study_v1",
+  "matchedStudyIds": ["study|…"],
+  "matchedFactors": ["macro_regime", "gamma_regime", "catalyst_ids"],
+  "differentFactors": [],
+  "aggregates": {
+    "d5": {
+      "horizon": "5D",
+      "matureCount": 3,
+      "sampleSize": 3,
+      "status": "available",
+      "meanReturn": 0.012,
+      "medianReturn": 0.01,
+      "positiveRate": 0.667
+    }
+  },
+  "warnings": []
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| Match factors | `macro_regime`, `gamma_regime`, `structure_status`, `bounded_gamma_availability`, `bounded_scope`, `catalyst_ids` |
+| Match rule | Exact string equality on **available** fields only; unavailable → candidate rejected — no fabricated matches |
+| `gamma_regime` | Requires explicit PIT enrichment (e.g. `MarketStructureState.current.gammaRegime`); not inferred from outcomes |
+| `catalyst_ids` | Sorted pipe-joined catalyst IDs from archive `catalystEvidence` components |
+| Aggregation | Mature 1D/5D/20D only: mean/median return, positive rate, mean/median MFE/MAE, `matureCount` / `sampleSize` |
+| Insufficient data | `status: insufficient_data` when `matureCount < minMatureSampleSize`; explicit `warnings` |
+| Leakage | Outcomes must not appear in match profiles or criteria; query study excluded by default |
+
+Fixtures: `fixtures/studies/similar-regime-corpus.m53.json`.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json

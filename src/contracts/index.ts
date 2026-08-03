@@ -20,3 +20,4 @@ export * from "./market-structure-state-v2";
 export * from "./replay";
 export * from "./research-archive";
 export * from "./study-outcome";
+export * from "./similar-regime-study";
