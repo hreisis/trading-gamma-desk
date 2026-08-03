@@ -1124,6 +1124,58 @@ Fixtures: `fixtures/studies/similar-regime-corpus.m53.json`.
 
 ---
 
+## 3g. StudyEvidenceBundle (M5-4)
+
+Deterministic evidence rollup from `SimilarRegimeStudy` (M5-3). Zod: `src/contracts/study-evidence-bundle.ts`. Builder: `buildStudyEvidenceBundle` in `src/studies/`.
+
+**Critical:** Evidence status describes **historical cohort statistics only** — not buy/sell, not forward prediction, not LLM inference.
+
+```json
+{
+  "kind": "StudyEvidenceBundle",
+  "schemaVersion": "0.1.0",
+  "bundleId": "evidence|study|…|0.1.0",
+  "methodologyId": "study_evidence_bundle_v1",
+  "primaryHorizon": "5D",
+  "evidenceStatus": "supported",
+  "statusBasis": {
+    "ruleId": "rule.supported.positive_cohort",
+    "primaryHorizon": "5D",
+    "medianReturn": 0.02,
+    "meanReturn": 0.02,
+    "positiveRate": 1,
+    "reasons": ["medianReturn=0.02 > 0", "…"]
+  },
+  "cohortQuality": {
+    "status": "adequate",
+    "matchedStudyCount": 3,
+    "warnings": []
+  },
+  "sources": [
+    { "kind": "similar_regime_study", "refId": "study|…" },
+    { "kind": "daily_research_archive", "refId": "research|…", "relativePath": "fixtures/studies/archive/…" }
+  ]
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| Input | `SimilarRegimeStudy` only — no live prices, no LLM |
+| Primary horizon | Default **5D**; overall `evidenceStatus` follows primary horizon classification |
+| Per-horizon | `horizonEvidence.d1/d5/d20` each carry aggregate + status + `statusBasis` |
+| `insufficient_evidence` | `matchedStudyCount=0`, or horizon `insufficient_data`, or null metrics |
+| `supported` | `medianReturn > 0` **and** `meanReturn > 0` **and** `positiveRate >= 0.6` |
+| `not_supported` | `medianReturn < 0` **and** `meanReturn < 0` **and** `positiveRate <= 0.4` |
+| `mixed` | Available metrics that fail both supported and not_supported thresholds |
+| Cohort quality | `empty` / `thin` / `adequate` from match count + primary horizon maturity |
+| Warnings | M5-3 `warnings` preserved verbatim in `cohortQuality.warnings` |
+| Sources | `similar_regime_study`, `study_definition`, optional `daily_research_archive` / `forward_outcome` refs |
+| IDs | `bundleId = evidence\|{studyId}\|{methodologyVersion}` |
+
+Thresholds (`EVIDENCE_STATUS_THRESHOLDS`) are fixed constants — not calibrated probabilities.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json
