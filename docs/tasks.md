@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 5 — Strategy research / replay / regime.** **M5-4** deterministic evidence bundle (✅). M5 complete through evidence layer; **M6** not started. No UI / live API / LLM.
+**Milestone 6 — Constrained LLM study agent.** **M6-1** study memo contract + prompt + citation validation (✅). Next: **M6-2** narrator adapter. No UI / live API wiring.
 
 ### Queued (not started)
 
@@ -55,6 +55,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.0 | `StudyDefinition` + `StudyForwardOutcome` (M5-2) | PIT study anchor + separate forward 1D/5D/20D returns, MFE/MAE, maturity; never merged into replay inputs |
 | 0.1.0 | `StudyMatchProfile` + `SimilarRegimeStudy` (M5-3) | Explicit PIT macro/catalyst/gamma match fields; deterministic similar-regime aggregates; outcomes never affect matching |
 | 0.1.0 | `StudyEvidenceBundle` (M5-4) | Deterministic evidence rollup from similar-regime study; explicit status rules; cohort quality + source refs; not a trade signal |
+| 0.1.0 | `StudyMemo` (M6-1) | Constrained LLM memo from evidence bundle only; separated evidence/inference/limitations/unknowns; citation + guardrail validation |
 
 ---
 
@@ -162,7 +163,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 | ID | Task | Done when |
 | --- | --- | --- |
-| M6-1 | Study-agent contract | Input = precomputed evidence only; output schema + guardrails (citations, banned inference) |
+| M6-1 | Study memo contract + guardrails | `StudyMemo` from `StudyEvidenceBundle` only; prompt builder, provider interface, citation validation, abstain on insufficient evidence; mocked offline tests — ✅ |
 | M6-2 | Narrator adapter | Injectable LLM path with reject/fallback to rule-based summary |
 | M6-3 | Integration tests | Fake narrator in CI; no network; public demo uses synthetic study fixtures |
 

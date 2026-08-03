@@ -22,3 +22,4 @@ export * from "./research-archive";
 export * from "./study-outcome";
 export * from "./similar-regime-study";
 export * from "./study-evidence-bundle";
+export * from "./study-memo";

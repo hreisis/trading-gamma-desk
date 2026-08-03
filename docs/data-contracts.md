@@ -1176,6 +1176,59 @@ Thresholds (`EVIDENCE_STATUS_THRESHOLDS`) are fixed constants — not calibrated
 
 ---
 
+## 3h. StudyMemo (M6-1)
+
+Constrained LLM study memo from `StudyEvidenceBundle` only. Zod: `src/contracts/study-memo.ts`. Builder: `buildStudyMemo` in `src/study-agent/`.
+
+**Critical:** Input is the evidence bundle packet only — no raw prices, archives, or new computed stats. LLM must not add math, facts, or trade signals. Abstain deterministically when `evidenceStatus === insufficient_evidence` or cohort is empty.
+
+```json
+{
+  "kind": "StudyMemo",
+  "schemaVersion": "0.1.0",
+  "status": "complete",
+  "headline": "Similar-regime cohort supported on 5D horizon",
+  "evidence": [
+    {
+      "id": "ev1",
+      "text": "Evidence status is supported on primary horizon 5D.",
+      "bundleFieldPaths": ["bundle.evidenceStatus", "bundle.primaryHorizon"]
+    }
+  ],
+  "inference": [
+    {
+      "id": "inf1",
+      "text": "Historical cohort mean 5D return is 0.02.",
+      "bundleFieldPaths": ["bundle.horizonEvidence.d5.aggregate.meanReturn"]
+    }
+  ],
+  "limitations": [],
+  "unknowns": [],
+  "validation": {
+    "schemaValid": true,
+    "citationsValid": true,
+    "numbersValid": true,
+    "prohibitedInferenceDetected": false,
+    "errors": []
+  }
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| Input | `StudyEvidenceBundle` only — serialized as `StudyMemoInputPacket` |
+| Sections | `evidence`, `inference`, `limitations`, `unknowns` — each bullet cites `bundleFieldPaths` |
+| Abstain | No LLM call when `insufficient_evidence` or empty cohort; `status: abstained`, `inference: []`, `validation.errors` includes `abstained:` marker |
+| Unavailable | Provider/key failure before valid memo; `evidence: []`, error in `unknowns`, `citationsValid: false` |
+| Rejected | LLM output failed local validation; content preserved, `validation.errors` cite citation/number/guardrail failures |
+| Citations | Every bullet must cite resolvable `bundle.*` paths; unknown paths → `rejected` |
+| Numbers | Tokens in text must appear in cited field corpus — no hallucinated stats |
+| Prohibited | buy/sell, bullish/bearish, predictions, price literals not in bundle |
+| Provider | `StudyMemoNarrator` interface; OpenAI Responses strict JSON (`createOpenAiStudyMemoNarrator`) |
+| Offline tests | `createFakeStudyMemoNarrator` — no network in CI |
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json
