@@ -3,6 +3,7 @@ import { loadAiStudyBriefing } from "@/ai-study";
 import { demoFlagFromRequest } from "@/desk/public-demo";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** AI Study briefing JSON — server-side generation only. */
 export async function GET(request: Request) {
