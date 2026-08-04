@@ -7,18 +7,20 @@ import {
   CATALYST_DEMO_DISCLAIMER,
 } from "@/catalyst";
 import {
-  LIVE_DATA_UNAVAILABLE_MESSAGE,
-  PUBLIC_DEMO_BANNER,
-  PUBLIC_DEMO_COMPACT_BANNER,
   PUBLIC_DEMO_DRIVER,
+  PUBLIC_DEMO_FIXTURE_PATH,
 } from "@/desk";
 
 /**
- * Hits a real `next start` process with GAMMADESK_PUBLIC_DEMO=1.
- * Expects a prior `next build` (CI / smoke:demo:prod runs build first).
+ * Hits a real `next start` process built with GAMMADESK_PUBLIC_DEMO=1.
+ * `/` stays current/live even when that env is set; synthetic fixtures are
+ * only served on `/demo` or `?demo=1`.
  */
 const START_TIMEOUT_MS = 60_000;
 const FETCH_TIMEOUT_MS = 15_000;
+
+const FIXTURE_FALLBACK_BANNER =
+  "Demo · fixture fallback — not a live market session.";
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -101,14 +103,52 @@ describe("public demo production build", () => {
     });
   });
 
-  it("serves / with illustrative synthetic demo chrome and driver", async () => {
+  it("serves / in current/live mode with an honest empty state", async () => {
+    const desk = await fetch(baseUrl + "/api/macro/latest", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).then((r) => r.json());
+
+    expect(desk.isPublicDemo).toBe(false);
+    expect(desk.isDemo).toBe(false);
+    expect(desk.driverPath).not.toBe(PUBLIC_DEMO_FIXTURE_PATH);
+
     const res = await fetch(baseUrl + "/", {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain(PUBLIC_DEMO_COMPACT_BANNER);
-    expect(html).toContain("not actual news, calendar prints, or market observations");
+
+    expect(html).not.toContain('data-testid="banner-illustrative-demo"');
+    expect(html).not.toContain('data-testid="demo-route-banner"');
+
+    if (desk.status === "empty") {
+      expect(html).toContain("No macro driver");
+      expect(desk.driver).toBeNull();
+    } else {
+      expect(desk.isLiveDriver).toBe(true);
+      expect(html).toContain(desk.driver.label);
+    }
+  });
+
+  it("serves /demo in explicit synthetic mode with fixture provenance", async () => {
+    const desk = await fetch(baseUrl + "/api/macro/latest?demo=1", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).then((r) => r.json());
+    expect(desk.isPublicDemo).toBe(true);
+    expect(desk.isDemo).toBe(true);
+    expect(desk.isLiveDriver).toBe(false);
+    expect(desk.driver?.label).toBe(PUBLIC_DEMO_DRIVER.label);
+    expect(desk.driverPath).toBe(PUBLIC_DEMO_FIXTURE_PATH);
+
+    const res = await fetch(baseUrl + "/demo", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+
+    expect(html).toContain('data-testid="demo-route-banner"');
+    expect(html).toContain("Synthetic fixtures only via");
+    expect(html).toContain('data-testid="banner-illustrative-demo"');
     expect(html).toContain(PUBLIC_DEMO_DRIVER.label);
     expect(html).toContain(
       `${PUBLIC_DEMO_DRIVER.confidence.score}/100 (uncalibrated)`,
@@ -116,47 +156,44 @@ describe("public demo production build", () => {
     expect(html).toContain("Catalyst feed");
     expect(html).toContain('data-testid="driver-risk-light"');
     expect(html).toContain(CATALYST_DEMO_DISCLAIMER);
-    // Duplicate macro/catalyst demo banners are collapsed into one chrome line.
-    expect(html).not.toContain("Illustrative catalyst demo · synthetic events");
-    expect(html.toLowerCase()).not.toContain("live driver");
     expect(html).not.toContain("fixture missing or invalid");
     expect(html).not.toContain("ENOENT");
+
+    const fixtureHtml = await fetch(baseUrl + "/?source=fixture", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).then((r) => r.text());
+    expect(fixtureHtml).toContain(FIXTURE_FALLBACK_BANNER);
   });
 
-  it("serves /?source=live as live data unavailable without a driver", async () => {
-    const res = await fetch(baseUrl + "/?source=live", {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toContain(LIVE_DATA_UNAVAILABLE_MESSAGE);
-    expect(html).toContain("Live data unavailable in public demo");
-    expect(html).not.toContain(PUBLIC_DEMO_DRIVER.label);
-    expect(html.toLowerCase()).not.toContain("live driver");
-  });
-
-  it("API mirrors the same public-demo provenance", async () => {
-    const home = await fetch(baseUrl + "/api/macro/latest", {
+  it("distinguishes default desk API from explicit demo flag", async () => {
+    const desk = await fetch(baseUrl + "/api/macro/latest", {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     }).then((r) => r.json());
-    expect(home.isPublicDemo).toBe(true);
-    expect(home.isLiveDriver).toBe(false);
-    expect(home.sourceLabel).toBe(PUBLIC_DEMO_BANNER);
-    expect(home.driver?.label).toBe(PUBLIC_DEMO_DRIVER.label);
+    expect(desk.isPublicDemo).toBe(false);
+    expect(desk.isDemo).toBe(false);
+    expect(desk.driverPath).not.toBe(PUBLIC_DEMO_FIXTURE_PATH);
 
-    const live = await fetch(baseUrl + "/api/macro/latest?source=live", {
+    const demoDesk = await fetch(baseUrl + "/api/macro/latest?demo=1", {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     }).then((r) => r.json());
-    expect(live.status).toBe("live_unavailable");
-    expect(live.driver).toBeNull();
-    expect(live.error?.message).toBe(LIVE_DATA_UNAVAILABLE_MESSAGE);
+    expect(demoDesk.isPublicDemo).toBe(true);
+    expect(demoDesk.isDemo).toBe(true);
+    expect(demoDesk.isLiveDriver).toBe(false);
+    expect(demoDesk.driver?.label).toBe(PUBLIC_DEMO_DRIVER.label);
+    expect(demoDesk.driverPath).toBe(PUBLIC_DEMO_FIXTURE_PATH);
 
     const catalysts = await fetch(baseUrl + "/api/catalysts", {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     }).then((r) => r.json());
-    expect(catalysts.mode).toBe("synthetic_demo");
-    expect(catalysts.banner).toBe(CATALYST_DEMO_BANNER);
-    expect(catalysts.isPublicDemo).toBe(true);
-    expect(Array.isArray(catalysts.catalysts)).toBe(true);
+    expect(catalysts.isPublicDemo).toBe(false);
+    expect(catalysts.mode).not.toBe("synthetic_demo");
+
+    const demoCatalysts = await fetch(baseUrl + "/api/catalysts?demo=1", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).then((r) => r.json());
+    expect(demoCatalysts.mode).toBe("synthetic_demo");
+    expect(demoCatalysts.banner).toBe(CATALYST_DEMO_BANNER);
+    expect(demoCatalysts.isPublicDemo).toBe(true);
+    expect(Array.isArray(demoCatalysts.catalysts)).toBe(true);
   });
 });
