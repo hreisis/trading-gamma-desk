@@ -1229,6 +1229,28 @@ Constrained LLM study memo from `StudyEvidenceBundle` only. Zod: `src/contracts/
 
 ---
 
+## 3i. Study memo workflow & CLI (M6-2)
+
+End-to-end memo build from an on-disk `StudyEvidenceBundle`. Workflow: `runStudyMemoWorkflow` in `src/study-agent/build-memo-workflow.ts`. Store: `src/study-agent/memo-store.ts`.
+
+```bash
+npm run studies:memo -- --date 2026-07-29 --bundle fixtures/studies/evidence-bundle.m62.json
+```
+
+| Rule | Notes |
+| --- | --- |
+| Input | Explicit `--date` + `--bundle` path — **no latest fallback**, no network fetch |
+| Date guard | `--date` must equal `bundle.queryContext.sessionDate` |
+| Abstain | `insufficient_evidence` / empty cohort → deterministic abstain (no LLM, no fallback body) |
+| OpenAI | When `OPENAI_API_KEY` set — Responses API strict JSON; local validation after |
+| Fallback | Missing key, provider failure, or rejected LLM → `buildRuleBasedMemoOutput` (`rule_based` / `study_memo_rule_v1`) |
+| Output | Atomic write to `data/studies/memos/{date}/study-memo.json` (override with `--out`) |
+| Flags | `--dry-run`, `--force-fallback` (skip OpenAI even when key present) |
+
+Fixtures: `fixtures/studies/evidence-bundle.m62.json`.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json
