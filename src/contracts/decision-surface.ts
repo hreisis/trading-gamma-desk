@@ -1,17 +1,84 @@
 import { z } from "zod";
 import { IsoDate } from "./common";
-import { EvidenceStatus } from "./study-evidence-bundle";
+import { EvidenceStatus, CohortQualityStatus } from "./study-evidence-bundle";
+import { ForwardHorizon } from "./study-outcome";
 import { StructureConditionState } from "./market-structure-state-v2";
 import { StudyMemoBullet, StudyMemoStatus } from "./study-memo";
 
-export const DECISION_SURFACE_VIEW_SCHEMA_VERSION = "0.1.0";
+export const DECISION_SURFACE_VIEW_SCHEMA_VERSION = "0.2.0";
 
 export const DecisionSurfaceStatus = z.enum([
   "ready",
   "missing_date",
   "date_unavailable",
   "partial",
+  "artifacts_missing",
+  "integrity_failed",
 ]);
+
+export const EvidenceStrengthDisplay = z.enum([
+  "insufficient",
+  "preliminary",
+  "limited",
+  "adequate",
+]);
+
+export const ArtifactKind = z.enum([
+  "driver",
+  "structure",
+  "evidence_bundle",
+  "study_memo",
+  "pipeline_run",
+]);
+
+export const ArtifactSeverity = z.enum([
+  "missing",
+  "invalid",
+  "mismatched",
+  "stale",
+]);
+
+export const ArtifactIntegrityIssue = z.object({
+  artifact: ArtifactKind,
+  severity: ArtifactSeverity,
+  message: z.string().min(1),
+  path: z.string().optional(),
+});
+
+export const HorizonEvidenceDisplay = z.object({
+  horizon: ForwardHorizon,
+  dataStatus: z.enum(["available", "insufficient_data"]),
+  evidenceStatus: EvidenceStatus,
+  matureCount: z.number().int().nonnegative(),
+  sampleSize: z.number().int().nonnegative(),
+  meanReturn: z.string(),
+  medianReturn: z.string(),
+  positiveRate: z.string(),
+  meanMfe: z.string(),
+  meanMae: z.string(),
+  unavailableReason: z.string().optional(),
+});
+
+export const DecisionEvidenceSummary = z.object({
+  bundleId: z.string().min(1),
+  evidenceStatus: EvidenceStatus,
+  evidenceStatusLabel: z.string().min(1),
+  evidenceStatusNote: z.string(),
+  strengthDisplay: EvidenceStrengthDisplay,
+  strengthSummary: z.string().min(1),
+  primaryHorizon: ForwardHorizon,
+  cohortMatchedCount: z.number().int().nonnegative(),
+  cohortMatureCount: z.number().int().nonnegative(),
+  cohortQualityStatus: CohortQualityStatus,
+  horizons: z.object({
+    d1: HorizonEvidenceDisplay,
+    d5: HorizonEvidenceDisplay,
+    d20: HorizonEvidenceDisplay,
+  }),
+  limitations: z.array(z.string()),
+  cohortWarnings: z.array(z.string()),
+  statusBasisRuleId: z.string().min(1),
+});
 
 export const PublicPolicySlotStatus = z.enum(["unavailable"]);
 
@@ -32,6 +99,7 @@ export const DeskStance = z.object({
   summary: z.string().min(1),
   evidenceStatus: EvidenceStatus,
   structureCondition: StructureConditionState.nullable(),
+  /** Explicit marker — not an order, allocation, or probability. */
   nonTrade: z.literal(true),
 });
 
@@ -49,9 +117,14 @@ export const DecisionObserveSummary = z.object({
 });
 
 export const DecisionResearchSection = z.object({
+  evidenceSummary: DecisionEvidenceSummary,
   memoHeadline: z.string().min(1),
   memoStatus: StudyMemoStatus,
+  memoStatusLabel: z.string().min(1),
+  memoSourceLabel: z.string().min(1),
+  memoProvenanceLabel: z.string().min(1),
   memoProvider: z.string().min(1),
+  memoModel: z.string().min(1),
   bundleId: z.string().min(1),
   evidence: z.array(StudyMemoBullet),
   inference: z.array(StudyMemoBullet),
@@ -68,6 +141,8 @@ export const DecisionSurfaceView = z.object({
   isSynthetic: z.boolean(),
   sourceLabel: z.string().min(1),
   errorMessage: z.string().optional(),
+  artifactIssues: z.array(ArtifactIntegrityIssue),
+  studyIntegrityOk: z.boolean(),
   observe: DecisionObserveSummary.optional(),
   research: DecisionResearchSection.optional(),
   policy: PublicPolicySlot.optional(),
@@ -75,6 +150,10 @@ export const DecisionSurfaceView = z.object({
 });
 
 export type DecisionSurfaceStatus = z.infer<typeof DecisionSurfaceStatus>;
+export type EvidenceStrengthDisplay = z.infer<typeof EvidenceStrengthDisplay>;
+export type ArtifactIntegrityIssue = z.infer<typeof ArtifactIntegrityIssue>;
+export type HorizonEvidenceDisplay = z.infer<typeof HorizonEvidenceDisplay>;
+export type DecisionEvidenceSummary = z.infer<typeof DecisionEvidenceSummary>;
 export type PublicPolicySlot = z.infer<typeof PublicPolicySlot>;
 export type DeskStance = z.infer<typeof DeskStance>;
 export type DecisionObserveSummary = z.infer<typeof DecisionObserveSummary>;

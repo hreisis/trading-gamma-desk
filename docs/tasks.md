@@ -4,9 +4,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 6 — Constrained LLM study agent (✅ complete through M6-4).** M5-3/M5-4 and M6-1…M6-4 shipped. **M6 exit criteria satisfied.**
+**Milestone 6 — Constrained LLM study agent (✅ complete through M6-4).** M5-3/M5-4 and M6-1…M6-4 shipped: deterministic similar-regime evidence, constrained memo agent, integration smoke, and end-to-end `studies:pipeline`. **M6 exit criteria satisfied** (see below).
 
-**Next public milestone:** **M8 — Minimal decision interface** — **M8-1** decision surface (✅). Next: **M8-2** uncertainty display. **M7** private policy remains a separate private-repo track.
+**Next public milestone:** **M8 — Minimal decision interface** — **M8-1** decision surface (✅), **M8-2** uncertainty + exact-date study artifacts (✅). Next: **M8-3** evidence path. **M7** private policy remains a separate private-repo track.
 
 ### Queued (not started)
 
@@ -58,6 +58,10 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.1.0 | `StudyMatchProfile` + `SimilarRegimeStudy` (M5-3) | Explicit PIT macro/catalyst/gamma match fields; deterministic similar-regime aggregates; outcomes never affect matching |
 | 0.1.0 | `StudyEvidenceBundle` (M5-4) | Deterministic evidence rollup from similar-regime study; explicit status rules; cohort quality + source refs; not a trade signal |
 | 0.1.0 | `StudyMemo` (M6-1) | Constrained LLM memo from evidence bundle only; separated evidence/inference/limitations/unknowns; citation + guardrail validation |
+| 0.1.0 | Study memo workflow & CLI (M6-2) | `runStudyMemoWorkflow`; exact `--date` + `--bundle`; OpenAI or rule-based fallback; atomic memo store |
+| 0.1.0 | Study memo integration smoke (M6-3) | `StudyMemoIntegrationSmokeReport`; live dry-run + offline fake narrator; `sectionCounts` from validated memo |
+| 0.1.0 | End-to-end study pipeline (M6-4) | `StudyPipelineManifest` + `runStudyPipeline`; archive → memo; atomic writes under `data/studies/` |
+| 0.2.0 | `DecisionSurfaceView` (M8-2) | Exact-date study artifact loading; `DecisionEvidenceSummary`, `ArtifactIntegrityIssue`, display-only strength; stance suppression on integrity failure |
 
 ---
 
@@ -157,7 +161,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M5-3 | Deterministic similar-regime study | `StudyMatchProfile` + `SimilarRegimeStudy`; exact PIT field matching (macro/catalyst/gamma); mature 1D/5D/20D aggregates; outcomes never affect matching; fixture + tests; no network / no ML — ✅ |
 | M5-4 | Deterministic evidence bundle | `StudyEvidenceBundle` from M5-3; query context, cohort quality, horizon evidence, explicit status rules (`supported`/`mixed`/`not_supported`/`insufficient_evidence`); source refs + preserved warnings; fixture + tests; no LLM / no trade signals — ✅ |
 
-**Exit criteria (M5):** Operator can run deterministic regime/replay studies from fixtures without LLM or live vendors.
+**Exit criteria (M5):** Operator can run deterministic regime/replay studies from fixtures without LLM or live vendors. **✅ Satisfied** (M5-1A…M5-4).
 
 ---
 
@@ -170,11 +174,15 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M6-3 | Integration smoke | `studies:memo:smoke` live dry-run + offline fake narrator; `StudyMemoIntegrationSmokeReport` with `sectionCounts` from validated memo; gitignored `data/studies/memo-integration-smoke-latest.json` — ✅ |
 | M6-4 | End-to-end study pipeline | `studies:pipeline` chains archive → definition → outcomes → similar regime → evidence bundle → validated memo; explicit `--date` + `--manifest`; atomic writes under `data/studies/`; offline tests — ✅ |
 
-**Exit criteria (M6):** LLM produces study briefs/decision memos from cited deterministic inputs only; validation failures never silently pass.
+**Exit criteria (M6):** LLM produces study briefs/decision memos from cited deterministic inputs only; validation failures never silently pass. **✅ Satisfied** — evidence bundle is the sole LLM input; local validation rejects bad citations/numbers/prohibited language; `rejected`/`unavailable` fall back to rule-based memo or abstain; integration smoke + offline tests cover the path; no trade advice in contracts or guardrails.
+
+**Post-M6 (deferred):** M6-5+ optional enhancements (e.g. full-chain live smoke UI wiring) — not required for M6 exit.
 
 ---
 
 ## Milestone 7 — Private portfolio policy
+
+**Status:** Planned — **separate private repository**; does not block public **M8** work.
 
 | ID | Task | Done when |
 | --- | --- | --- |
@@ -188,12 +196,12 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 ## Milestone 8 — Minimal decision interface
 
-**Status:** **In progress** — M8-1 decision surface ✅; M8-2 uncertainty display next.
+**Status:** **Next public milestone** — starts after M6 exit; consumes Observe + Research outputs; Evaluate → Decide in one viewport.
 
 | ID | Task | Done when |
 | --- | --- | --- |
 | M8-1 | Decision surface | `/decide?date=` SSR viewport: Observe (driver/catalyst/structure) + StudyMemo research w/ citations + public policy-unavailable slot + deterministic non-trade stance; fixture-only; exact date — ✅ |
-| M8-2 | Uncertainty display | Scores labelled uncalibrated; no probability bands without calibration |
+| M8-2 | Uncertainty + study artifacts | Non-demo `/decide` loads exact-date driver, structure, `StudyEvidenceBundle`, and `StudyMemo` from `data/`; deterministic evidence panel (status, cohort, horizons, MFE/MAE, limitations); display-only strength; memo provenance labels; artifact integrity errors; stance suppressed on study integrity failure; demo stays fixture-only — ✅ |
 | M8-3 | Evidence path | Expand-original-evidence for every AI line |
 
 **Exit criteria (M8):** Operator can Evaluate → Decide from one minimal UI without dashboard clutter.

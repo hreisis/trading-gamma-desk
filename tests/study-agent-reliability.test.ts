@@ -369,16 +369,16 @@ describe("study memo provider parse retry", () => {
       similarRegimeStudy: study,
       symbol: "SPY",
     });
-    const narrator = vi.fn(createFakeStudyMemoNarrator("ok"));
+    const narrate = vi.fn();
     const result = await runStudyMemoWorkflow({
       bundle,
-      narrator,
+      narrator: { providerId: "fake", narrate },
       forceFallback: false,
       synthetic: true,
     });
     expect(result.source).toBe("abstained");
     expect(result.memo.status).toBe("abstained");
-    expect(narrator).not.toHaveBeenCalled();
+    expect(narrate).not.toHaveBeenCalled();
   });
 });
 

@@ -1291,22 +1291,26 @@ Fixtures: `fixtures/studies/pipeline.m64.json`, `fixtures/studies/profiles/peer-
 
 ---
 
-## 3l. Decision surface (M8-1)
+## 3l. Decision surface (M8-1 / M8-2)
 
-Single SSR viewport contract for `/decide?date=` — fixture-driven, offline only. Types: `DecisionSurfaceView`, `DeskStance`, `PublicPolicySlot` in `src/contracts/decision-surface.ts`. Loader: `loadDecisionSurface` in `src/desk/load-decision-surface.ts`.
+Single SSR viewport contract for `/decide?date=` — offline only, no OpenAI/fetch/regeneration at render. Types: `DecisionSurfaceView`, `DecisionEvidenceSummary`, `DeskStance`, `PublicPolicySlot`, `ArtifactIntegrityIssue` in `src/contracts/decision-surface.ts`. Loader: `loadDecisionSurface` in `src/desk/load-decision-surface.ts`.
 
 | Rule | Notes |
 | --- | --- |
 | Route | `/decide?date=YYYY-MM-DD` — **exact session date required**; no `latest` fallback |
-| Data | Bundled fixtures only — no `data/` reads, fetch, scheduler, OpenAI, Alpaca, or M7 evaluator |
+| Demo (`GAMMADESK_PUBLIC_DEMO=1`) | Bundled fixtures only — never reads `data/` |
+| Non-demo | Exact-date reads: `data/drivers/{date}.json`, `data/studies/evidence/{date}/{symbol}/evidence-bundle.json`, `data/studies/memos/{date}/study-memo.json`, optional `data/studies/pipeline/{date}/run.json`, bounded gamma snapshot (sessionDate must match) |
 | Observe | `DominantDriver`, catalyst headlines, bounded `MarketStructureState` (v2) |
-| Research | `StudyMemo` + evidence sections with citation paths |
+| Research | Deterministic evidence summary first (status, cohort n, mature samples, 1D/5D/20D, MFE/MAE, limitations); AI memo beneath with status/source labels |
+| Strength | Display-only: `insufficient` / `preliminary` / `limited` / `adequate` — does not alter `evidenceStatus` |
+| Integrity | Render missing/invalid/mismatched/stale issues; **suppress stance** when study bundle/memo integrity fails |
 | Policy | `PublicPolicySlot` — `status: unavailable` in public repo (M7 private track) |
-| Stance | `buildDeskStance` — deterministic non-trade posture from evidence status + structure context |
-| Labels | Scores marked **uncalibrated**; preserve missing/unknown states |
-| Prohibited | No buy/sell, probability, sizing, or order language in stance or UI |
+| Stance | `buildDeskStance` — deterministic non-trade posture when study integrity OK |
+| Formatting | Missing metrics → `unknown` (never zero); returns as readable percentages; distinguish `not_supported` vs `insufficient_evidence` |
+| n=1 | Display copy: *Preliminary positive evidence — single historical match (n=1).* |
+| Prohibited | No buy/sell, probability, sizing, or order language in stance |
 
-Bundled session: `2026-07-29` (`PUBLIC_DEMO_SESSION`).
+Bundled demo session: `2026-07-29` (`PUBLIC_DEMO_SESSION`).
 
 ---
 

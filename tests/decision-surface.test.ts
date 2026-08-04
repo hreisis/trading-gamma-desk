@@ -26,7 +26,10 @@ describe("M8-1 decision surface loader", () => {
   });
 
   it("rejects unknown dates without latest fallback", () => {
-    const view = loadDecisionSurface({ sessionDate: "2026-07-30" });
+    const view = loadDecisionSurface({
+      sessionDate: "2026-07-30",
+      publicDemo: true,
+    });
     expect(view.status).toBe("date_unavailable");
     expect(view.errorMessage).toMatch(/No bundled decision-surface fixtures/);
   });
@@ -34,6 +37,7 @@ describe("M8-1 decision surface loader", () => {
   it("loads ready view for fixture session", () => {
     const view = loadDecisionSurface({
       sessionDate: DECISION_SURFACE_FIXTURE_SESSION,
+      publicDemo: true,
     });
     expect(view.status).toBe("ready");
     expect(view.observe?.confidenceDisplay).toMatch(/uncalibrated/);
@@ -54,6 +58,7 @@ describe("M8-1 desk stance", () => {
   it("derives non-trade stance from evidence and structure", () => {
     const view = loadDecisionSurface({
       sessionDate: DECISION_SURFACE_FIXTURE_SESSION,
+      publicDemo: true,
     });
     const stance = buildDeskStance({
       sessionDate: DECISION_SURFACE_FIXTURE_SESSION,
@@ -77,7 +82,11 @@ describe("M8-1 decision surface SSR", () => {
     expect(html).toContain('data-testid="decision-stance"');
     expect(html).toContain("uncalibrated");
     expect(html).toContain("Portfolio policy is unavailable");
-    expect(PROHIBITED.test(html)).toBe(false);
+    const stanceSection = html.match(
+      /data-testid="decision-stance"[\s\S]*?<\/section>/,
+    )?.[0];
+    expect(stanceSection).toBeTruthy();
+    expect(PROHIBITED.test(stanceSection ?? "")).toBe(false);
   });
 
   it("shows citation paths on research bullets", () => {

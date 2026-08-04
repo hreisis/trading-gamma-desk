@@ -51,18 +51,18 @@ MVP assumes a single desk user (or small team), US session focus, English market
 
 ## Roadmap milestones (M4–M9)
 
-Shipped work (M1–M3) established macro regime, catalyst evidence, and desk UI foundations. **Current and forward work:**
+Shipped work (M1–M6) established macro regime, catalyst evidence, desk UI foundations, gamma structure, deterministic strategy research, and a constrained study memo agent. **Current and forward work:**
 
 | Milestone | Theme | Outcome |
 | --- | --- | --- |
-| **M4** | Gamma snapshots / features | M4-1 GEX engine (✅); M4-2 immutable as-of snapshots + prior-close/open change engine; M4-3/M4-3C desk-ready `MarketStructureState` (0.1.0 historical + 0.2.0 bounded interpretation); M4-3B bounded provider; M4-4 Desk UI v1 |
-| **M5** | Strategy research / replay / regime | Historical replay, regime-conditioned studies, evidence tables — still deterministic |
-| **M6** | Constrained LLM study agent | LLM organizes cited evidence into study briefs and decision memos; no math in the model |
-| **M7** | Private portfolio policy | Separate private repo: thresholds, sizing, allocation rules, instrument universe |
-| **M8** | Minimal decision interface | **In progress** — M8-1 decision surface ✅ (`/decide?date=`); M8-2 uncertainty display next |
+| **M4** | Gamma snapshots / features | ✅ Immutable snapshots, change engine, bounded provider, desk-ready `MarketStructureState`, Structure·Gamma UI |
+| **M5** | Strategy research / replay / regime | ✅ PIT archive, forward outcomes, similar-regime study, evidence bundle — all deterministic |
+| **M6** | Constrained LLM study agent | ✅ Cited study memos from `StudyEvidenceBundle` only; validation + fallback; integration smoke; end-to-end `studies:pipeline` |
+| **M7** | Private portfolio policy | **Planned (private repo)** — thresholds, sizing, allocation rules, instrument universe; parallel track, not blocking M8 |
+| **M8** | Minimal decision interface | **In progress** — M8-1 decision surface ✅; M8-2 uncertainty + study artifacts ✅; M8-3 evidence path next |
 | **M9** | Shadow mode / review loop | Decision logs in private repo; compare to outcomes; optional calibration feed |
 
-M4–M6 are **product path**, not post-MVP backlog. M7–M9 require the **separate private repository** boundary above.
+M4–M6 are **shipped on the public product path**. M7–M9 require the **separate private repository** boundary for policy and logs; **M8** is the next milestone in this public repo.
 
 ---
 
@@ -94,11 +94,11 @@ Non-negotiable product principles:
 ### In (through M9)
 
 - Cross-asset macro, catalyst evidence chain (M1–M3, shipped)
-- Gamma GEX engine, historical snapshots, change comparisons, and desk-ready features (M4)
-- Deterministic strategy replay and regime studies (M5)
-- Evidence-grounded, guardrailed LLM study agent (M6)
-- Private portfolio policy layer (M7 — separate private repo)
-- Minimal decision UI (M8)
+- Gamma GEX engine, historical snapshots, change comparisons, and desk-ready features (M4, shipped)
+- Deterministic strategy replay and regime studies (M5, shipped)
+- Evidence-grounded, guardrailed LLM study agent + end-to-end pipeline (M6, shipped)
+- Private portfolio policy layer (M7 — separate private repo, planned)
+- Minimal decision UI (M8 — next public milestone)
 - Shadow logging and review loop (M9 — decision logs in private repo)
 
 ### Out (unless explicitly replanned)
@@ -117,6 +117,22 @@ Non-negotiable product principles:
 - AI outputs cite evidence bullets; no unsupported flow or causation language
 - Gamma never presented as a standalone directional forecast
 - Review loop can compare decision log to outcomes without contaminating public demo data
+- Study memos cite bundle fields only; insufficient evidence abstains; validation failures never silently pass (M6 exit)
+
+---
+
+## Current status (M6 close-out)
+
+| Area | Status |
+| --- | --- |
+| M5-3 similar-regime study | ✅ Shipped |
+| M5-4 evidence bundle | ✅ Shipped |
+| M6-1…M6-4 study agent + pipeline | ✅ Shipped |
+| M6 exit criteria | ✅ Satisfied |
+| **Next public milestone** | **M8-3** evidence path |
+| M8-1 decision surface | ✅ Shipped (`/decide?date=`) |
+| M8-2 uncertainty + study artifacts | ✅ Shipped (exact-date `data/` loads, evidence panel, integrity errors, stance suppression) |
+| M7 private policy | Planned — separate private repo |
 
 ---
 

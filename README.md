@@ -6,9 +6,9 @@ Decision loop: **Observe → Research → Evaluate → Decide → Review**
 
 Module chain (deterministic compute → interpreted outputs): **Driver → Catalyst → Structure → Confirmation → Updated View**
 
-**Shipped (M1–M3):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC). UI renders precomputed payloads — it does not classify markets or recompute scores.
+**Shipped (M1–M6):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC), Structure·Gamma desk section, and deterministic strategy research + constrained study memo pipeline (`studies:build`, `studies:pipeline`, `studies:memo`). UI renders precomputed payloads — it does not classify markets or recompute scores.
 
-**In progress (M4+):** gamma snapshots and features (M4-1…M4-4 ✅); strategy research / replay (M5-1A ✅; M5-1B ✅); next **M5-2** regime studies; constrained LLM study agent (M6), private portfolio policy (M7), minimal decision interface (M8), shadow mode/review loop (M9). Deterministic calculations stay separate from LLM reasoning; **scores are not probabilities** until outcome-linked calibration.
+**Next public milestone (M8):** minimal decision interface — Evaluate → Decide in one viewport. **M7** private portfolio policy remains a **separate private-repo** track (planned, not blocking M8).
 
 **Public vs private:** this repo ships **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio data, allocation policy, and decision logs live in a **separate private repository** (`.gitignore` here is secondary local protection, not the primary boundary).
 
@@ -170,9 +170,9 @@ npm run catalyst:update -- --max-events 2
 | `/?source=live` | Live only — empty if no drivers (no silent fixture). **Public demo:** macro page shows **Live data unavailable**; Catalyst UI is hidden on that page. `/api/catalysts` still returns `synthetic_demo` (API has no `?source=` gate) — intentional until a later M3 split. |
 | `/api/macro/latest` | Same view model as JSON |
 | `/api/catalysts` | Public `CatalystFeed` DTO (`?category=&status=&importance=&asset=&start=&end=`) — no cache paths, raw provider errors, or AI token usage |
-| `/decide?date=2026-07-29` | **M8-1 decision surface** — Observe + study research + policy-unavailable slot + non-trade stance; fixture-only; exact date required |
+| `/decide?date=2026-07-29` | **M8-1 decision surface** — Observe (driver/catalyst/structure) + study research w/ citations + policy-unavailable slot + non-trade stance; fixture-only; **exact date required** (no latest) |
 
-Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md). Decision surface: `/decide?date=2026-07-29`.
+Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md). Decision surface demo: `/decide?date=2026-07-29`.
 
 ---
 
@@ -263,11 +263,26 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 | **M1** Macro (M1-11) | ✅ |
 | **M2** Catalyst / events (M2-5B; Alpaca live smoke deferred) | ✅ |
 | **M3** Catalyst UI + risk lights (M3-1.5) | ✅ |
-| **M4** Gamma snapshots / features (M4-1…M4-3 ✅) + bounded MarketData provider (M4-3B ✅) | ✅ |
-| **M5** Strategy research / replay (M5-1A ✅; M5-1B ✅) | 🔄 M5-2 next |
-| **M6** Constrained LLM study agent | Planned |
-| **M7** Private portfolio policy | Planned |
-| **M8** Minimal decision interface | **In progress** — M8-1 decision surface ✅ |
-| **M9** Shadow mode / review loop | Planned |
+| **M4** Gamma snapshots / features (M4-1…M4-4) | ✅ |
+| **M5** Strategy research / replay / regime (M5-1A…M5-4) | ✅ |
+| **M6** Constrained LLM study agent (M6-1…M6-4) | ✅ |
+| **M7** Private portfolio policy | Planned (private repo) |
+| **M8** Minimal decision interface | **Next** — M8-1 decision surface |
+| **M9** Shadow mode / review loop | Planned (private repo) |
 
 Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope for the catalyst chain. Market Temperature stays in the backlog. See [product](docs/product.md) and [tasks](docs/tasks.md) for the full M4–M9 plan.
+
+### Strategy research & study memos (M5–M6)
+
+Deterministic PIT research and constrained LLM memos — **offline/fixture path**; no scheduler; no trade advice.
+
+```bash
+npm run studies:build -- --date 2026-07-29 --manifest fixtures/studies/sources.m51b.json
+npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
+npm run studies:memo -- --date 2026-07-29 --bundle fixtures/studies/evidence-bundle.m62.json
+```
+
+- **Exact date required** — no latest-fallback on any studies CLI.
+- **Pipeline (M6-4):** archive → definition → outcomes → similar regime → evidence bundle → validated memo (rule-based by default; OpenAI optional on memo-only path when key set).
+- **Outputs:** gitignored `data/studies/` (archive, definitions, outcomes, evidence, memos, pipeline run record).
+- **Tests:** fake narrator / rule-based fallback — CI never calls OpenAI. Integration smoke (`studies:memo:smoke`) is manual opt-in.

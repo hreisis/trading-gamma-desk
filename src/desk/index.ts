@@ -10,4 +10,8 @@ export * from "./format-gamma";
 export * from "./resolve-desk-request";
 export * from "./build-desk-stance";
 export * from "./decision-surface-fixtures";
+export * from "./decision-evidence-display";
 export * from "./load-decision-surface";
+export * from "./load-decision-artifacts";
+export * from "./load-session-driver";
+export * from "./load-session-bounded-gamma";
