@@ -1251,6 +1251,24 @@ Fixtures: `fixtures/studies/evidence-bundle.m62.json`.
 
 ---
 
+## 3j. Study memo integration smoke (M6-3)
+
+Manual live smoke + offline CI regression. Runner: `runStudyMemoIntegrationSmoke` in `src/study-agent/integration-smoke.ts`. Report contract: `StudyMemoIntegrationSmokeReport` in `src/contracts/study-memo-integration-smoke.ts`.
+
+```bash
+npm run studies:memo:smoke -- --live --dry-run --date 2026-07-29
+```
+
+| Rule | Notes |
+| --- | --- |
+| Input | Same exact `--date` + `--bundle` as M6-2 (default fixture) |
+| Live | `--live` uses OpenAI when `OPENAI_API_KEY` set; otherwise rule-based fallback |
+| Write | Default `--dry-run` — no memo file; sanitized report to gitignored `data/studies/memo-integration-smoke-latest.json` |
+| Summary | `sectionCounts` copied from validated `StudyMemo` arrays — console summary must match report |
+| CI | Fake narrator / rule-based fallback only — no network |
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json

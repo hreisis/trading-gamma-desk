@@ -53,6 +53,7 @@ function numbersSupported(
     if (corpus.includes(token.replace(/,/g, ""))) continue;
     const corpusNorm = normalizeNumToken(corpus);
     if (corpusNorm.includes(n)) continue;
+    if (/^\d+$/.test(n) && corpusNorm.includes(`${n}d`)) continue;
     return { ok: false, bad: token };
   }
   return { ok: true };

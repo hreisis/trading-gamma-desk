@@ -4,7 +4,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 6 — Constrained LLM study agent.** **M6-2** end-to-end study memo workflow + CLI (✅). Next: **M6-3** integration tests. No UI / live API wiring.
+**Milestone 6 — Constrained LLM study agent.** **M6-3** integration smoke + offline regression (✅). Next: M6-4+ (not started). No UI / live API wiring.
 
 ### Queued (not started)
 
@@ -165,7 +165,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | --- | --- | --- |
 | M6-1 | Study memo contract + guardrails | `StudyMemo` from `StudyEvidenceBundle` only; prompt builder, provider interface, citation validation, abstain on insufficient evidence; mocked offline tests — ✅ |
 | M6-2 | End-to-end study memo workflow | `runStudyMemoWorkflow` + `studies:memo` CLI; exact `--date` + `--bundle`; OpenAI when configured else rule-based fallback; atomic write to `data/studies/memos/{date}/study-memo.json`; offline tests — ✅ |
-| M6-3 | Integration tests | Fake narrator in CI; no network; public demo uses synthetic study fixtures |
+| M6-3 | Integration smoke | `studies:memo:smoke` live dry-run + offline fake narrator; `StudyMemoIntegrationSmokeReport` with `sectionCounts` from validated memo; gitignored `data/studies/memo-integration-smoke-latest.json` — ✅ |
 
 **Exit criteria (M6):** LLM produces study briefs/decision memos from cited deterministic inputs only; validation failures never silently pass.
 

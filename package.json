@@ -29,6 +29,7 @@
     "studies:build": "tsx scripts/build-daily-research.ts",
     "studies:replay": "tsx scripts/replay-daily-research.ts",
     "studies:memo": "tsx scripts/build-study-memo.ts",
+    "studies:memo:smoke": "tsx --env-file=.env scripts/study-memo-integration-smoke.ts",
     "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts",
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },

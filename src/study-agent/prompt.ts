@@ -2,7 +2,7 @@ import type { StudyEvidenceBundle } from "@/contracts";
 import type { StudyMemoInputPacket } from "./narrator";
 
 /** Bump when system/user prompt rules change (forces memo rebuild). */
-export const STUDY_MEMO_PROMPT_VERSION = "0.1.0";
+export const STUDY_MEMO_PROMPT_VERSION = "0.1.1";
 
 export const STUDY_MEMO_SYSTEM_PROMPT = [
   "You write a constrained study memo from a precomputed StudyEvidenceBundle JSON packet.",
@@ -50,7 +50,10 @@ export function buildStudyMemoInputPacket(
 export function buildStudyMemoUserPrompt(packet: StudyMemoInputPacket): string {
   return [
     "Write a study memo from the following StudyEvidenceBundle packet.",
-    "Use bundleFieldPaths like bundle.evidenceStatus, bundle.horizonEvidence.d5.aggregate.meanReturn, bundle.cohortQuality.matchedStudyCount, etc.",
+    "bundleFieldPaths must start with bundle. and resolve on the StudyEvidenceBundle — never use packet-only keys like bundle.queryMatchFields.",
+    "Match fields: bundle.queryContext.matchProfile.fields.<factor> (e.g. bundle.queryContext.matchProfile.fields.macro_regime).",
+    "Horizon stats: bundle.horizonEvidence.d5.aggregate.meanReturn, bundle.primaryHorizon, bundle.statusBasis.primaryHorizon.",
+    "Use exact numeric values from cited fields; horizon labels like 5D must be cited via a field that contains them.",
     "Input JSON (authoritative — do not invent beyond it):",
     JSON.stringify(packet, null, 2),
   ].join("\n\n");

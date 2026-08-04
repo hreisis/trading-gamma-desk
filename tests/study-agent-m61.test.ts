@@ -286,6 +286,69 @@ describe("M6-1 citation validation", () => {
     expect(memo.validation.numbersValid).toBe(false);
   });
 
+  it("allows horizon day digits when citing horizonEvidence aggregate paths", () => {
+    const bundle = supportedBundle();
+    const memo = validateStudyMemoOutput({
+      bundle,
+      output: {
+        headline: "Similar-regime study on the primary horizon",
+        evidence: [
+          {
+            id: "ev_horizon",
+            text: "Primary 5D horizon mean return is 0.02 with 20D context at 0.04.",
+            bundleFieldPaths: [
+              "bundle.horizonEvidence.d5.aggregate.meanReturn",
+              "bundle.horizonEvidence.d20.aggregate.meanReturn",
+            ],
+          },
+        ],
+        inference: [],
+        limitations: bundle.limitations.slice(0, 1).map((text, i) => ({
+          id: `lim${i + 1}`,
+          text,
+          bundleFieldPaths: ["bundle.limitations"],
+        })),
+        unknowns: [],
+      },
+      provider: "test",
+      model: "test",
+      generatedAt: bundle.computedAt,
+      synthetic: true,
+    });
+    expect(memo.validation.numbersValid).toBe(true);
+    expect(memo.status).toBe("complete");
+  });
+
+  it("accepts queryMatchFields alias paths via bundle match profile shim", () => {
+    const bundle = supportedBundle();
+    const memo = validateStudyMemoOutput({
+      bundle,
+      output: {
+        headline: "Similar-regime study memo",
+        evidence: [
+          {
+            id: "ev_match",
+            text: "Macro regime field is fed_rates.",
+            bundleFieldPaths: ["bundle.queryMatchFields.macro_regime"],
+          },
+        ],
+        inference: [],
+        limitations: bundle.limitations.slice(0, 1).map((text, i) => ({
+          id: `lim${i + 1}`,
+          text,
+          bundleFieldPaths: ["bundle.limitations"],
+        })),
+        unknowns: [],
+      },
+      provider: "test",
+      model: "test",
+      generatedAt: bundle.computedAt,
+      synthetic: true,
+    });
+    expect(memo.validation.citationsValid).toBe(true);
+    expect(memo.status).toBe("complete");
+  });
+
   it("rejects prohibited trade language", async () => {
     const bundle = supportedBundle();
     const memo = await buildStudyMemo({

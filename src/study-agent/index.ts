@@ -10,3 +10,5 @@ export * from "./rule-based-memo";
 export * from "./build-memo-workflow";
 export * from "./memo-store";
 export * from "./cli";
+export * from "./integration-smoke";
+export * from "./integration-smoke-paths";
