@@ -1327,7 +1327,13 @@ Proves non-demo `/decide` renders `data/` pipeline artifacts when present. **Not
 | Study archive / peer corpus / SPY prices | Fixture-backed in current `pipeline.m64.json` manifest |
 | Cohort at acceptance | n=1; outcomes from synthetic SPY price fixture |
 
-Test: `tests/decision-surface-real-acceptance.test.ts`. Real historical foundation: **M8-5 (queued)**.
+Test (opt-in — skipped in default CI; requires local `data/` artifacts):
+
+```bash
+GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
+```
+
+Real historical foundation: **M8-5 (queued)**.
 
 ---
 

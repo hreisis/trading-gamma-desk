@@ -223,7 +223,14 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | Memo | Rule-based fallback (`complete`); evidence cites fixture-backed bundle |
 | Non-demo missing artifacts | Shows unavailable — never falls back to bundled fixtures |
 
-Automated: `tests/decision-surface-real-acceptance.test.ts`. **Real historical Study validation deferred to M8-5.**
+Automated (opt-in, requires local `data/` pipeline artifacts — **not run in CI**):
+
+```bash
+npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
+GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
+```
+
+Default `npm test` skips this suite unless `GAMMADESK_REAL_ACCEPTANCE=1`. **Real historical Study validation deferred to M8-5.**
 
 ### M8-5 (queued — not started)
 

@@ -2,12 +2,15 @@
  * M8 local acceptance (2026-07-29) — documents non-demo /decide loading data/ pipeline
  * artifacts. Does NOT validate real historical Study research (fixture archive,
  * peer corpus, SPY prices remain in pipeline.m64.json). See docs/tasks.md M8-5.
+ *
+ * Opt-in only — excluded from default CI/offline runs:
+ *   GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
  */
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { DecisionSurface } from "@/app/components/DecisionSurface";
 import { StudyEvidenceBundle, StudyForwardOutcome, StudyMemo } from "@/contracts";
 import {
@@ -20,32 +23,86 @@ const SESSION = "2026-07-29";
 const SYMBOL = "SPY";
 const DATA_ROOT = "data";
 
+const REAL_ACCEPTANCE_ENABLED = process.env.GAMMADESK_REAL_ACCEPTANCE === "1";
+
+const REQUIRED_ARTIFACTS = [
+  {
+    label: "driver",
+    path: join(DATA_ROOT, "drivers", `${SESSION}.json`),
+  },
+  {
+    label: "evidence bundle",
+    path: join(
+      DATA_ROOT,
+      "studies/evidence",
+      SESSION,
+      SYMBOL,
+      "evidence-bundle.json",
+    ),
+  },
+  {
+    label: "study memo",
+    path: join(DATA_ROOT, "studies/memos", SESSION, "study-memo.json"),
+  },
+  {
+    label: "similar-regime study",
+    path: join(
+      DATA_ROOT,
+      "studies/similar-regime",
+      SESSION,
+      SYMBOL,
+      "similar-regime-study.json",
+    ),
+  },
+  {
+    label: "pipeline run",
+    path: join(DATA_ROOT, "studies/pipeline", SESSION, "run.json"),
+  },
+  {
+    label: "matched peer forward outcome",
+    path: join(
+      DATA_ROOT,
+      "studies/outcomes/study__research__2026-07-22__0.1.0__SPY__0.1.0/2026-08-29/forward-outcome.json",
+    ),
+  },
+] as const;
+
 function readArtifact<T>(path: string, parser: (raw: unknown) => T): T {
   return parser(JSON.parse(readFileSync(path, "utf8")));
 }
 
 describe("M8 pipeline wiring acceptance (2026-07-29, not real historical Study)", () => {
-  const bundlePath = join(
-    DATA_ROOT,
-    "studies/evidence",
-    SESSION,
-    SYMBOL,
-    "evidence-bundle.json",
-  );
-  const memoPath = join(DATA_ROOT, "studies/memos", SESSION, "study-memo.json");
-  const similarPath = join(
-    DATA_ROOT,
-    "studies/similar-regime",
-    SESSION,
-    SYMBOL,
-    "similar-regime-study.json",
-  );
-  const runPath = join(DATA_ROOT, "studies/pipeline", SESSION, "run.json");
-  const driverPath = join(DATA_ROOT, "drivers", `${SESSION}.json`);
-  const peerOutcomePath = join(
-    DATA_ROOT,
-    "studies/outcomes/study__research__2026-07-22__0.1.0__SPY__0.1.0/2026-08-29/forward-outcome.json",
-  );
+  if (!REAL_ACCEPTANCE_ENABLED) {
+    it.skip(
+      "skipped — set GAMMADESK_REAL_ACCEPTANCE=1 after generating local data/ pipeline artifacts (see docs/tasks.md)",
+      () => {},
+    );
+    return;
+  }
+
+  beforeAll(() => {
+    const missing = REQUIRED_ARTIFACTS.filter(({ path }) => !existsSync(path));
+    if (missing.length > 0) {
+      throw new Error(
+        [
+          "GAMMADESK_REAL_ACCEPTANCE=1 but required data/ artifacts are missing:",
+          ...missing.map(({ label, path }) => `  - ${label}: ${path}`),
+          "",
+          "Generate locally (not committed to git):",
+          "  npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json",
+          "",
+          "Then run:",
+          "  GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts",
+        ].join("\n"),
+      );
+    }
+  });
+
+  const bundlePath = REQUIRED_ARTIFACTS[1]!.path;
+  const memoPath = REQUIRED_ARTIFACTS[2]!.path;
+  const runPath = REQUIRED_ARTIFACTS[4]!.path;
+  const driverPath = REQUIRED_ARTIFACTS[0]!.path;
+  const peerOutcomePath = REQUIRED_ARTIFACTS[5]!.path;
 
   it("loads non-demo /decide from data/ artifacts (not bundled fixtures)", () => {
     const view = loadDecisionSurface({
@@ -105,9 +162,11 @@ describe("M8 pipeline wiring acceptance (2026-07-29, not real historical Study)"
     expect(session.sessionDate).toBe("2026-07-22");
     expect(session.studyId).toBe("study|research|2026-07-22|0.1.0|SPY|0.1.0");
     expect(session.horizons.find((h) => h.horizon === "5D")?.return).toBe(
-      formatStudyReturnPercent(peerOutcome.returns.d5.status === "available"
-        ? peerOutcome.returns.d5.value
-        : null),
+      formatStudyReturnPercent(
+        peerOutcome.returns.d5.status === "available"
+          ? peerOutcome.returns.d5.value
+          : null,
+      ),
     );
   });
 
