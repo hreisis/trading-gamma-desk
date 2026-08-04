@@ -1101,7 +1101,50 @@ PIT-truncated price artifact for non-demo Study outcomes. Builder: `buildStudyPr
 | Rejects | Fixture/synthetic inputs; duplicate/unordered sessions; invalid OHLC; missing exact asOf coverage |
 | Provenance | Required when `synthetic: false`; flows into `StudyForwardOutcome.provenance.priceSourceKind: local_store` |
 | Manifest | Non-demo manifests may reference `data/studies/prices/SPY/{asOf}/price-series.json` (`fixtures/studies/pipeline.m85a-real-prices.json` example) |
-| Scope | Real SPY prices alone **do not** make the Study cohort real — archive + peer corpus remain fixture-backed until **M8-5b** |
+| Scope | Real SPY prices alone **do not** make the Study cohort real — default pipeline archive + peer corpus remain fixture-backed until **M8-5c** (M8-5b builders write real artifacts offline) |
+
+### Real archive & peer corpus (M8-5b)
+
+Offline data-foundation layer for non-synthetic multi-session Study research. Builders: `src/studies/real-archive/`. Contracts: `src/contracts/real-archive.ts`.
+
+**Inventory CLI:** `npm run studies:inventory-archive -- --through YYYY-MM-DD`  
+**Build CLI:** `npm run studies:build-archive -- --through YYYY-MM-DD`
+
+| Artifact | Path |
+| --- | --- |
+| DailyResearch archive (eligible sessions only) | `data/studies/archive/{sessionDate}/daily-research.json` |
+| Peer corpus (versioned by cutoff) | `data/studies/profiles/{throughDate}/peer-corpus.json` |
+
+**Per-session sources manifest** (`RealArchiveSessionSourcesManifest`) records repo-relative refs with `sourceKind: local_store`, `synthetic: false`, `sessionDate` / `effectiveAsOf`, and `availableAt`/`observedAt` when present. No absolute filesystem paths.
+
+**Session classification:** `eligible` \| `partial` \| `ineligible` \| `invalid` with deterministic exclusion codes (e.g. `missing_macro`, `missing_exact_structure`, `structure_date_mismatch`, `catalyst_syn_id`, `catalyst_not_available_as_of`, `fixture_provenance`).
+
+| Rule | Notes |
+| --- | --- |
+| `--through` | Required PIT cutoff — only sessions ≤ cutoff |
+| Discovery | Parse/validate `data/drivers/{date}.json`; filename must match internal `marketSessionDate` |
+| Structure | Exact `sessionDate` — historical gamma snapshot preferred; bounded gamma must match date; **no nearest/latest fallback** |
+| Catalyst | Only `released` catalysts with `releaseResult.observedAt` ≤ session cutoff; reject `syn-*` in non-synthetic archives |
+| Build policy | Write archives **only for eligible** sessions; never overwrite valid archive with partial/invalid |
+| Peer profiles | Derived via existing `buildStudyMatchProfile()` from built archives — not hand-authored |
+| Outcomes | **No forward return fields** in archive or match profiles |
+| Pipeline | `fixtures/studies/pipeline.m64.json` unchanged; demo/CI fixture-only until **M8-5c** |
+
+```json
+{
+  "kind": "RealArchivePeerCorpus",
+  "schemaVersion": "0.1.0",
+  "throughDate": "2026-08-03",
+  "sourceKind": "local_store",
+  "synthetic": false,
+  "included": [{ "sessionDate": "2026-07-29", "studyId": "study|…", "archiveRelativePath": "studies/archive/2026-07-29/daily-research.json" }],
+  "excluded": [{ "sessionDate": "2026-07-30", "classification": "partial", "reasons": ["missing_exact_structure: …"] }],
+  "profiles": [],
+  "coverage": { "candidateSessions": 1, "eligibleArchives": 0, "matchingViable": false, "matchingViableNote": "…" }
+}
+```
+
+Fixtures: `tests/studies-m85b.test.ts` uses synthetic temp `data/` — **not real-data acceptance**.
 
 ---
 
@@ -1375,7 +1418,7 @@ Test (opt-in — skipped in default CI; requires local `data/` artifacts):
 GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
 ```
 
-Real historical foundation: **M8-5b (queued)** for multi-session PIT archive. **M8-5a (shipped)** — real Tiingo SPY bars + exact-date `StudyPriceSeries`.
+Real historical foundation: **M8-5b (shipped)** — offline real PIT archive + peer corpus builders; default pipeline still fixture-backed until **M8-5c**. **M8-5a (shipped)** — real Tiingo SPY bars + exact-date `StudyPriceSeries`.
 
 ---
 

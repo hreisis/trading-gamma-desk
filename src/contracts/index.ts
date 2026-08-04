@@ -27,3 +27,4 @@ export * from "./study-memo-integration-smoke";
 export * from "./study-pipeline";
 export * from "./study-memo-eval-report";
 export * from "./decision-surface";
+export * from "./real-archive";

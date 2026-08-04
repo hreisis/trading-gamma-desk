@@ -14,7 +14,7 @@ Module chain (deterministic compute → interpreted outputs): **Driver → Catal
 
 **Public portfolio demo:** **Synthetic Demo Data — illustrative, not market data.** All demo research uses bundled fixtures only; never reads `data/`. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
 
-**Study validation status:** M8 ships the decision UI and pipeline wiring. Local acceptance on 2026-07-29 confirms non-demo `/decide` loads `data/` artifacts, but Study archive and peer corpus remain fixture-backed. **M8-5a** adds real Tiingo SPY bars + exact-date `StudyPriceSeries` (`studies:ingest-prices`). Real historical Study validation (multi-session archive) is **M8-5b (queued)** — not claimed as passed.
+**Study validation status:** M8 ships the decision UI and pipeline wiring. Local acceptance on 2026-07-29 confirms non-demo `/decide` loads `data/` artifacts, but the default non-demo pipeline manifest still uses fixture-backed Study archive and peer corpus. **M8-5a** adds real Tiingo SPY bars + exact-date `StudyPriceSeries` (`studies:ingest-prices`). **M8-5b** adds offline builders for a real PIT multi-session archive and peer corpus from local `data/` — **not wired into default pipeline**; real historical Study validation is **not claimed as passed** (M8-5c required).
 
 ### Regime vs catalyst vs confidence
 
@@ -282,10 +282,13 @@ Deterministic PIT research and constrained LLM memos — **offline/fixture path*
 npm run studies:build -- --date 2026-07-29 --manifest fixtures/studies/sources.m51b.json
 npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
 npm run studies:ingest-prices -- --date 2026-08-29   # real SPY price series (requires ingest + TIINGO_TOKEN)
+npm run studies:inventory-archive -- --through 2026-08-03   # inventory local PIT archive candidates (offline)
+npm run studies:build-archive -- --through 2026-08-03       # build real archive + peer corpus (offline; gitignored data/)
 npm run studies:memo -- --date 2026-07-29 --bundle fixtures/studies/evidence-bundle.m62.json
 ```
 
 - **Exact date required** — no latest-fallback on any studies CLI.
+- **Real archive (M8-5b):** `studies:inventory-archive` and `studies:build-archive` require `--through YYYY-MM-DD`; write `data/studies/archive/{sessionDate}/daily-research.json` (eligible sessions only) and `data/studies/profiles/{throughDate}/peer-corpus.json`. Demo/CI and `pipeline.m64.json` remain fixture-backed until **M8-5c**.
 - **Pipeline (M6-4):** archive → definition → outcomes → similar regime → evidence bundle → validated memo (rule-based by default; OpenAI optional on memo-only path when key set).
 - **Outputs:** gitignored `data/studies/` (archive, definitions, outcomes, evidence, memos, pipeline run record).
 - **Tests:** fake narrator / rule-based fallback — CI never calls OpenAI. Integration smoke (`studies:memo:smoke`) is manual opt-in.

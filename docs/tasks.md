@@ -230,7 +230,7 @@ npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeli
 GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
 ```
 
-Default `npm test` skips this suite unless `GAMMADESK_REAL_ACCEPTANCE=1`. **Real historical Study validation deferred to M8-5b.**
+Default `npm test` skips this suite unless `GAMMADESK_REAL_ACCEPTANCE=1`. **Real historical Study validation deferred to M8-5c** (pipeline wiring after M8-5b data foundation).
 
 ### M8-5a (shipped) — real SPY price ingestion
 
@@ -249,11 +249,35 @@ npm run ingest   # requires TIINGO_TOKEN — writes data/bars/SPY.json
 npm run studies:ingest-prices -- --date 2026-08-29
 ```
 
-Real SPY prices alone do **not** make the Study cohort real. Archive + peer corpus remain fixture-backed until M8-5b.
+Real SPY prices alone do **not** make the Study cohort real. Default pipeline archive + peer corpus remain fixture-backed until M8-5c.
 
-### M8-5b (queued — not started)
+### M8-5b (shipped) — real PIT archive + peer corpus (data foundation)
 
-Multi-session PIT archive from actual desk/catalyst/structure artifacts, remove fixture inputs from non-demo manifests, compute outcomes without look-ahead, require non-synthetic provenance across archive + corpus, re-run acceptance with honest cohort reporting. See planning notes in product/architecture docs.
+Offline builders discover eligible historical sessions from local `data/` artifacts and write non-synthetic `DailyResearchArchive` entries plus a derived peer corpus. **Does not** switch default non-demo pipeline or claim real Study acceptance.
+
+| Deliverable | Status |
+| --- | --- |
+| Contracts (`RealArchiveSessionSourcesManifest`, inventory report, peer corpus) | ✅ `src/contracts/real-archive.ts` |
+| Candidate discovery + validation | ✅ `src/studies/real-archive/` — parse/validate artifacts; exact session-date alignment; no nearest/latest fallback |
+| Inventory CLI | ✅ `npm run studies:inventory-archive -- --through YYYY-MM-DD` |
+| Archive + corpus builder CLI | ✅ `npm run studies:build-archive -- --through YYYY-MM-DD` |
+| Archive output | ✅ `data/studies/archive/{sessionDate}/daily-research.json` (eligible only; atomic; idempotent) |
+| Peer corpus output | ✅ `data/studies/profiles/{throughDate}/peer-corpus.json` |
+| Catalyst PIT | ✅ Rejects `syn-*`, synthetic, and post-session releases when cache cannot prove availability |
+| Structure PIT | ✅ Exact `sessionDate` only — historical snapshot or bounded gamma; bounded loaded independently |
+| Demo/CI isolation | ✅ `pipeline.m64.json` unchanged; default tests offline fixtures only |
+| Tests | ✅ `tests/studies-m85b.test.ts` (fixture inputs — not real-data acceptance) |
+
+```bash
+npm run studies:inventory-archive -- --through 2026-08-03
+npm run studies:build-archive -- --through 2026-08-03
+```
+
+**Blockers for real acceptance:** sparse local coverage (often 0 eligible sessions until exact-date structure artifacts exist per session). **M8-5c (queued)** wires real archive/corpus into non-demo pipeline manifests and enforces end-to-end non-synthetic provenance.
+
+### M8-5c (queued — not started)
+
+Wire real archive + peer corpus into non-demo pipeline manifests; enforce end-to-end non-synthetic provenance; re-run acceptance with honest cohort reporting. Do not start until M8-5b local coverage is understood.
 
 ---
 

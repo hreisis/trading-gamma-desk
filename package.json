@@ -33,6 +33,8 @@
     "studies:memo:eval": "tsx --env-file=.env scripts/study-memo-quality-eval.ts",
     "studies:pipeline": "tsx scripts/run-study-pipeline.ts",
     "studies:ingest-prices": "tsx scripts/ingest-study-prices.ts",
+    "studies:inventory-archive": "tsx scripts/inventory-real-archive.ts",
+    "studies:build-archive": "tsx scripts/build-real-archive.ts",
     "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts",
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },

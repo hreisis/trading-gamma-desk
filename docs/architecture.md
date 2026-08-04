@@ -86,7 +86,7 @@ Status: **stack locked for Milestone 1** (single TypeScript runtime). Data flow 
 | `macro/` | Transforms, z-scores, signature scoring, driver assembly | Pure functions, no IO, unit + property tested |
 | `catalyst/` | Raw event → canonical Catalyst; dedupe; feed query; calendar + BLS results + documents + rule-based briefs + optional AI briefs + market-context ETF snapshots + deterministic reaction patterns + optional AI market-reaction narratives + integration smoke + unified incremental update | Normalize/extract/compute/classify are pure; fetch/build/enhance/smoke/update scripts are local-only; public demo never networks / never calls LLM or Alpaca; smoke requires `--live`; `catalyst:update` is manual orchestration with a run lock (no scheduler) |
 | `gamma/` | Provider-neutral options chain → OI-based Estimated GEX structure → optional bounded provider snapshot → feature/interpretation state | Pure compute; Flip reserved unavailable without gamma recompute; `MarketStructureState` 0.1.0 from historical snapshot+change; 0.2.0 bounded interpretation from `BoundedGammaProviderSnapshot` + optional change set |
-| `studies/` | PIT archive (M5-1B) + definitions/outcomes (M5-2) + similar-regime (M5-3) + evidence bundle (M5-4) + end-to-end pipeline (M6-4) | `DailyResearchArchive`, `StudyDefinition`, `StudyForwardOutcome`, `SimilarRegimeStudy`, `StudyEvidenceBundle`; `runStudyPipeline` → validated memo; outcomes never in replay inputs or match selection; atomic gitignored store |
+| `studies/` | PIT archive (M5-1B) + definitions/outcomes (M5-2) + similar-regime (M5-3) + evidence bundle (M5-4) + end-to-end pipeline (M6-4) + **real archive builders (M8-5b)** | `DailyResearchArchive`, `StudyDefinition`, `StudyForwardOutcome`, `SimilarRegimeStudy`, `StudyEvidenceBundle`; `studies/real-archive/` discovers local sessions, builds non-synthetic archives + peer corpus offline; default pipeline still fixture-backed until M8-5c; outcomes never in replay inputs or match selection; atomic gitignored store |
 | `study-agent/` | Constrained LLM study memo (M6-1) + workflow/CLI (M6-2) + integration smoke (M6-3) | `StudyMemo` from bundle only; OpenAI when configured else rule-based fallback; citation/number/prohibited validation; abstain on insufficient evidence; `studies:memo` / `studies:memo:smoke` |
 | `interpret/` | Template generator, optional LLM + guardrails | Emits contract-shaped JSON only |
 | `contracts/` | Zod schemas | Mirrors `docs/data-contracts.md` |
@@ -194,5 +194,5 @@ Deployment path, when wanted: the local run commits the snapshot (a few KB per s
 | M5 (M5-1A…M5-4) | ✅ Shipped |
 | M6 (M6-1…M6-4) | ✅ Shipped — exit criteria satisfied |
 | M7 | Planned — private repo |
-| M8 | ✅ Shipped — decision surface `/decide?date=` (M8-1…M8-4); **M8-5a** real SPY price ingest + `StudyPriceSeries`; **M8-5b** multi-session archive queued |
+| M8 | ✅ Shipped — decision surface `/decide?date=` (M8-1…M8-4); **M8-5a** real SPY price ingest + `StudyPriceSeries`; **M8-5b** real PIT archive/corpus builders (data foundation — not default pipeline); **M8-5c** queued to wire into non-demo pipeline |
 | M9 | Planned — private repo |
