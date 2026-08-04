@@ -4,21 +4,39 @@ import { loadAiStudyBriefing } from "@/ai-study";
 
 export const dynamic = "force-dynamic";
 
-export default async function AiStudyPage() {
-  const briefing = await loadAiStudyBriefing();
+export default async function AiStudyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const params = await searchParams;
+  const historicalDate = params.date?.trim();
+  const briefing = await loadAiStudyBriefing({
+    sessionDate: historicalDate ?? null,
+  });
 
   return (
     <DeskChrome activeNav="ai-study">
       <section className="desk-intro">
         <h1 className="desk-title">AI Study briefing</h1>
         <p className="desk-section-note">
-          One concise market briefing synthesized from macro, catalysts,
-          structure, Alpaca quotes, and historical study context when
-          available. Missing or fixture-backed inputs are labeled — nothing is
-          invented server-side beyond the LLM narrative over supplied facts.
+          {briefing.mode === "historical" ? (
+            <>
+              Historical replay for session {briefing.sessionDate}. Alpaca quotes
+              and catalysts may still reflect live snapshots — see provenance
+              below.
+            </>
+          ) : (
+            <>
+              Current session briefing anchored to today&apos;s US market date
+              (America/New_York) with live Alpaca quotes. Cached macro, gamma,
+              and historical study inputs show their own session/as-of when they
+              lag today.
+            </>
+          )}
         </p>
       </section>
-      <AiStudyPanel briefing={briefing} />
+      <AiStudyPanel briefing={briefing} historicalDate={historicalDate ?? null} />
     </DeskChrome>
   );
 }

@@ -66,7 +66,7 @@ export function extractOutputText(payload: unknown): string | null {
   return null;
 }
 
-function parseUsage(payload: unknown): StudyMemoNarratorUsage | undefined {
+export function parseUsage(payload: unknown): StudyMemoNarratorUsage | undefined {
   if (!payload || typeof payload !== "object") return undefined;
   const u = (payload as Record<string, unknown>).usage;
   if (!u || typeof u !== "object") return undefined;

@@ -12,7 +12,7 @@ export {
 } from "@/catalyst/briefs/ai/config";
 
 export const AI_STUDY_MAX_OUTPUT_TOKENS = 1400;
-export const AI_STUDY_PARSE_RETRIES = 1;
+export const AI_STUDY_PARSE_RETRIES = 2;
 
 export function resolveAiStudyLlmModel(
   env: NodeJS.ProcessEnv = process.env,

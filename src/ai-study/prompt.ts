@@ -1,17 +1,34 @@
 import type { AiStudyInputPacket } from "./collect-inputs";
 
-export const AI_STUDY_PROMPT_VERSION = "0.1.0";
+export const AI_STUDY_PROMPT_VERSION = "0.2.0";
 
 export const AI_STUDY_SYSTEM_PROMPT = `You are GammaDesk AI Study — a concise market briefing assistant.
 
 Rules:
 - Use ONLY facts provided in the user JSON packet. Do not invent prices, catalysts, gamma levels, historical matches, or calendar events.
-- When an input is unavailable or fixture-backed, say so explicitly in the relevant section.
+- Every claim MUST include evidenceIds referencing ids from evidenceCatalog only.
+- evidenceIds MUST be exact strings copied from the evidenceCatalog array — never invent ids (e.g. do not use market_temperature; it is not in the catalog).
+- When an input is unavailable or fixture-backed, say so explicitly in the relevant claim text.
 - Market Temperature is not provided — do not infer a temperature score.
 - Gamma is an amplifier/compressor context — not a standalone buy/sell signal.
 - Scenarios (bull/base/bear) are conditional narrative paths, not trade advice or probability forecasts.
-- Keep each bullet short and evidence-linked.
+- Keep each claim text short and evidence-linked.
 - Do not mention filesystem paths, API keys, or internal tooling.`;
+
+const claimSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text", "evidenceIds"],
+  properties: {
+    text: { type: "string" },
+    evidenceIds: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 1,
+      maxItems: 8,
+    },
+  },
+} as const;
 
 export const AI_STUDY_NARRATOR_JSON_SCHEMA = {
   type: "object",
@@ -24,22 +41,22 @@ export const AI_STUDY_NARRATOR_JSON_SCHEMA = {
     "scenarios",
   ],
   properties: {
-    marketRegime: { type: "string" },
+    marketRegime: claimSchema,
     mainDrivers: {
       type: "array",
-      items: { type: "string" },
+      items: claimSchema,
       minItems: 1,
       maxItems: 6,
     },
     keyLevelsStructure: {
       type: "array",
-      items: { type: "string" },
+      items: claimSchema,
       minItems: 1,
       maxItems: 8,
     },
     upcomingRisks: {
       type: "array",
-      items: { type: "string" },
+      items: claimSchema,
       minItems: 1,
       maxItems: 8,
     },
@@ -48,9 +65,9 @@ export const AI_STUDY_NARRATOR_JSON_SCHEMA = {
       additionalProperties: false,
       required: ["bull", "base", "bear"],
       properties: {
-        bull: { type: "string" },
-        base: { type: "string" },
-        bear: { type: "string" },
+        bull: claimSchema,
+        base: claimSchema,
+        bear: claimSchema,
       },
     },
   },
@@ -61,7 +78,9 @@ export function buildAiStudyUserPrompt(packet: AiStudyInputPacket): string {
     {
       promptVersion: AI_STUDY_PROMPT_VERSION,
       sessionDate: packet.sessionDate,
+      sessionAlignment: packet.sessionAlignment,
       inputProvenance: packet.inputs,
+      evidenceCatalog: packet.evidenceIds,
       facts: packet.facts,
       outputSections: [
         "marketRegime",

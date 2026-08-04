@@ -2,14 +2,23 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadAlpacaMarketPanel } from "@/alpaca";
 import { StudyEvidenceBundle } from "@/contracts";
-import type { AiStudyInputProvenance } from "@/contracts/ai-study-briefing";
+import type {
+  AiStudyInputProvenance,
+  AiStudySessionAlignment,
+} from "@/contracts/ai-study-briefing";
 import { loadCatalystFeed } from "@/catalyst";
-import { resolveDeskRequest } from "@/desk";
-import { loadBoundedGammaDeskView } from "@/desk/load-bounded-gamma";
+import { loadSessionDriver } from "@/desk/load-session-driver";
+import { loadSessionBoundedGamma } from "@/desk/load-session-bounded-gamma";
 import { isPublicDemoMode, PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
 import { buildMarketStructureStateV2 } from "@/gamma/structure-state-v2";
 import { studyEvidenceBundlePath } from "@/studies/pipeline-store";
 import evidenceFixture from "../../fixtures/studies/evidence-bundle.m62.json";
+import { buildAiStudyEvidenceCorpus } from "./evidence-corpus";
+import {
+  isHistoricalAiStudySession,
+  resolveCurrentMarketSessionDate,
+} from "./session";
+import { buildSessionAlignment } from "./validate";
 
 export interface AiStudyFacts {
   readonly sessionDate: string | null;
@@ -23,46 +32,109 @@ export interface AiStudyFacts {
 
 export interface AiStudyInputPacket {
   readonly sessionDate: string | null;
+  readonly mode: "current" | "historical";
   readonly inputs: readonly AiStudyInputProvenance[];
   readonly facts: AiStudyFacts;
+  readonly sessionAlignment: AiStudySessionAlignment;
+  readonly evidenceIds: readonly string[];
+  readonly blocked: boolean;
+  readonly blockReason: string | null;
 }
 
 function input(
-  id: AiStudyInputProvenance["id"],
-  status: AiStudyInputProvenance["status"],
-  sourceLabel: string,
-  note?: string,
+  row: AiStudyInputProvenance,
 ): AiStudyInputProvenance {
-  return { id, status, sourceLabel, ...(note ? { note } : {}) };
+  return row;
 }
 
-function summarizeMacro(publicDemo: boolean): {
+function summarizeMacro(
+  publicDemo: boolean,
+  sessionDate: string | null,
+  dataRoot: string,
+): {
   provenance: AiStudyInputProvenance;
   facts: Record<string, unknown> | null;
   sessionDate: string | null;
 } {
-  const view = resolveDeskRequest({ publicDemo });
-  if (view.status !== "ready" || !view.driver) {
+  if (publicDemo) {
     return {
-      provenance: input(
-        "macro",
-        "unavailable",
-        view.sourceLabel ?? "macro desk",
-        view.error?.message ?? "No DominantDriver available",
-      ),
-      facts: null,
-      sessionDate: null,
+      sessionDate: PUBLIC_DEMO_SESSION,
+      provenance: input({
+        id: "macro",
+        status: "fixture",
+        sourceLabel: "Synthetic Demo Data — illustrative, not market data.",
+        note: "Synthetic demo macro fixture",
+        provider: "synthetic_demo",
+        sessionDate: PUBLIC_DEMO_SESSION,
+        fetchedAt: null,
+        freshness: "fixture",
+      }),
+      facts: {
+        sessionDate: PUBLIC_DEMO_SESSION,
+        label: "Illustrative rates-led easing (demo)",
+      },
     };
   }
-  const driver = view.driver;
+
+  const target = sessionDate;
+  if (!target) {
+    return {
+      sessionDate: null,
+      provenance: input({
+        id: "macro",
+        status: "unavailable",
+        sourceLabel: "local_store",
+        note: "No macro driver session on disk",
+        provider: "local_store",
+        sessionDate: null,
+        fetchedAt: null,
+        freshness: "unavailable",
+      }),
+      facts: null,
+    };
+  }
+
+  const loaded = loadSessionDriver(target, dataRoot);
+  const mismatched = loaded.issues.some((i) => i.severity === "mismatched");
+  if (!loaded.driver || mismatched) {
+    return {
+      sessionDate: target,
+      provenance: input({
+        id: "macro",
+        status: "unavailable",
+        sourceLabel: loaded.driverPath ?? "data/drivers",
+        note:
+          loaded.issues.find((i) => i.severity === "mismatched")?.message ??
+          loaded.issues[0]?.message ??
+          "Macro driver unavailable for target session",
+        provider: "local_store",
+        sessionDate: loaded.driver?.marketSessionDate ?? target,
+        fetchedAt: null,
+        freshness: mismatched ? "stale" : "unavailable",
+      }),
+      facts: null,
+    };
+  }
+
+  const driver = loaded.driver;
+  const stale = loaded.issues.some((i) => i.severity === "stale");
+  const alignedToTarget = driver.marketSessionDate === target;
   return {
     sessionDate: driver.marketSessionDate,
-    provenance: input(
-      "macro",
-      view.isDemo || view.isPublicDemo ? "fixture" : "available",
-      view.sourceLabel ?? "DominantDriver",
-      view.isPublicDemo ? "Synthetic demo macro fixture" : undefined,
-    ),
+    provenance: input({
+      id: "macro",
+      status: !alignedToTarget || stale ? "partial" : "available",
+      sourceLabel: loaded.driverPath ?? "DominantDriver",
+      note: !alignedToTarget
+        ? `Macro driver session ${driver.marketSessionDate} != target ${target}`
+        : stale
+          ? "Macro driver flagged stale/incomplete"
+          : undefined,
+      provider: "local_store",
+      sessionDate: driver.marketSessionDate,
+      fetchedAt: driver.generatedAt,
+      freshness: !alignedToTarget || stale ? "stale" : "cached",
+    }),
     facts: {
       sessionDate: driver.marketSessionDate,
       label: driver.label,
@@ -82,11 +154,14 @@ function summarizeMacro(publicDemo: boolean): {
   };
 }
 
-function summarizeCatalysts(publicDemo: boolean): {
+function summarizeCatalysts(
+  publicDemo: boolean,
+  now: Date,
+): {
   provenance: AiStudyInputProvenance;
   facts: readonly Record<string, unknown>[];
 } {
-  const feed = loadCatalystFeed({}, { publicDemo });
+  const feed = loadCatalystFeed({}, { publicDemo, now });
   const events = feed.catalysts.slice(0, 8).map((c) => ({
     id: c.id,
     headline: c.headline,
@@ -97,50 +172,117 @@ function summarizeCatalysts(publicDemo: boolean): {
     direction: c.direction,
     synthetic: c.synthetic,
   }));
+  const fetchedAt = now.toISOString();
   if (events.length === 0) {
     return {
-      provenance: input(
-        "catalysts",
-        "unavailable",
-        feed.source.type,
-        feed.disclaimer ?? "No catalyst events in feed window",
-      ),
+      provenance: input({
+        id: "catalysts",
+        status: "unavailable",
+        sourceLabel: feed.source.type,
+        note: feed.disclaimer ?? "No catalyst events in feed window",
+        provider: publicDemo ? "synthetic_demo" : feed.source.type,
+        sessionDate: null,
+        fetchedAt,
+        freshness: "unavailable",
+      }),
       facts: [],
     };
   }
   const hasSynthetic = events.some((e) => e.synthetic);
   return {
-    provenance: input(
-      "catalysts",
-      publicDemo || hasSynthetic ? "fixture" : "available",
-      publicDemo ? "synthetic_fixtures" : feed.source.type,
-      publicDemo
+    provenance: input({
+      id: "catalysts",
+      status: publicDemo || hasSynthetic ? "fixture" : "available",
+      sourceLabel: publicDemo ? "synthetic_fixtures" : feed.source.type,
+      note: publicDemo
         ? "Synthetic demo catalyst fixtures"
         : hasSynthetic
           ? "Feed includes synthetic catalyst rows"
-          : undefined,
-    ),
+          : feed.mode === "stale_calendar"
+            ? "Calendar cache stale — events may be dated"
+            : undefined,
+      provider: publicDemo ? "synthetic_demo" : feed.source.type,
+      sessionDate: null,
+      fetchedAt,
+      freshness: publicDemo
+        ? "fixture"
+        : feed.mode === "stale_calendar"
+          ? "stale"
+          : "cached",
+    }),
     facts: events,
   };
 }
 
-function summarizeGamma(publicDemo: boolean): {
+function summarizeGamma(
+  publicDemo: boolean,
+  sessionDate: string | null,
+  dataRoot: string,
+): {
   provenance: AiStudyInputProvenance;
   facts: Record<string, unknown> | null;
 } {
-  const view = loadBoundedGammaDeskView({ publicDemo, symbol: "SPY" });
-  if (view.status !== "ready" || !view.snapshot) {
+  if (publicDemo) {
     return {
-      provenance: input(
-        "gamma_structure",
-        "unavailable",
-        view.sourceLabel,
-        view.error?.message ?? "Bounded gamma unavailable",
-      ),
+      provenance: input({
+        id: "gamma_structure",
+        status: "fixture",
+        sourceLabel: "fixtures/gamma/providers/marketdata-app/spy-bounded-ui.json",
+        note: "Synthetic bounded gamma fixture",
+        provider: "synthetic_demo",
+        sessionDate: PUBLIC_DEMO_SESSION,
+        fetchedAt: null,
+        freshness: "fixture",
+      }),
+      facts: {
+        sessionDate: PUBLIC_DEMO_SESSION,
+        symbol: "SPY",
+        spot: 548.25,
+        gammaRegime: "negative",
+        status: "available",
+      },
+    };
+  }
+
+  const target = sessionDate;
+  if (!target) {
+    return {
+      provenance: input({
+        id: "gamma_structure",
+        status: "unavailable",
+        sourceLabel: "marketdata_app",
+        note: "Session date unknown — cannot align gamma",
+        provider: "marketdata_app",
+        sessionDate: null,
+        fetchedAt: null,
+        freshness: "unavailable",
+      }),
       facts: null,
     };
   }
-  const snap = view.snapshot;
+
+  const loaded = loadSessionBoundedGamma({ sessionDate: target, symbol: "SPY" });
+  const snap = loaded.snapshot;
+  const mismatched = loaded.issues.some((i) => i.severity === "mismatched");
+  if (!snap || mismatched) {
+    return {
+      provenance: input({
+        id: "gamma_structure",
+        status: "unavailable",
+        sourceLabel: loaded.snapshotPath ?? "marketdata_app",
+        note:
+          loaded.issues.find((i) => i.severity === "mismatched")?.message ??
+          loaded.issues[0]?.message ??
+          "Bounded gamma unavailable for target session",
+        provider: "marketdata_app",
+        sessionDate: target,
+        fetchedAt: snap?.source.fetchedAt ?? snap?.generatedAt ?? null,
+        freshness: mismatched ? "stale" : "unavailable",
+      }),
+      facts: null,
+    };
+  }
+
   let structureV2: Record<string, unknown> | null = null;
   try {
     const state = buildMarketStructureStateV2({ bounded: snap });
@@ -158,17 +300,24 @@ function summarizeGamma(publicDemo: boolean): {
   } catch {
     structureV2 = null;
   }
+
   return {
-    provenance: input(
-      "gamma_structure",
-      view.isFixture ? "fixture" : snap.status === "available" ? "available" : "partial",
-      view.sourceLabel,
-      view.isFixture
-        ? "Synthetic bounded gamma fixture"
-        : snap.status !== "available"
+    provenance: input({
+      id: "gamma_structure",
+      status:
+        snap.status === "available"
+          ? "available"
+          : "partial",
+      sourceLabel: loaded.snapshotPath ?? "marketdata_app",
+      note:
+        snap.status !== "available"
           ? `Bounded gamma status: ${snap.status}`
           : undefined,
-    ),
+      provider: "marketdata_app",
+      sessionDate: snap.sessionDate,
+      fetchedAt: snap.source.fetchedAt ?? snap.generatedAt,
+      freshness: "cached",
+    }),
     facts: {
       sessionDate: snap.sessionDate,
       symbol: snap.symbol,
@@ -184,11 +333,15 @@ function summarizeGamma(publicDemo: boolean): {
   };
 }
 
-async function summarizeMarketQuotes(publicDemo: boolean): Promise<{
+async function summarizeMarketQuotes(
+  publicDemo: boolean,
+  now: Date,
+): Promise<{
   provenance: AiStudyInputProvenance;
   facts: readonly Record<string, unknown>[];
 }> {
-  const panel = await loadAlpacaMarketPanel({ publicDemo });
+  const panel = await loadAlpacaMarketPanel({ publicDemo, now });
+  const fetchedAt = panel.fetchedAt;
   const core = ["SPY", "QQQ", "BTC/USD"];
   const quotes = panel.quotes
     .filter((q) => core.includes(q.symbol))
@@ -202,30 +355,49 @@ async function summarizeMarketQuotes(publicDemo: boolean): Promise<{
       error: q.error,
     }));
   const anyAvailable = quotes.some((q) => q.latestPrice !== null);
+  const anyStale = quotes.some((q) => q.status === "stale");
+
   if (panel.status === "synthetic_demo") {
     return {
-      provenance: input(
-        "market_quotes",
-        "fixture",
-        "synthetic_demo",
-        "Synthetic demo market quotes",
-      ),
+      provenance: input({
+        id: "market_quotes",
+        status: "fixture",
+        sourceLabel: "synthetic_demo",
+        note: "Synthetic demo market quotes",
+        provider: "synthetic_demo",
+        sessionDate: null,
+        fetchedAt,
+        freshness: "fixture",
+      }),
       facts: quotes,
     };
   }
   if (!anyAvailable) {
     return {
-      provenance: input(
-        "market_quotes",
-        "unavailable",
-        "alpaca",
-        panel.message,
-      ),
+      provenance: input({
+        id: "market_quotes",
+        status: "unavailable",
+        sourceLabel: "alpaca",
+        note: panel.message,
+        provider: "alpaca",
+        sessionDate: null,
+        fetchedAt,
+        freshness: "unavailable",
+      }),
       facts: quotes,
     };
   }
   return {
-    provenance: input("market_quotes", "available", "alpaca"),
+    provenance: input({
+      id: "market_quotes",
+      status: anyStale ? "partial" : "available",
+      sourceLabel: "alpaca",
+      note: anyStale ? "Some Alpaca quotes are stale" : undefined,
+      provider: "alpaca",
+      sessionDate: null,
+      fetchedAt,
+      freshness: anyStale ? "stale" : "live",
+    }),
     facts: quotes,
   };
 }
@@ -233,6 +405,7 @@ async function summarizeMarketQuotes(publicDemo: boolean): Promise<{
 function summarizeHistoricalStudy(
   sessionDate: string | null,
   publicDemo: boolean,
+  dataRoot: string,
 ): {
   provenance: AiStudyInputProvenance;
   facts: Record<string, unknown> | null;
@@ -240,13 +413,18 @@ function summarizeHistoricalStudy(
   if (publicDemo) {
     const bundle = StudyEvidenceBundle.parse(evidenceFixture);
     return {
-      provenance: input(
-        "historical_study",
-        "fixture",
-        "fixtures/studies/evidence-bundle.m62.json",
-        "Synthetic demo historical study fixture",
-      ),
+      provenance: input({
+        id: "historical_study",
+        status: "fixture",
+        sourceLabel: "fixtures/studies/evidence-bundle.m62.json",
+        note: "Synthetic demo historical study fixture",
+        provider: "synthetic_demo",
+        sessionDate: PUBLIC_DEMO_SESSION,
+        fetchedAt: null,
+        freshness: "fixture",
+      }),
       facts: {
+        sessionDate: PUBLIC_DEMO_SESSION,
         evidenceStatus: bundle.evidenceStatus,
         primaryHorizon: bundle.primaryHorizon,
         cohortQuality: bundle.cohortQuality,
@@ -261,20 +439,23 @@ function summarizeHistoricalStudy(
   }
 
   const date = sessionDate ?? "";
-  const dataRoot = join(process.cwd(), "data");
   const path = date
     ? studyEvidenceBundlePath(dataRoot, date, "SPY")
     : null;
   if (!path || !existsSync(path)) {
     return {
-      provenance: input(
-        "historical_study",
-        "unavailable",
-        "local_store",
-        sessionDate
+      provenance: input({
+        id: "historical_study",
+        status: "unavailable",
+        sourceLabel: "local_store",
+        note: sessionDate
           ? `No evidence bundle at data/studies/evidence/${sessionDate}/SPY/`
           : "Session date unknown — cannot resolve historical study",
-      ),
+        provider: "local_store",
+        sessionDate: sessionDate,
+        fetchedAt: null,
+        freshness: "unavailable",
+      }),
       facts: null,
     };
   }
@@ -283,12 +464,17 @@ function summarizeHistoricalStudy(
       JSON.parse(readFileSync(path, "utf8")),
     );
     return {
-      provenance: input(
-        "historical_study",
-        "available",
-        `data/studies/evidence/${date}/SPY/evidence-bundle.json`,
-      ),
+      provenance: input({
+        id: "historical_study",
+        status: "available",
+        sourceLabel: path,
+        provider: "local_store",
+        sessionDate: date,
+        fetchedAt: bundle.computedAt,
+        freshness: "cached",
+      }),
       facts: {
+        sessionDate: date,
         evidenceStatus: bundle.evidenceStatus,
         primaryHorizon: bundle.primaryHorizon,
         cohortQuality: bundle.cohortQuality,
@@ -302,54 +488,97 @@ function summarizeHistoricalStudy(
     };
   } catch {
     return {
-      provenance: input(
-        "historical_study",
-        "unavailable",
-        path,
-        "Evidence bundle present but invalid",
-      ),
+      provenance: input({
+        id: "historical_study",
+        status: "unavailable",
+        sourceLabel: path,
+        note: "Evidence bundle present but invalid",
+        provider: "local_store",
+        sessionDate: date,
+        fetchedAt: null,
+        freshness: "unavailable",
+      }),
       facts: null,
     };
   }
 }
 
+export interface CollectAiStudyInputsOptions {
+  readonly env?: NodeJS.ProcessEnv;
+  readonly now?: Date;
+  readonly sessionDate?: string | null;
+  readonly dataRoot?: string;
+}
+
 export async function collectAiStudyInputs(
-  env: NodeJS.ProcessEnv = process.env,
+  options: CollectAiStudyInputsOptions = {},
 ): Promise<AiStudyInputPacket> {
+  const env = options.env ?? process.env;
   const publicDemo = isPublicDemoMode(env);
-  const macro = summarizeMacro(publicDemo);
-  const catalysts = summarizeCatalysts(publicDemo);
-  const gamma = summarizeGamma(publicDemo);
-  const quotes = await summarizeMarketQuotes(publicDemo);
-  const sessionDate =
-    macro.sessionDate ?? (publicDemo ? PUBLIC_DEMO_SESSION : null);
-  const historical = summarizeHistoricalStudy(sessionDate, publicDemo);
+  const now = options.now ?? new Date();
+  const dataRoot = options.dataRoot ?? join(process.cwd(), "data");
+  const historicalMode = isHistoricalAiStudySession(options.sessionDate);
+  const targetSession = publicDemo
+    ? PUBLIC_DEMO_SESSION
+    : historicalMode
+      ? options.sessionDate!.trim()
+      : resolveCurrentMarketSessionDate(now);
+  const mode: AiStudyInputPacket["mode"] = historicalMode ? "historical" : "current";
+
+  const macro = summarizeMacro(publicDemo, targetSession, dataRoot);
+  const catalysts = summarizeCatalysts(publicDemo, now);
+  const gamma = summarizeGamma(publicDemo, targetSession, dataRoot);
+  const quotes = await summarizeMarketQuotes(publicDemo, now);
+  const sessionDate = targetSession;
+  const historical = summarizeHistoricalStudy(sessionDate, publicDemo, dataRoot);
 
   const inputs: AiStudyInputProvenance[] = [
     macro.provenance,
-    input(
-      "market_temperature",
-      "unavailable",
-      "not_implemented",
-      "Market Temperature is backlog — not computed in this MVP",
-    ),
+    input({
+      id: "market_temperature",
+      status: "unavailable",
+      sourceLabel: "not_implemented",
+      note: "Market Temperature is backlog — not computed in this MVP",
+      provider: "not_implemented",
+      sessionDate: null,
+      fetchedAt: null,
+      freshness: "unavailable",
+    }),
     catalysts.provenance,
     gamma.provenance,
     quotes.provenance,
     historical.provenance,
   ];
 
+  const facts: AiStudyFacts = {
+    sessionDate,
+    macro: macro.facts,
+    marketTemperature: null,
+    catalysts: catalysts.facts,
+    gammaStructure: gamma.facts,
+    marketQuotes: quotes.facts,
+    historicalStudy: historical.facts,
+  };
+
+  const sessionAlignment = buildSessionAlignment({
+    targetSessionDate: sessionDate,
+    inputs,
+  });
+
+  const evidence = buildAiStudyEvidenceCorpus(facts, inputs);
+  const blockReason =
+    !publicDemo && historicalMode && !sessionAlignment.aligned
+      ? `Session alignment conflict: ${sessionAlignment.conflicts.join("; ")}`
+      : null;
+
   return {
     sessionDate,
+    mode,
     inputs,
-    facts: {
-      sessionDate,
-      macro: macro.facts,
-      marketTemperature: null,
-      catalysts: catalysts.facts,
-      gammaStructure: gamma.facts,
-      marketQuotes: quotes.facts,
-      historicalStudy: historical.facts,
-    },
+    facts,
+    sessionAlignment,
+    evidenceIds: evidence.map((e) => e.id),
+    blocked: Boolean(blockReason),
+    blockReason,
   };
 }

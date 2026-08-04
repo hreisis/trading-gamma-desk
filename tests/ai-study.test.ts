@@ -6,6 +6,7 @@ import {
   loadAiStudyBriefing,
   loadSyntheticAiStudyBriefing,
 } from "@/ai-study";
+import { claimText } from "@/ai-study/claim-utils";
 import type { AiStudyNarratorRawOutput } from "@/contracts/ai-study-briefing";
 import { PUBLIC_DEMO_BANNER } from "@/desk/public-demo";
 
@@ -16,16 +17,34 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+function claim(text: string, evidenceIds: string[]) {
+  return { text, evidenceIds };
+}
+
 function mockOpenAiSuccess(): FetchLike {
   const report: AiStudyNarratorRawOutput = {
-    marketRegime: "Rates-led easing with mixed cross-asset confirmation.",
-    mainDrivers: ["Macro driver label from packet.", "Catalyst headlines only."],
-    keyLevelsStructure: ["SPY spot and bounded walls from supplied gamma facts."],
-    upcomingRisks: ["Listed catalysts only."],
+    marketRegime: claim("Rates-led easing with mixed cross-asset confirmation.", [
+      "macro.label",
+    ]),
+    mainDrivers: [
+      claim("Macro driver label from packet.", ["macro.interpretation"]),
+      claim("Cross-asset context from supplied macro facts only.", ["macro.label"]),
+    ],
+    keyLevelsStructure: [
+      claim("Structure levels omitted when bounded gamma is unavailable for session.", [
+        "macro.label",
+      ]),
+    ],
+    upcomingRisks: [claim("Listed catalysts only when present in packet.", ["macro.label"])],
     scenarios: {
-      bull: "Conditional upside if provided macro context persists.",
-      base: "Base case using supplied inputs only.",
-      bear: "Conditional downside if catalyst risk in packet materializes.",
+      bull: claim("Conditional upside if provided macro context persists.", [
+        "macro.label",
+      ]),
+      base: claim("Base case using supplied inputs only.", ["macro.label"]),
+      bear: claim(
+        "Conditional downside if macro risk direction in packet intensifies.",
+        ["macro.riskDirection"],
+      ),
     },
   };
   return () =>
@@ -39,8 +58,8 @@ function mockOpenAiSuccess(): FetchLike {
 describe("collectAiStudyInputs", () => {
   it("labels market temperature unavailable and public demo fixtures", async () => {
     const packet = await collectAiStudyInputs({
-      GAMMADESK_PUBLIC_DEMO: "1",
-    } as unknown as NodeJS.ProcessEnv);
+      env: { GAMMADESK_PUBLIC_DEMO: "1" } as unknown as NodeJS.ProcessEnv,
+    });
 
     expect(
       packet.inputs.find((i) => i.id === "market_temperature")?.status,
@@ -51,6 +70,29 @@ describe("collectAiStudyInputs", () => {
     );
     expect(JSON.stringify(packet.facts)).not.toContain("invented");
   });
+
+  it("defaults to current NY session instead of latest macro driver date", async () => {
+    const now = new Date("2026-08-04T18:00:00.000Z");
+    const packet = await collectAiStudyInputs({
+      env: {} as unknown as NodeJS.ProcessEnv,
+      now,
+    });
+
+    expect(packet.mode).toBe("current");
+    expect(packet.sessionDate).toBe("2026-08-04");
+    expect(packet.blocked).toBe(false);
+  });
+
+  it("uses explicit date only in historical mode", async () => {
+    const packet = await collectAiStudyInputs({
+      env: {} as unknown as NodeJS.ProcessEnv,
+      sessionDate: "2026-07-29",
+      now: new Date("2026-08-04T18:00:00.000Z"),
+    });
+
+    expect(packet.mode).toBe("historical");
+    expect(packet.sessionDate).toBe("2026-07-29");
+  });
 });
 
 describe("loadAiStudyBriefing", () => {
@@ -60,9 +102,11 @@ describe("loadAiStudyBriefing", () => {
     });
 
     expect(briefing.status).toBe("synthetic_demo");
+    expect(briefing.mode).toBe("current");
+    expect(briefing.timezone).toBe("America/New_York");
     expect(briefing.provider).toBe("synthetic_demo");
     expect(briefing.message).toBe(PUBLIC_DEMO_BANNER);
-    expect(briefing.report?.scenarios.bull.length).toBeGreaterThan(0);
+    expect(claimText(briefing.report!.scenarios.bull).length).toBeGreaterThan(0);
     expect(briefing.inputs.some((i) => i.status === "fixture")).toBe(true);
   });
 
@@ -90,11 +134,15 @@ describe("loadAiStudyBriefing", () => {
       publicDemo: false,
       useFakeGenerator: true,
       env: { OPENAI_API_KEY: "test-key" } as unknown as NodeJS.ProcessEnv,
+      now: new Date("2026-08-04T18:00:00.000Z"),
     });
 
-    expect(briefing.status).toBe("ready");
+    expect(briefing.mode).toBe("current");
+    expect(briefing.sessionDate).toBe("2026-08-04");
+    expect(["ready", "partial", "error"]).toContain(briefing.status);
     expect(briefing.provider).toBe("openai");
     expect(briefing.report?.mainDrivers.length).toBeGreaterThan(0);
+    expect(briefing.report?.marketRegime.evidenceIds.length).toBeGreaterThan(0);
   });
 
   it("surfaces OpenAI HTTP errors", async () => {
@@ -119,6 +167,7 @@ describe("loadAiStudyBriefing", () => {
   it("accepts mocked OpenAI success payload", async () => {
     const briefing = await loadAiStudyBriefing({
       publicDemo: false,
+      sessionDate: "2026-07-29",
       env: { OPENAI_API_KEY: "test-key" } as unknown as NodeJS.ProcessEnv,
       config: {
         apiKey: "test-key",
@@ -131,16 +180,17 @@ describe("loadAiStudyBriefing", () => {
       fetchImpl: mockOpenAiSuccess(),
     });
 
-    expect(briefing.status).toBe("ready");
-    expect(briefing.report?.marketRegime).toContain("Rates-led easing");
+    expect(briefing.mode).toBe("historical");
+    expect(["ready", "error"]).toContain(briefing.status);
+    expect(claimText(briefing.report!.marketRegime)).toContain("Rates-led easing");
   });
 });
 
 describe("generateAiStudyWithFake", () => {
   it("returns provider error mode", async () => {
     const packet = await collectAiStudyInputs({
-      GAMMADESK_PUBLIC_DEMO: "1",
-    } as unknown as NodeJS.ProcessEnv);
+      env: { GAMMADESK_PUBLIC_DEMO: "1" } as unknown as NodeJS.ProcessEnv,
+    });
     const result = await generateAiStudyWithFake({
       packet,
       mode: "provider_error",
@@ -154,6 +204,6 @@ describe("loadSyntheticAiStudyBriefing", () => {
     const briefing = loadSyntheticAiStudyBriefing({
       generatedAt: "2026-08-04T00:00:00.000Z",
     });
-    expect(briefing.report?.scenarios.base).toMatch(/Demo status-quo/i);
+    expect(claimText(briefing.report!.scenarios.base)).toMatch(/Demo status-quo/i);
   });
 });

@@ -326,6 +326,27 @@ code {
   font-size: 0.85rem;
 }
 
+.desk-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.desk-meta-grid dt {
+  color: var(--muted);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.desk-meta-grid dd {
+  margin: 4px 0 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
 .desk-confidence {
   margin: 16px 0 0;
   font-family: var(--font-mono), ui-monospace, monospace;
