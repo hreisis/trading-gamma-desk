@@ -13,7 +13,7 @@ export default async function DecidePage({
 }) {
   const params = await searchParams;
   const sessionDate = parseDecisionSurfaceDateParam(params.date);
-  const view = loadDecisionSurface({ sessionDate });
+  const view = loadDecisionSurface({ sessionDate, publicDemo: false });
 
   return <DecisionSurface view={view} />;
 }
