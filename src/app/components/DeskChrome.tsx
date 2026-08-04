@@ -5,7 +5,7 @@ export function DeskChrome({
   activeNav,
 }: {
   children: React.ReactNode;
-  activeNav?: "macro" | "decide" | "market" | "ai-study";
+  activeNav?: "macro" | "decide" | "market" | "news" | "ai-study";
 }) {
   return (
     <main className="desk">
@@ -33,6 +33,13 @@ export function DeskChrome({
               aria-current={activeNav === "market" ? "page" : undefined}
             >
               Market
+            </a>
+            <a
+              className={activeNav === "news" ? "desk-nav-link is-active" : "desk-nav-link"}
+              href="/news"
+              aria-current={activeNav === "news" ? "page" : undefined}
+            >
+              News
             </a>
             <a
               className={

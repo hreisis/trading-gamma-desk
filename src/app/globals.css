@@ -1611,3 +1611,48 @@ code {
 .desk-list li + li {
   margin-top: 6px;
 }
+
+.market-news-sections {
+  display: grid;
+  gap: 20px;
+}
+
+.market-news-section h3 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.market-news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.market-news-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.market-news-headline {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.market-news-headline:hover {
+  text-decoration: underline;
+}
+
+.market-news-summary {
+  margin: 6px 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.market-news-meta {
+  margin: 0;
+  font-size: 0.88rem;
+}

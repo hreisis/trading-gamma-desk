@@ -30,3 +30,4 @@ export * from "./decision-surface";
 export * from "./real-archive";
 export * from "./alpaca-market";
 export * from "./ai-study-briefing";
+export * from "./market-news";

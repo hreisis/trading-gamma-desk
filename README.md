@@ -83,6 +83,8 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 
 **Portfolio market panel:** open [`/market`](http://localhost:3000/market) for SPY, QQQ, BTC/USD, and optional `ALPACA_WATCHLIST` symbols via Alpaca snapshots. Missing `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY` shows **Alpaca not configured** — no Tiingo or desk fixture fallback on this surface. Public demo serves labelled synthetic quotes only. Free/paper accounts should set `CATALYST_MARKET_FEED=iex` in local `.env` (SIP requires paid entitlement).
 
+**Market news:** open [`/news`](http://localhost:3000/news) for recent headlines via the Alpaca News API (`/v1beta1/news`) when `APCA_*` is configured. Sections cover macro (general feed), SPY/QQQ, crypto (`BTC/USD`), and optional watchlist symbols. No AI summarization — headline, source, timestamp, symbols, and link only. Missing credentials show explicit unavailable states; stale headlines are labelled, not hidden. Public demo serves `fixtures/news/public-demo.news.json` only — never calls Alpaca or exposes keys.
+
 | Command | Purpose |
 | --- | --- |
 | `npm run daily` | Full refresh (`--force` replaces today’s snapshot) |
@@ -101,8 +103,10 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `/market` | Portfolio watchlist — Alpaca when `APCA_*` configured; synthetic fixtures in public demo |
+| `/news` | Market headlines — Alpaca News when `APCA_*` configured; synthetic fixtures in public demo |
 | `GET /api/alpaca/health` | Alpaca credential + connectivity status |
 | `GET /api/alpaca/market` | Watchlist quotes JSON for the Market panel |
+| `GET /api/news` | Market headlines JSON for the News panel |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
 
 ### Official US macro calendar (M2-2A)

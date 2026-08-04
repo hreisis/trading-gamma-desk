@@ -1,0 +1,104 @@
+{
+  "kind": "MarketNewsPanel",
+  "schemaVersion": "0.1.0",
+  "fetchedAt": "2026-07-29T16:00:00.000Z",
+  "configured": false,
+  "status": "synthetic_demo",
+  "message": "Synthetic Demo Data — illustrative, not market data.",
+  "provider": "synthetic_demo",
+  "sections": [
+    {
+      "topic": "macro",
+      "label": "Macro & broad market",
+      "status": "ready",
+      "items": [
+        {
+          "id": "demo-macro-1",
+          "headline": "Fed officials signal data-dependent path as inflation cools gradually",
+          "summary": "Illustrative macro headline for portfolio demo — not a live wire.",
+          "source": "synthetic_demo",
+          "publishedAt": "2026-07-29T14:30:00.000Z",
+          "updatedAt": "2026-07-29T14:30:00.000Z",
+          "symbols": [],
+          "topics": ["macro"],
+          "url": null,
+          "itemSource": "synthetic_demo",
+          "status": "available"
+        },
+        {
+          "id": "demo-macro-2",
+          "headline": "Treasury yields dip as growth data softens ahead of payrolls",
+          "summary": "Synthetic rates headline — for UI structure only.",
+          "source": "synthetic_demo",
+          "publishedAt": "2026-07-29T13:05:00.000Z",
+          "updatedAt": "2026-07-29T13:05:00.000Z",
+          "symbols": [],
+          "topics": ["macro"],
+          "url": null,
+          "itemSource": "synthetic_demo",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "topic": "indices",
+      "label": "SPY / QQQ",
+      "status": "ready",
+      "items": [
+        {
+          "id": "demo-indices-1",
+          "headline": "SPY holds above prior range as mega-cap earnings offset macro caution",
+          "summary": "Synthetic index headline tied to SPY for demo navigation.",
+          "source": "synthetic_demo",
+          "publishedAt": "2026-07-29T15:10:00.000Z",
+          "updatedAt": "2026-07-29T15:10:00.000Z",
+          "symbols": ["SPY", "QQQ"],
+          "topics": ["indices"],
+          "url": null,
+          "itemSource": "synthetic_demo",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "topic": "crypto",
+      "label": "Crypto",
+      "status": "ready",
+      "items": [
+        {
+          "id": "demo-crypto-1",
+          "headline": "BTC/USD steadies after weekend volatility as ETF flows normalize",
+          "summary": "Synthetic crypto headline — not a live quote or news wire.",
+          "source": "synthetic_demo",
+          "publishedAt": "2026-07-29T12:45:00.000Z",
+          "updatedAt": "2026-07-29T12:45:00.000Z",
+          "symbols": ["BTC/USD"],
+          "topics": ["crypto"],
+          "url": null,
+          "itemSource": "synthetic_demo",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "topic": "watchlist",
+      "label": "Watchlist",
+      "status": "ready",
+      "items": [
+        {
+          "id": "demo-watchlist-1",
+          "headline": "IWM small caps lag QQQ as rate-cut timing debate persists",
+          "summary": "Synthetic watchlist headline for optional ALPACA_WATCHLIST symbols.",
+          "source": "synthetic_demo",
+          "publishedAt": "2026-07-29T11:20:00.000Z",
+          "updatedAt": "2026-07-29T11:20:00.000Z",
+          "symbols": ["IWM"],
+          "topics": ["watchlist"],
+          "url": null,
+          "itemSource": "synthetic_demo",
+          "status": "available"
+        }
+      ]
+    }
+  ]
+}
