@@ -13,6 +13,7 @@ export default async function AiStudyPage({
   const historicalDate = params.date?.trim();
   const briefing = await loadAiStudyBriefing({
     sessionDate: historicalDate ?? null,
+    publicDemo: false,
   });
 
   return (

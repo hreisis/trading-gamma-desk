@@ -252,26 +252,27 @@ export function MacroDesk({
   view,
   catalystFeed,
   gammaView,
+  demoMode,
 }: {
   view: MacroDeskView;
   catalystFeed?: CatalystFeedDto | null;
   gammaView?: BoundedGammaDeskView | null;
+  demoMode?: boolean;
 }) {
   if (view.status === "live_unavailable") {
     return (
-      <DeskChrome activeNav="macro">
+      <DeskChrome activeNav="macro" demoMode={demoMode}>
         <DeskStatusBanners view={view} />
         <section className="desk-state" data-testid="state-live-unavailable">
           <h1 className="desk-title">Live data unavailable</h1>
           <p className="desk-interpretation">
             {view.error?.message ??
-              "This public deployment does not serve live drivers."}
+              "This deployment does not serve live drivers for this request."}
           </p>
           <p className="desk-section-note">
-            Open <a href="/">the illustrative demo</a> for the synthetic
-            scenario. Local development can still use{" "}
-            <code>npm run daily</code> with live mode when{" "}
-            <code>GAMMADESK_PUBLIC_DEMO</code> is unset.
+            Open <a href="/demo">the synthetic demo</a> for the illustrative
+            scenario fixture, or configure live credentials and local{" "}
+            <code>data/drivers</code> for current mode.
           </p>
         </section>
       </DeskChrome>
@@ -280,7 +281,7 @@ export function MacroDesk({
 
   if (view.status === "empty" || (view.driver === null && !view.error)) {
     return (
-      <DeskChrome activeNav="macro">
+      <DeskChrome activeNav="macro" demoMode={demoMode}>
         <DeskStatusBanners view={view} />
         {gammaView ? <GammaDesk view={gammaView} /> : null}
         <section className="desk-state" data-testid="state-empty">
@@ -296,7 +297,7 @@ export function MacroDesk({
 
   if (view.driver === null) {
     return (
-      <DeskChrome activeNav="macro">
+      <DeskChrome activeNav="macro" demoMode={demoMode}>
         <DeskStatusBanners view={view} />
         {gammaView ? <GammaDesk view={gammaView} /> : null}
         <section
@@ -322,7 +323,7 @@ export function MacroDesk({
   }
 
   return (
-    <DeskChrome activeNav="macro">
+    <DeskChrome activeNav="macro" demoMode={demoMode}>
       <DeskStatusBanners view={view} />
       {gammaView ? <GammaDesk view={gammaView} /> : null}
       <div data-testid={`state-${view.status}`}>

@@ -6,7 +6,7 @@ import {
 import {
   LIVE_DATA_UNAVAILABLE_MESSAGE,
   loadPublicDemoDeskView,
-  isPublicDemoMode,
+  resolvePublicDemoMode,
 } from "./public-demo";
 
 export type DeskSourceQuery = "live" | "fixture" | undefined;
@@ -14,6 +14,8 @@ export type DeskSourceQuery = "live" | "fixture" | undefined;
 export interface ResolveDeskRequestOptions {
   readonly source?: DeskSourceQuery | string | null;
   readonly publicDemo?: boolean;
+  readonly demoQuery?: string | null;
+  readonly demoPath?: boolean;
   readonly dataRoot?: string;
   readonly fixturePath?: string;
 }
@@ -48,7 +50,11 @@ function liveUnavailableView(publicDemo: boolean): MacroDeskView {
 export function resolveDeskRequest(
   options: ResolveDeskRequestOptions = {},
 ): MacroDeskView {
-  const publicDemo = options.publicDemo ?? isPublicDemoMode();
+  const publicDemo = resolvePublicDemoMode({
+    publicDemo: options.publicDemo,
+    demoQuery: options.demoQuery,
+    demoPath: options.demoPath,
+  });
   const source =
     options.source === "live" || options.source === "fixture"
       ? options.source

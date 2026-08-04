@@ -1,12 +1,25 @@
 import { GITHUB_REPO_URL, PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
+import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
+
+function navHref(path: string, demoMode?: boolean): string {
+  if (!demoMode) return path;
+  if (path === "/") return "/demo";
+  return `/demo${path}`;
+}
 
 export function DeskChrome({
   children,
   activeNav,
+  demoMode,
 }: {
   children: React.ReactNode;
   activeNav?: "macro" | "decide" | "market" | "news" | "ai-study";
+  demoMode?: boolean;
 }) {
+  const decideDate = demoMode
+    ? PUBLIC_DEMO_SESSION
+    : resolveCurrentMarketSessionDate();
+
   return (
     <main className="desk">
       <header className="desk-brand">
@@ -15,28 +28,28 @@ export function DeskChrome({
           <nav className="desk-nav" aria-label="Primary">
             <a
               className={activeNav === "macro" ? "desk-nav-link is-active" : "desk-nav-link"}
-              href="/"
+              href={navHref("/", demoMode)}
               aria-current={activeNav === "macro" ? "page" : undefined}
             >
               Macro Desk
             </a>
             <a
               className={activeNav === "decide" ? "desk-nav-link is-active" : "desk-nav-link"}
-              href={`/decide?date=${PUBLIC_DEMO_SESSION}`}
+              href={`/decide?date=${decideDate}`}
               aria-current={activeNav === "decide" ? "page" : undefined}
             >
               Decide
             </a>
             <a
               className={activeNav === "market" ? "desk-nav-link is-active" : "desk-nav-link"}
-              href="/market"
+              href={navHref("/market", demoMode)}
               aria-current={activeNav === "market" ? "page" : undefined}
             >
               Market
             </a>
             <a
               className={activeNav === "news" ? "desk-nav-link is-active" : "desk-nav-link"}
-              href="/news"
+              href={navHref("/news", demoMode)}
               aria-current={activeNav === "news" ? "page" : undefined}
             >
               News
@@ -45,7 +58,7 @@ export function DeskChrome({
               className={
                 activeNav === "ai-study" ? "desk-nav-link is-active" : "desk-nav-link"
               }
-              href="/ai-study"
+              href={navHref("/ai-study", demoMode)}
               aria-current={activeNav === "ai-study" ? "page" : undefined}
             >
               AI Study
@@ -71,6 +84,12 @@ export function DeskChrome({
         </a>
         <span className="desk-footer-sep">·</span>
         <span>Read-only Macro Desk · confidence uncalibrated</span>
+        {!demoMode ? (
+          <>
+            <span className="desk-footer-sep">·</span>
+            <a href="/demo">Synthetic demo</a>
+          </>
+        ) : null}
       </footer>
     </main>
   );

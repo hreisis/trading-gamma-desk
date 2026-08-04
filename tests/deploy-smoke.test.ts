@@ -8,7 +8,9 @@ import {
   PUBLIC_DEMO_FIXTURE_PATH,
   PUBLIC_DEMO_SESSION,
   SITE_DESCRIPTION,
+  SITE_DESCRIPTION_DEMO,
   SITE_TITLE,
+  SITE_TITLE_DEMO,
   formatConfidenceScore,
   loadDecisionSurface,
   loadPublicDemoDeskView,
@@ -16,7 +18,7 @@ import {
 } from "@/desk";
 
 /**
- * Deployment smoke checks for the public portfolio demo.
+ * Deployment smoke checks for the public demo.
  * Does not call Tiingo or read generated data/.
  */
 describe("deploy smoke (public synthetic demo)", () => {
@@ -66,11 +68,16 @@ describe("deploy smoke (public synthetic demo)", () => {
     expect(view.error?.message).toBe(LIVE_DATA_UNAVAILABLE_MESSAGE);
   });
 
-  it("keeps portfolio metadata suitable for a public host", () => {
+  it("keeps production site metadata live-oriented", () => {
     expect(SITE_TITLE.length).toBeGreaterThan(10);
     expect(SITE_DESCRIPTION.length).toBeGreaterThan(40);
-    expect(SITE_DESCRIPTION.toLowerCase()).toContain("synthetic");
-    expect(SITE_TITLE.toLowerCase()).not.toContain("historical");
+    expect(SITE_TITLE.toLowerCase()).not.toContain("illustrative");
+    expect(SITE_DESCRIPTION.toLowerCase()).not.toContain("synthetic scenario");
+  });
+
+  it("keeps demo route metadata clearly synthetic", () => {
+    expect(SITE_TITLE_DEMO.toLowerCase()).toContain("demo");
+    expect(SITE_DESCRIPTION_DEMO.toLowerCase()).toContain("synthetic");
   });
 
   it("does not require Tiingo token or data/ for the public path", () => {

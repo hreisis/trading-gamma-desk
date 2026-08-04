@@ -1,5 +1,5 @@
 /**
- * Public portfolio demo mode (M1-11).
+ * Public demo mode (M1-11).
  *
  * When enabled, the desk serves only a synthetic DominantDriver fixture for
  * product demonstration. No cloud Tiingo, no local data/drivers, and no
@@ -54,17 +54,24 @@ export const GITHUB_REPO_URL =
   "https://github.com/hreisis/trading-gamma-desk";
 
 export const SITE_TITLE =
-  "GammaDesk — Macro Desk (Illustrative Demo)";
+  "GammaDesk — Macro Desk";
 
 export const SITE_DESCRIPTION =
-  "Portfolio demo of GammaDesk Macro Desk: a read-only cross-asset dominant-driver view over a synthetic scenario fixture. Confidence scores are uncalibrated; not live or historical market data.";
+  "Read-only cross-asset macro desk with structure, catalysts, market quotes, and AI study — live when configured, never silent synthetic fallback.";
+
+/** Legacy demo host metadata — used only on `/demo` routes. */
+export const SITE_TITLE_DEMO =
+  "GammaDesk — Macro Desk (Illustrative Demo)";
+
+export const SITE_DESCRIPTION_DEMO =
+  "Public demo of GammaDesk Macro Desk: a read-only cross-asset dominant-driver view over a synthetic scenario fixture. Confidence scores are uncalibrated; not live or historical market data.";
 
 /** Bundled synthetic driver — validated once at module load. */
 export const PUBLIC_DEMO_DRIVER: DominantDriverType = DominantDriver.parse(
   publicDemoFixtureJson,
 );
 
-/** True when the process is configured as the public portfolio demo. */
+/** True when the process env enables demo (CI smoke / local only — not production). */
 export function isPublicDemoMode(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
@@ -72,8 +79,38 @@ export function isPublicDemoMode(
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
+export function isDemoQueryParam(value: string | null | undefined): boolean {
+  const raw = (value ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
 /**
- * Desk view for the public portfolio host. Never reads process.cwd() or
+ * Resolve whether this request should serve synthetic demo fixtures.
+ * Production defaults to live/current — demo requires `/demo` or `?demo=1`.
+ */
+export function resolvePublicDemoMode(input: {
+  readonly env?: Record<string, string | undefined>;
+  readonly demoQuery?: string | null;
+  readonly demoPath?: boolean;
+  readonly publicDemo?: boolean;
+} = {}): boolean {
+  if (input.publicDemo === true) return true;
+  if (input.publicDemo === false) return false;
+  if (input.demoPath) return true;
+  if (isDemoQueryParam(input.demoQuery)) return true;
+  return isPublicDemoMode(input.env);
+}
+
+export function demoFlagFromRequest(request: Request): boolean {
+  const url = new URL(request.url);
+  return resolvePublicDemoMode({
+    demoQuery: url.searchParams.get("demo"),
+    demoPath: url.pathname.startsWith("/demo"),
+  });
+}
+
+/**
+ * Desk view for the public demo host. Never reads process.cwd() or
  * data/drivers — payload comes from the statically imported fixture.
  */
 export function loadPublicDemoDeskView(): MacroDeskView {

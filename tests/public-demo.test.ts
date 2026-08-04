@@ -10,9 +10,12 @@ import {
   PUBLIC_DEMO_FIXTURE_PATH,
   PUBLIC_DEMO_SESSION,
   SITE_DESCRIPTION,
+  SITE_DESCRIPTION_DEMO,
   SITE_TITLE,
+  SITE_TITLE_DEMO,
   formatConfidenceScore,
   isPublicDemoMode,
+  resolvePublicDemoMode,
   loadMacroDesk,
   resolveDeskRequest,
 } from "@/desk";
@@ -39,6 +42,20 @@ describe("isPublicDemoMode", () => {
     expect(isPublicDemoMode({ GAMMADESK_PUBLIC_DEMO: "1" })).toBe(true);
     expect(isPublicDemoMode({ GAMMADESK_PUBLIC_DEMO: "true" })).toBe(true);
     expect(isPublicDemoMode({ GAMMADESK_PUBLIC_DEMO: "0" })).toBe(false);
+  });
+});
+
+describe("resolvePublicDemoMode", () => {
+  it("defaults to live unless demo path, query, or env", () => {
+    expect(resolvePublicDemoMode({})).toBe(false);
+    expect(resolvePublicDemoMode({ demoPath: true })).toBe(true);
+    expect(resolvePublicDemoMode({ demoQuery: "1" })).toBe(true);
+    expect(
+      resolvePublicDemoMode({ env: { GAMMADESK_PUBLIC_DEMO: "1" } }),
+    ).toBe(true);
+    expect(resolvePublicDemoMode({ publicDemo: false, demoQuery: "1" })).toBe(
+      false,
+    );
   });
 });
 
@@ -141,12 +158,16 @@ describe("local mode unchanged without public demo", () => {
   });
 });
 
-describe("portfolio metadata", () => {
-  it("describes an illustrative synthetic demo, not a real session", () => {
+describe("site metadata", () => {
+  it("uses live-oriented production titles", () => {
     expect(SITE_TITLE).toMatch(/GammaDesk/);
-    expect(SITE_TITLE).toMatch(/Illustrative Demo/i);
-    expect(SITE_DESCRIPTION.toLowerCase()).toContain("synthetic");
-    expect(SITE_DESCRIPTION.toLowerCase()).toContain("uncalibrated");
-    expect(SITE_DESCRIPTION.toLowerCase()).not.toContain("historical fixture");
+    expect(SITE_TITLE).not.toMatch(/Illustrative Demo/i);
+    expect(SITE_DESCRIPTION.toLowerCase()).not.toContain("synthetic scenario");
+  });
+
+  it("keeps demo titles clearly synthetic", () => {
+    expect(SITE_TITLE_DEMO).toMatch(/Illustrative Demo/i);
+    expect(SITE_DESCRIPTION_DEMO.toLowerCase()).toContain("synthetic");
+    expect(SITE_DESCRIPTION_DEMO.toLowerCase()).toContain("uncalibrated");
   });
 });

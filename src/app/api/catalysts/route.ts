@@ -6,14 +6,11 @@ import {
 } from "@/contracts";
 import { loadCatalystFeed, toPublicCatalystFeed } from "@/catalyst";
 import type { CatalystQuery } from "@/catalyst";
+import { demoFlagFromRequest } from "@/desk/public-demo";
 
 /**
- * Read-only catalyst feed DTO. Public demo: synthetic fixtures only.
- * Local: official calendar cache when present (no network in the request path).
- * Query: category, status, importance, asset, start, end.
- *
- * Response is the public CatalystFeed contract — cache paths, raw provider
- * errors, AI token usage, and internal identity fields are stripped.
+ * Read-only catalyst feed DTO. Demo (`?demo=1` or `/demo`): synthetic fixtures only.
+ * Production: official calendar cache when present (no network in the request path).
  */
 export const dynamic = "force-dynamic";
 
@@ -40,6 +37,9 @@ export function GET(request: Request) {
     end: url.searchParams.get("end") ?? undefined,
   };
 
-  const feed = toPublicCatalystFeed(loadCatalystFeed(query));
+  const publicDemo = demoFlagFromRequest(request);
+  const feed = toPublicCatalystFeed(
+    loadCatalystFeed(query, { publicDemo: publicDemo ? true : false }),
+  );
   return NextResponse.json(feed);
 }

@@ -5,7 +5,7 @@ import { loadMarketNewsPanel } from "@/news";
 export const dynamic = "force-dynamic";
 
 export default async function NewsPage() {
-  const panel = await loadMarketNewsPanel();
+  const panel = await loadMarketNewsPanel({ publicDemo: false });
 
   return (
     <DeskChrome activeNav="news">

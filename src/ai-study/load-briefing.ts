@@ -5,7 +5,6 @@ import {
   AI_STUDY_METHODOLOGY_VERSION,
   type AiStudyBriefing,
 } from "@/contracts/ai-study-briefing";
-import { isPublicDemoMode } from "@/desk/public-demo";
 import { collectAiStudyInputs } from "./collect-inputs";
 import { loadAiStudyLlmConfig, type AiStudyLlmRuntimeConfig } from "./config";
 import { loadSyntheticAiStudyBriefing } from "./demo-fixture";
@@ -93,7 +92,7 @@ export async function loadAiStudyBriefing(
   const env = options.env ?? process.env;
   const now = options.now ?? new Date();
   const generatedAt = now.toISOString();
-  const publicDemo = options.publicDemo ?? isPublicDemoMode(env);
+  const publicDemo = options.publicDemo ?? false;
 
   if (publicDemo) {
     return loadSyntheticAiStudyBriefing({ generatedAt, now });
@@ -103,6 +102,7 @@ export async function loadAiStudyBriefing(
     env,
     now,
     sessionDate: options.sessionDate,
+    publicDemo,
   });
   const sessionFields = sessionMeta(options, packet.mode);
   const config = options.config ?? loadAiStudyLlmConfig(env);

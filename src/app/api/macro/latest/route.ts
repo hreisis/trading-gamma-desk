@@ -1,20 +1,28 @@
 import { NextResponse } from "next/server";
 import { resolveDeskRequest } from "@/desk";
+import { demoFlagFromRequest } from "@/desk/public-demo";
 
 /**
  * Serve the latest desk view model (read-only).
  * Does not ingest, classify, or interpret.
  *
  * Query:
- * - `?source=fixture` — force fixture (local); public demo already fixture-only
- * - `?source=live` — local live-only; in public demo → live_unavailable
+ * - `?source=fixture` — force fixture (local)
+ * - `?source=live` — local live-only
+ * - `?demo=1` — synthetic demo fixtures (same as `/demo` routes)
  */
 export const dynamic = "force-dynamic";
 
 export function GET(request: Request) {
   const url = new URL(request.url);
   const source = url.searchParams.get("source");
-  const view = resolveDeskRequest({ source });
+  const demo = demoFlagFromRequest(request);
+  const view = resolveDeskRequest({
+    source,
+    demoQuery: url.searchParams.get("demo"),
+    demoPath: demo && url.pathname.startsWith("/demo"),
+    publicDemo: demo ? true : false,
+  });
 
   return NextResponse.json({
     status: view.status,

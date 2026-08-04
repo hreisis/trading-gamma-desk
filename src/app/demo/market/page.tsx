@@ -4,17 +4,15 @@ import { loadAlpacaMarketPanel } from "@/alpaca";
 
 export const dynamic = "force-dynamic";
 
-export default async function MarketPage() {
-  const panel = await loadAlpacaMarketPanel({ publicDemo: false });
+export default async function DemoMarketPage() {
+  const panel = await loadAlpacaMarketPanel({ publicDemo: true });
 
   return (
-    <DeskChrome activeNav="market">
+    <DeskChrome activeNav="market" demoMode>
       <section className="desk-intro">
-        <h1 className="desk-title">Portfolio market data</h1>
+        <h1 className="desk-title">Market data (demo)</h1>
         <p className="desk-section-note">
-          Recent quotes from Alpaca when configured locally. This surface never
-          falls back to Tiingo or desk fixtures — missing credentials show an
-          explicit unavailable state.
+          Synthetic quote fixtures — not live Alpaca data.
         </p>
       </section>
       <AlpacaMarketPanel panel={panel} />

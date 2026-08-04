@@ -58,7 +58,7 @@ function mockOpenAiSuccess(): FetchLike {
 describe("collectAiStudyInputs", () => {
   it("labels market temperature unavailable and public demo fixtures", async () => {
     const packet = await collectAiStudyInputs({
-      env: { GAMMADESK_PUBLIC_DEMO: "1" } as unknown as NodeJS.ProcessEnv,
+      publicDemo: true,
     });
 
     expect(
@@ -189,7 +189,7 @@ describe("loadAiStudyBriefing", () => {
 describe("generateAiStudyWithFake", () => {
   it("returns provider error mode", async () => {
     const packet = await collectAiStudyInputs({
-      env: { GAMMADESK_PUBLIC_DEMO: "1" } as unknown as NodeJS.ProcessEnv,
+      publicDemo: true,
     });
     const result = await generateAiStudyWithFake({
       packet,

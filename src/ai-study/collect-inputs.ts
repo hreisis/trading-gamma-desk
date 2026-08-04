@@ -9,7 +9,7 @@ import type {
 import { loadCatalystFeed } from "@/catalyst";
 import { loadSessionDriver } from "@/desk/load-session-driver";
 import { loadSessionBoundedGamma } from "@/desk/load-session-bounded-gamma";
-import { isPublicDemoMode, PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
+import { PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
 import { buildMarketStructureStateV2 } from "@/gamma/structure-state-v2";
 import { studyEvidenceBundlePath } from "@/studies/pipeline-store";
 import evidenceFixture from "../../fixtures/studies/evidence-bundle.m62.json";
@@ -508,13 +508,14 @@ export interface CollectAiStudyInputsOptions {
   readonly now?: Date;
   readonly sessionDate?: string | null;
   readonly dataRoot?: string;
+  readonly publicDemo?: boolean;
 }
 
 export async function collectAiStudyInputs(
   options: CollectAiStudyInputsOptions = {},
 ): Promise<AiStudyInputPacket> {
   const env = options.env ?? process.env;
-  const publicDemo = isPublicDemoMode(env);
+  const publicDemo = options.publicDemo ?? false;
   const now = options.now ?? new Date();
   const dataRoot = options.dataRoot ?? join(process.cwd(), "data");
   const historicalMode = isHistoricalAiStudySession(options.sessionDate);

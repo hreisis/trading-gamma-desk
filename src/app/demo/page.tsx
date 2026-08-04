@@ -2,34 +2,36 @@ import { MacroDesk } from "@/app/components/MacroDesk";
 import { loadCatalystFeed, toPublicCatalystFeed } from "@/catalyst";
 import { loadBoundedGammaDeskView, resolveDeskRequest } from "@/desk";
 
-/** Always resolve at request time (env + query). */
 export const dynamic = "force-dynamic";
 
-export default async function Home({
+export default async function DemoHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; gamma?: string; demo?: string }>;
+  searchParams: Promise<{ source?: string; gamma?: string }>;
 }) {
   const params = await searchParams;
   const view = resolveDeskRequest({
     source: params.source,
-    demoQuery: params.demo,
-    publicDemo: false,
+    demoPath: true,
+    publicDemo: true,
   });
   const catalystFeed =
     view.status === "live_unavailable"
       ? null
-      : toPublicCatalystFeed(
-          loadCatalystFeed({}, { publicDemo: view.isPublicDemo }),
-        );
+      : toPublicCatalystFeed(loadCatalystFeed({}, { publicDemo: true }));
 
   const gammaView = loadBoundedGammaDeskView({
     symbol: "SPY",
     forceFixture: params.gamma === "fixture",
-    publicDemo: view.isPublicDemo,
+    publicDemo: true,
   });
 
   return (
-    <MacroDesk view={view} catalystFeed={catalystFeed} gammaView={gammaView} />
+    <MacroDesk
+      view={view}
+      catalystFeed={catalystFeed}
+      gammaView={gammaView}
+      demoMode
+    />
   );
 }
