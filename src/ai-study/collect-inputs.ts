@@ -6,9 +6,14 @@ import type {
   AiStudyInputProvenance,
   AiStudySessionAlignment,
 } from "@/contracts/ai-study-briefing";
-import { loadCatalystFeed } from "@/catalyst";
+import { loadCatalystFeed, loadCatalystFeedAsync } from "@/catalyst";
 import { loadSessionDriver } from "@/desk/load-session-driver";
 import { loadSessionBoundedGamma } from "@/desk/load-session-bounded-gamma";
+import {
+  ensureMacroDriverArtifact,
+  loadBoundedGammaDeskViewAsync,
+  resolveRuntimeDataRoot,
+} from "@/desk/production-runtime";
 import { PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
 import { buildMarketStructureStateV2 } from "@/gamma/structure-state-v2";
 import { studyEvidenceBundlePath } from "@/studies/pipeline-store";
@@ -154,14 +159,14 @@ function summarizeMacro(
   };
 }
 
-function summarizeCatalysts(
+function summarizeCatalystsFromFeed(
+  feed: ReturnType<typeof loadCatalystFeed>,
   publicDemo: boolean,
   now: Date,
 ): {
   provenance: AiStudyInputProvenance;
   facts: readonly Record<string, unknown>[];
 } {
-  const feed = loadCatalystFeed({}, { publicDemo, now });
   const events = feed.catalysts.slice(0, 8).map((c) => ({
     id: c.id,
     headline: c.headline,
@@ -261,7 +266,11 @@ function summarizeGamma(
     };
   }
 
-  const loaded = loadSessionBoundedGamma({ sessionDate: target, symbol: "SPY" });
+  const loaded = loadSessionBoundedGamma({
+    sessionDate: target,
+    symbol: "SPY",
+    dataRoot: join(dataRoot, "gamma", "providers", "marketdata-app"),
+  });
   const snap = loaded.snapshot;
   const mismatched = loaded.issues.some((i) => i.severity === "mismatched");
   if (!snap || mismatched) {
@@ -517,7 +526,7 @@ export async function collectAiStudyInputs(
   const env = options.env ?? process.env;
   const publicDemo = options.publicDemo ?? false;
   const now = options.now ?? new Date();
-  const dataRoot = options.dataRoot ?? join(process.cwd(), "data");
+  const dataRoot = options.dataRoot ?? resolveRuntimeDataRoot(env);
   const historicalMode = isHistoricalAiStudySession(options.sessionDate);
   const targetSession = publicDemo
     ? PUBLIC_DEMO_SESSION
@@ -526,8 +535,21 @@ export async function collectAiStudyInputs(
       : resolveCurrentMarketSessionDate(now);
   const mode: AiStudyInputPacket["mode"] = historicalMode ? "historical" : "current";
 
+  if (!publicDemo) {
+    await ensureMacroDriverArtifact({ dataRoot, env });
+    await loadBoundedGammaDeskViewAsync({
+      symbol: "SPY",
+      dataRoot: join(dataRoot, "gamma", "providers", "marketdata-app"),
+      publicDemo: false,
+      env,
+    });
+  }
+
   const macro = summarizeMacro(publicDemo, targetSession, dataRoot);
-  const catalysts = summarizeCatalysts(publicDemo, now);
+  const catalystFeed = publicDemo
+    ? loadCatalystFeed({}, { publicDemo, now, dataRoot })
+    : await loadCatalystFeedAsync({}, { publicDemo, now, dataRoot, env });
+  const catalysts = summarizeCatalystsFromFeed(catalystFeed, publicDemo, now);
   const gamma = summarizeGamma(publicDemo, targetSession, dataRoot);
   const quotes = await summarizeMarketQuotes(publicDemo, now);
   const sessionDate = targetSession;

@@ -1,23 +1,20 @@
 import { NextResponse } from "next/server";
-import { resolveDeskRequest } from "@/desk";
+import { resolveDeskRequestAsync } from "@/desk";
 import { demoFlagFromRequest } from "@/desk/public-demo";
 
 /**
  * Serve the latest desk view model (read-only).
- * Does not ingest, classify, or interpret.
- *
- * Query:
- * - `?source=fixture` — force fixture (local)
- * - `?source=live` — local live-only
- * - `?demo=1` — synthetic demo fixtures (same as `/demo` routes)
+ * Production serverless hosts refresh macro drivers via TIINGO_TOKEN when
+ * local `data/drivers/` is absent.
  */
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const url = new URL(request.url);
   const source = url.searchParams.get("source");
   const demo = demoFlagFromRequest(request);
-  const view = resolveDeskRequest({
+  const view = await resolveDeskRequestAsync({
     source,
     demoQuery: url.searchParams.get("demo"),
     demoPath: demo && url.pathname.startsWith("/demo"),

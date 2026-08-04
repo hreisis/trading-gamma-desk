@@ -4,15 +4,18 @@ import {
   CatalystImportance,
   CatalystStatus,
 } from "@/contracts";
-import { loadCatalystFeed, toPublicCatalystFeed } from "@/catalyst";
+import { toPublicCatalystFeed } from "@/catalyst";
 import type { CatalystQuery } from "@/catalyst";
+import { loadCatalystFeedAsync } from "@/desk";
 import { demoFlagFromRequest } from "@/desk/public-demo";
 
 /**
  * Read-only catalyst feed DTO. Demo (`?demo=1` or `/demo`): synthetic fixtures only.
- * Production: official calendar cache when present (no network in the request path).
+ * Production: official calendar cache when present; on serverless cache miss fetches
+ * BLS/BEA/Federal Reserve schedules at request time.
  */
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function parseEnum<T extends string>(
   raw: string | null,
@@ -23,7 +26,7 @@ function parseEnum<T extends string>(
   return parsed.success ? parsed.data : undefined;
 }
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const url = new URL(request.url);
   const query: CatalystQuery = {
     category: parseEnum(url.searchParams.get("category"), CatalystCategory),
@@ -39,7 +42,9 @@ export function GET(request: Request) {
 
   const publicDemo = demoFlagFromRequest(request);
   const feed = toPublicCatalystFeed(
-    loadCatalystFeed(query, { publicDemo: publicDemo ? true : false }),
+    await loadCatalystFeedAsync(query, {
+      publicDemo: publicDemo ? true : false,
+    }),
   );
   return NextResponse.json(feed);
 }
