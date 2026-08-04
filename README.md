@@ -6,13 +6,15 @@ Decision loop: **Observe → Research → Evaluate → Decide → Review**
 
 Module chain (deterministic compute → interpreted outputs): **Driver → Catalyst → Structure → Confirmation → Updated View**
 
-**Shipped (M1–M6):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC), Structure·Gamma desk section, and deterministic strategy research + constrained study memo pipeline (`studies:build`, `studies:pipeline`, `studies:memo`). UI renders precomputed payloads — it does not classify markets or recompute scores.
+**Shipped (M1–M8):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC), Structure·Gamma desk section, deterministic strategy research + constrained study memo pipeline (`studies:build`, `studies:pipeline`, `studies:memo`), and the **Decision surface** at `/decide?date=` (Observe → Research → Evaluate → Decide). UI renders precomputed payloads — it does not classify markets or recompute scores.
 
-**Next public milestone (M8):** minimal decision interface — Evaluate → Decide in one viewport. **M7** private portfolio policy remains a **separate private-repo** track (planned, not blocking M8).
+**Next public milestone (M9):** shadow mode / review loop — decision logs and outcome compare in the **private repository**. **M7** private portfolio policy remains a **separate private-repo** track.
 
 **Public vs private:** this repo ships **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio data, allocation policy, and decision logs live in a **separate private repository** (`.gitignore` here is secondary local protection, not the primary boundary).
 
-**Public portfolio demo:** synthetic macro + catalyst fixtures — illustrative, not live or historical market data. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
+**Public portfolio demo:** **Synthetic Demo Data — illustrative, not market data.** All demo research uses bundled fixtures only; never reads `data/`. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
+
+**Study validation status:** M8 ships the decision UI and pipeline wiring. Local acceptance on 2026-07-29 confirms non-demo `/decide` loads `data/` artifacts, but Study inputs remain partly fixture-backed (archive, peer corpus, SPY prices). Real historical Study validation is **M8-5 (queued)** — not claimed as passed.
 
 ### Regime vs catalyst vs confidence
 
@@ -170,7 +172,7 @@ npm run catalyst:update -- --max-events 2
 | `/?source=live` | Live only — empty if no drivers (no silent fixture). **Public demo:** macro page shows **Live data unavailable**; Catalyst UI is hidden on that page. `/api/catalysts` still returns `synthetic_demo` (API has no `?source=` gate) — intentional until a later M3 split. |
 | `/api/macro/latest` | Same view model as JSON |
 | `/api/catalysts` | Public `CatalystFeed` DTO (`?category=&status=&importance=&asset=&start=&end=`) — no cache paths, raw provider errors, or AI token usage |
-| `/decide?date=2026-07-29` | **M8-1 decision surface** — Observe (driver/catalyst/structure) + study research w/ citations + policy-unavailable slot + non-trade stance; fixture-only; **exact date required** (no latest) |
+| `/decide?date=2026-07-29` | **M8 decision surface** — Observe + deterministic study evidence + auditable drill-down + AI memo + policy slot + non-trade stance; public demo uses fixtures only; **exact date required** (no latest) |
 
 Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md). Decision surface demo: `/decide?date=2026-07-29`.
 
@@ -267,8 +269,8 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 | **M5** Strategy research / replay / regime (M5-1A…M5-4) | ✅ |
 | **M6** Constrained LLM study agent (M6-1…M6-4) | ✅ |
 | **M7** Private portfolio policy | Planned (private repo) |
-| **M8** Minimal decision interface | **Next** — M8-1 decision surface |
-| **M9** Shadow mode / review loop | Planned (private repo) |
+| **M8** Minimal decision interface (M8-1…M8-4) | ✅ |
+| **M9** Shadow mode / review loop | **Next** (private repo) |
 
 Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope for the catalyst chain. Market Temperature stays in the backlog. See [product](docs/product.md) and [tasks](docs/tasks.md) for the full M4–M9 plan.
 

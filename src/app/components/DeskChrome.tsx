@@ -1,11 +1,33 @@
-import { GITHUB_REPO_URL } from "@/desk/public-demo";
+import { GITHUB_REPO_URL, PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
 
-export function DeskChrome({ children }: { children: React.ReactNode }) {
+export function DeskChrome({
+  children,
+  activeNav,
+}: {
+  children: React.ReactNode;
+  activeNav?: "macro" | "decide";
+}) {
   return (
     <main className="desk">
       <header className="desk-brand">
         <div className="desk-brand-row">
           <p className="desk-product">GammaDesk</p>
+          <nav className="desk-nav" aria-label="Primary">
+            <a
+              className={activeNav === "macro" ? "desk-nav-link is-active" : "desk-nav-link"}
+              href="/"
+              aria-current={activeNav === "macro" ? "page" : undefined}
+            >
+              Macro Desk
+            </a>
+            <a
+              className={activeNav === "decide" ? "desk-nav-link is-active" : "desk-nav-link"}
+              href={`/decide?date=${PUBLIC_DEMO_SESSION}`}
+              aria-current={activeNav === "decide" ? "page" : undefined}
+            >
+              Decide
+            </a>
+          </nav>
           <a
             className="desk-repo"
             href={GITHUB_REPO_URL}

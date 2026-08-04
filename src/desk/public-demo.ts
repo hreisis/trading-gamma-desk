@@ -30,19 +30,22 @@ export const PUBLIC_DEMO_SESSION = "2026-07-29";
 export const PUBLIC_DEMO_FIXTURE_PATH =
   "fixtures/macro/public-demo.2026-07-29.json";
 
-export const PUBLIC_DEMO_BANNER = "Illustrative demo · synthetic scenario";
+export const PUBLIC_DEMO_BANNER =
+  "Synthetic Demo Data — illustrative, not market data.";
 
 export const PUBLIC_DEMO_DISCLAIMER =
-  "Synthetic values for product demonstration — not actual market observations.";
+  "Synthetic Demo Data for product demonstration — not actual market observations.";
 
 /**
  * Single compact chrome banner for public demo (M3-1.5) — replaces stacked
  * macro + catalyst demo banners on the page.
  */
-export const PUBLIC_DEMO_COMPACT_BANNER =
-  "Illustrative demo · synthetic scenario — not actual market or catalyst observations.";
+export const PUBLIC_DEMO_COMPACT_BANNER = PUBLIC_DEMO_BANNER;
 
 export const PUBLIC_DEMO_SOURCE_LABEL = PUBLIC_DEMO_BANNER;
+
+/** Decision surface demo session label — not presented as live research. */
+export const PUBLIC_DEMO_SESSION_LABEL = "Demo session (synthetic fixtures)";
 
 export const LIVE_DATA_UNAVAILABLE_MESSAGE =
   "Live data unavailable in public demo";

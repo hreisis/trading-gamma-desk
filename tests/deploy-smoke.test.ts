@@ -10,6 +10,7 @@ import {
   SITE_DESCRIPTION,
   SITE_TITLE,
   formatConfidenceScore,
+  loadDecisionSurface,
   loadPublicDemoDeskView,
   resolveDeskRequest,
 } from "@/desk";
@@ -48,8 +49,7 @@ describe("deploy smoke (public synthetic demo)", () => {
     expect(view.isPublicDemo).toBe(true);
     expect(view.isLiveDriver).toBe(false);
     expect(view.sourceLabel).toBe(PUBLIC_DEMO_BANNER);
-    expect(view.sourceLabel).toContain("Illustrative demo");
-    expect(view.sourceLabel).toContain("synthetic");
+    expect(view.sourceLabel).toContain("Synthetic Demo Data");
     expect(view.sourceLabel).not.toContain(PUBLIC_DEMO_SESSION);
     expect(PUBLIC_DEMO_DISCLAIMER).toMatch(/not actual market observations/i);
     expect(JSON.stringify(view).toLowerCase()).not.toContain('"live driver"');
@@ -77,5 +77,16 @@ describe("deploy smoke (public synthetic demo)", () => {
     expect(process.env.TIINGO_TOKEN ?? "").toEqual(expect.any(String));
     const view = resolveDeskRequest({ publicDemo: true });
     expect(view.driver).not.toBeNull();
+  });
+
+  it("loads public demo decision surface without data/", () => {
+    const view = loadDecisionSurface({
+      sessionDate: PUBLIC_DEMO_SESSION,
+      publicDemo: true,
+    });
+    expect(view.status).toBe("ready");
+    expect(view.isPublicDemo).toBe(true);
+    expect(view.research?.evidenceDrillDown).toBeDefined();
+    expect(view.stance?.nonTrade).toBe(true);
   });
 });

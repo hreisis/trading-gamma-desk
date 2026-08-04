@@ -1291,19 +1291,20 @@ Fixtures: `fixtures/studies/pipeline.m64.json`, `fixtures/studies/profiles/peer-
 
 ---
 
-## 3l. Decision surface (M8-1 / M8-2 / M8-3)
+## 3l. Decision surface (M8-1 / M8-2 / M8-3 / M8-4)
 
-Single SSR viewport contract for `/decide?date=` — offline only, no OpenAI/fetch/regeneration at render. Types: `DecisionSurfaceView`, `DecisionEvidenceSummary`, `DecisionEvidenceDrillDown`, `DeskStance`, `PublicPolicySlot`, `ArtifactIntegrityIssue` in `src/contracts/decision-surface.ts`. Loader: `loadDecisionSurface`; drill-down builder: `buildDecisionEvidenceDrillDown`; peer context: `loadDecisionStudyContext`.
+Single SSR viewport contract for `/decide?date=` — offline only, no OpenAI/fetch/regeneration at render. Types: `DecisionSurfaceView`, `DecisionEvidenceSummary`, `DecisionEvidenceDrillDown`, `DeskStance`, `PublicPolicySlot`, `ArtifactIntegrityIssue` in `src/contracts/decision-surface.ts`. Loader: `loadDecisionSurface`; drill-down builder: `buildDecisionEvidenceDrillDown`; peer context: `loadDecisionStudyContext`; UI helpers: `decision-surface-ui.ts`.
 
 | Rule | Notes |
 | --- | --- |
 | Route | `/decide?date=YYYY-MM-DD` — **exact session date required**; no `latest` fallback |
-| Demo (`GAMMADESK_PUBLIC_DEMO=1`) | Bundled fixtures only — never reads `data/` |
+| Demo (`GAMMADESK_PUBLIC_DEMO=1`) | Bundled fixtures only — never reads `data/`; banner **Synthetic Demo Data — illustrative, not market data.**; session labeled **Demo session (synthetic fixtures)** |
 | Non-demo | Exact-date reads: `data/drivers/{date}.json`, `data/studies/evidence/{date}/{symbol}/evidence-bundle.json`, `data/studies/memos/{date}/study-memo.json`, optional `data/studies/pipeline/{date}/run.json`, `data/studies/similar-regime/{date}/{symbol}/similar-regime-study.json`, peer outcomes via pipeline manifest corpus — bounded gamma snapshot (sessionDate must match) |
 | Observe | `DominantDriver`, catalyst headlines, bounded `MarketStructureState` (v2) |
 | Research | Deterministic evidence summary first (status, cohort n, mature samples, 1D/5D/20D, MFE/MAE, limitations); AI memo beneath with status/source labels |
 | Drill-down (M8-3) | Collapsed `<details>` panel: full horizon stats (incl. median MFE/MAE + status basis), query match fields, match criteria, similarity/rejected counts, per-session match fields + horizon outcomes + missing-data notes, bundle limitations, cohort unknowns, memo citations resolved to `bundle.*` paths with display values on expand |
 | Lanes | Visual distinction: `deterministic` (evidence), `inference`, `limitations`, `unknowns` |
+| UI (M8-4) | Research ribbon badges (evidence status, strength, cohort n, horizon coverage, memo source); integrity ribbon; page status banners; primary nav Macro Desk ↔ Decide; responsive observe grid; keyboard focus on expandables |
 | Strength | Display-only: `insufficient` / `preliminary` / `limited` / `adequate` — does not alter `evidenceStatus` |
 | Integrity | Render missing/invalid/mismatched/stale issues (message only — **no filesystem paths**); **suppress stance** when study bundle/memo integrity fails |
 | Policy | `PublicPolicySlot` — `status: unavailable` in public repo (M7 private track) |
@@ -1313,6 +1314,20 @@ Single SSR viewport contract for `/decide?date=` — offline only, no OpenAI/fet
 | Prohibited | No buy/sell, probability, sizing, or order language in stance; no local paths, credentials, private policy, or raw provider payloads in UI |
 
 Bundled demo session: `2026-07-29` (`PUBLIC_DEMO_SESSION`). Demo peer fixtures: `fixtures/studies/profiles/peer-m62.json`, `fixtures/studies/outcomes/peer-m62-outcome.json`.
+
+### M8 acceptance note (2026-07-29, local only)
+
+Proves non-demo `/decide` renders `data/` pipeline artifacts when present. **Not real historical Study validation.**
+
+| Input | Status |
+| --- | --- |
+| `data/drivers/2026-07-29.json` | Real macro (Tiingo) |
+| `data/catalyst/*` | Real cached catalyst artifacts |
+| Bounded gamma exact-date | Unavailable (snapshot sessionDate mismatch) |
+| Study archive / peer corpus / SPY prices | Fixture-backed in current `pipeline.m64.json` manifest |
+| Cohort at acceptance | n=1; outcomes from synthetic SPY price fixture |
+
+Test: `tests/decision-surface-real-acceptance.test.ts`. Real historical foundation: **M8-5 (queued)**.
 
 ---
 

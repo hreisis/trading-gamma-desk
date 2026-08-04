@@ -6,7 +6,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 **Milestone 6 — Constrained LLM study agent (✅ complete through M6-4).** M5-3/M5-4 and M6-1…M6-4 shipped: deterministic similar-regime evidence, constrained memo agent, integration smoke, and end-to-end `studies:pipeline`. **M6 exit criteria satisfied** (see below).
 
-**Next public milestone:** **M8 — Minimal decision interface** — **M8-1** decision surface (✅), **M8-2** uncertainty + exact-date study artifacts (✅), **M8-3** auditable evidence drill-down (✅). **M7** private policy remains a separate private-repo track.
+**Next public milestone:** **M9 — Shadow mode / review loop** (private repo). **M8 — Minimal decision interface** is ✅ complete (M8-1…M8-4). **M7** private policy remains a separate private-repo track.
 
 ### Queued (not started)
 
@@ -196,15 +196,38 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 ## Milestone 8 — Minimal decision interface
 
-**Status:** **Next public milestone** — starts after M6 exit; consumes Observe + Research outputs; Evaluate → Decide in one viewport.
+**Status:** ✅ **Complete** (M8-1…M8-4).
 
 | ID | Task | Done when |
 | --- | --- | --- |
 | M8-1 | Decision surface | `/decide?date=` SSR viewport: Observe (driver/catalyst/structure) + StudyMemo research w/ citations + public policy-unavailable slot + deterministic non-trade stance; fixture-only; exact date — ✅ |
 | M8-2 | Uncertainty + study artifacts | Non-demo `/decide` loads exact-date driver, structure, `StudyEvidenceBundle`, and `StudyMemo` from `data/`; deterministic evidence panel (status, cohort, horizons, MFE/MAE, limitations); display-only strength; memo provenance labels; artifact integrity errors; stance suppressed on study integrity failure; demo stays fixture-only — ✅ |
 | M8-3 | Evidence path | Expandable auditable drill-down on `/decide`: full horizons + MFE/MAE, matched sessions, match/similarity fields, limitations/unknowns, memo citation resolution — ✅ |
+| M8-4 | UI polish + smoke | Portfolio-ready hierarchy, ribbons/badges, responsive layout, nav to `/decide`, keyboard/semantic expandables, representative state smoke tests, deploy smoke — ✅ |
 
-**Exit criteria (M8):** Operator can Evaluate → Decide from one minimal UI without dashboard clutter.
+**Exit criteria (M8):** Operator can Evaluate → Decide from one minimal UI without dashboard clutter. **Satisfied.**
+
+### M8 local acceptance (2026-07-29) — pipeline wiring only
+
+**Does not validate real historical Study research.** Documents non-demo `/decide` loading genuine `data/` pipeline outputs when present.
+
+| Layer | Result |
+| --- | --- |
+| Macro driver | ✅ Real — `data/drivers/2026-07-29.json` (Tiingo daily ingest) |
+| Catalysts | ✅ Real cached schedules/results in `data/catalyst/` |
+| Bounded structure | ❌ Unavailable for exact date — gamma snapshot `sessionDate` 2026-07-30 ≠ query 2026-07-29 → `/decide` status `partial` |
+| Study archive | ❌ Fixture — `fixtures/studies/archive/2026-07-29/daily-research.json` |
+| Peer corpus | ❌ Fixture — single peer from `fixtures/studies/profiles/peer-m64.json` |
+| SPY outcomes (1D/5D/20D) | ❌ Fixture price series — `fixtures/studies/prices/spy.m52.json` (`synthetic: true`) |
+| Cohort | n=1 matched peer (`2026-07-22`); 1 mature sample per horizon |
+| Memo | Rule-based fallback (`complete`); evidence cites fixture-backed bundle |
+| Non-demo missing artifacts | Shows unavailable — never falls back to bundled fixtures |
+
+Automated: `tests/decision-surface-real-acceptance.test.ts`. **Real historical Study validation deferred to M8-5.**
+
+### M8-5 (queued — not started)
+
+Real historical data foundation: ingest real SPY bars, build multi-session PIT archive from actual desk/catalyst/structure artifacts, remove fixture inputs from non-demo manifests, compute outcomes without look-ahead, require non-synthetic provenance, re-run acceptance with honest cohort reporting. See planning notes in product/architecture docs.
 
 ---
 

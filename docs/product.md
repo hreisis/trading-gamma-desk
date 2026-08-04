@@ -59,7 +59,7 @@ Shipped work (M1–M6) established macro regime, catalyst evidence, desk UI foun
 | **M5** | Strategy research / replay / regime | ✅ PIT archive, forward outcomes, similar-regime study, evidence bundle — all deterministic |
 | **M6** | Constrained LLM study agent | ✅ Cited study memos from `StudyEvidenceBundle` only; validation + fallback; integration smoke; end-to-end `studies:pipeline` |
 | **M7** | Private portfolio policy | **Planned (private repo)** — thresholds, sizing, allocation rules, instrument universe; parallel track, not blocking M8 |
-| **M8** | Minimal decision interface | **In progress** — M8-1 decision surface ✅; M8-2 uncertainty + study artifacts ✅; M8-3 auditable evidence drill-down ✅ |
+| **M8** | Minimal decision interface | ✅ Shipped — `/decide?date=` decision surface with evidence drill-down (M8-1…M8-4) |
 | **M9** | Shadow mode / review loop | Decision logs in private repo; compare to outcomes; optional calibration feed |
 
 M4–M6 are **shipped on the public product path**. M7–M9 require the **separate private repository** boundary for policy and logs; **M8** is the next milestone in this public repo.
@@ -129,9 +129,13 @@ Non-negotiable product principles:
 | M5-4 evidence bundle | ✅ Shipped |
 | M6-1…M6-4 study agent + pipeline | ✅ Shipped |
 | M6 exit criteria | ✅ Satisfied |
-| **Next public milestone** | **M8** complete (M8-3 drill-down) — **M9** shadow/review loop next |
+| **Next public milestone** | **M9** shadow/review loop (private repo) |
 | M8-1 decision surface | ✅ Shipped (`/decide?date=`) |
 | M8-2 uncertainty + study artifacts | ✅ Shipped (exact-date `data/` loads, evidence panel, integrity errors, stance suppression) |
+| M8-3 auditable evidence drill-down | ✅ Shipped (expandable horizons, matched sessions, citation resolution) |
+| M8-4 UI polish + smoke | ✅ Shipped (ribbons, nav, responsive layout, synthetic demo labeling, state smoke tests) |
+
+**M8 Study validation:** UI and pipeline wiring complete. **Real historical Study validation not passed** — 2026-07-29 local acceptance documented fixture-backed archive, peer corpus, SPY prices, and n=1 cohort; exact-date structure unavailable. **M8-5 queued.**
 | M7 private policy | Planned — separate private repo |
 
 ---

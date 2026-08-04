@@ -67,7 +67,7 @@ export const DECISION_SURFACE_MEMO: StudyMemo = validateStudyMemoOutput({
 });
 
 export const DECISION_SURFACE_SOURCE_LABEL =
-  "Illustrative decision surface · synthetic fixtures";
+  "Synthetic Demo Data — decision surface fixtures (not market data)";
 
 export const PUBLIC_POLICY_UNAVAILABLE_MESSAGE =
   "Portfolio policy is unavailable in the public repository. Thresholds, sizing, and allocation rules are evaluated in a separate private workspace (M7 — not wired here).";

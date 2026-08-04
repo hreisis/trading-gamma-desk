@@ -15,5 +15,6 @@ export * from "./load-decision-surface";
 export * from "./load-decision-artifacts";
 export * from "./load-session-driver";
 export * from "./load-session-bounded-gamma";
+export * from "./decision-surface-ui";
 export * from "./build-decision-evidence-drilldown";
 export * from "./load-decision-study-context";

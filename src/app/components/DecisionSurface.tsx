@@ -11,8 +11,116 @@ import type {
   MemoBulletDrillDown,
 } from "@/contracts/decision-surface";
 import { structureConditionLabel } from "@/desk/build-desk-stance";
-import { PUBLIC_DEMO_COMPACT_BANNER } from "@/desk/public-demo";
+import {
+  DECISION_SURFACE_FIXTURE_SESSION,
+} from "@/desk/decision-surface-fixtures";
+import {
+  PUBLIC_DEMO_COMPACT_BANNER,
+  PUBLIC_DEMO_SESSION_LABEL,
+} from "@/desk/public-demo";
+import {
+  type DecisionBadgeTone,
+  decisionBadgeClass,
+  evidenceStatusTone,
+  horizonCoverageSummary,
+  integritySummary,
+  isDecisionErrorStatus,
+  memoSourceShortLabel,
+  pageStatusBanner,
+  strengthTone,
+} from "@/desk/decision-surface-ui";
 import { DeskChrome } from "./DeskChrome";
+
+function DecisionBadge({
+  label,
+  tone,
+  testId,
+}: {
+  label: string;
+  tone: DecisionBadgeTone;
+  testId?: string;
+}) {
+  return (
+    <span className={decisionBadgeClass(tone)} data-testid={testId}>
+      {label}
+    </span>
+  );
+}
+
+function ResearchRibbon({ view }: { view: NonNullable<DecisionSurfaceView["research"]> }) {
+  const summary = view.evidenceSummary;
+  const coverage = horizonCoverageSummary(summary.horizons);
+
+  return (
+    <div className="decision-research-ribbon" data-testid="decision-research-ribbon">
+      <DecisionBadge
+        label={summary.evidenceStatusLabel}
+        tone={evidenceStatusTone(summary.evidenceStatus)}
+        testId="ribbon-evidence-status"
+      />
+      <DecisionBadge
+        label={`Strength · ${summary.strengthDisplay}`}
+        tone={strengthTone(summary.strengthDisplay)}
+        testId="ribbon-strength"
+      />
+      <DecisionBadge
+        label={`Cohort n=${summary.cohortMatchedCount}`}
+        tone={summary.cohortMatchedCount <= 1 ? "warn" : "info"}
+        testId="ribbon-cohort-n"
+      />
+      <DecisionBadge
+        label={coverage.label}
+        tone={coverage.tone}
+        testId="ribbon-horizon-coverage"
+      />
+      <DecisionBadge
+        label={`Memo · ${memoSourceShortLabel({
+          memoStatus: view.memoStatus,
+          memoSourceLabel: view.memoSourceLabel,
+        })}`}
+        tone={view.memoStatus === "abstained" ? "neutral" : "info"}
+        testId="ribbon-memo-source"
+      />
+    </div>
+  );
+}
+
+function PageIntegrityRibbon({ view }: { view: DecisionSurfaceView }) {
+  const integrity = integritySummary(view);
+  if (view.artifactIssues.length === 0 && view.studyIntegrityOk) return null;
+  return (
+    <div className="decision-integrity-ribbon" data-testid="decision-integrity-ribbon">
+      <DecisionBadge label={integrity.label} tone={integrity.tone} testId="ribbon-integrity" />
+      {!view.studyIntegrityOk ? (
+        <span className="decision-muted">Desk stance suppressed until study artifacts align.</span>
+      ) : null}
+    </div>
+  );
+}
+
+function PageStatusBanner({ view }: { view: DecisionSurfaceView }) {
+  const banner = pageStatusBanner(view);
+  if (!banner) return null;
+  return (
+    <section
+      className={`decision-status-banner decision-status-banner-${banner.tone}`}
+      data-testid="decision-page-status"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="decision-status-banner-title">{banner.label}</p>
+      {banner.detail ? <p className="decision-muted">{banner.detail}</p> : null}
+      {view.status === "missing_date" || view.status === "date_unavailable" ? (
+        <p className="decision-status-banner-action">
+          Try the bundled demo session:{" "}
+          <a href={`/decide?date=${DECISION_SURFACE_FIXTURE_SESSION}`}>
+            {DECISION_SURFACE_FIXTURE_SESSION}
+          </a>
+        </p>
+      ) : null}
+    </section>
+  );
+}
 
 function laneClass(lane: EvidenceDrillDownLane): string {
   return `decision-lane decision-lane-${lane}`;
@@ -20,11 +128,16 @@ function laneClass(lane: EvidenceDrillDownLane): string {
 
 function CitationDetails({ citations }: { citations: readonly CitationFieldPreview[] }) {
   return (
-    <ul className="decision-citation-list">
+    <ul className="decision-citation-list" aria-label="Memo citation paths">
       {citations.map((citation) => (
         <li key={citation.path} className="decision-citation-item">
           <details className="decision-citation-details">
-            <summary className="decision-citation-summary">{citation.path}</summary>
+            <summary
+              className="decision-citation-summary"
+              aria-label={`Citation ${citation.path}`}
+            >
+              {citation.path}
+            </summary>
             <p
               className="decision-citation-value"
               data-testid={`citation-value-${citation.path.replaceAll(".", "-")}`}
@@ -129,8 +242,11 @@ function HorizonDrillRow({ row }: { row: HorizonEvidenceDrillDown }) {
 
 function MatchedSessionRow({ session }: { session: MatchedSessionDisplay }) {
   return (
-    <details className="decision-matched-session" data-testid={`matched-session-${session.sessionDate}`}>
-      <summary>
+    <details
+      className="decision-matched-session"
+      data-testid={`matched-session-${session.sessionDate}`}
+    >
+      <summary aria-label={`Matched session ${session.sessionDate}`}>
         <span className="decision-value">{session.sessionDate}</span>
         <span className="decision-muted">
           {" "}
@@ -196,11 +312,17 @@ function MatchedSessionRow({ session }: { session: MatchedSessionDisplay }) {
 function EvidenceDrillDownPanel({ drillDown }: { drillDown: DecisionEvidenceDrillDown }) {
   const horizons = [drillDown.horizons.d1, drillDown.horizons.d5, drillDown.horizons.d20];
   return (
-    <details className="decision-drilldown" data-testid="decision-evidence-drilldown">
-      <summary className="decision-drilldown-summary">
+    <details
+      className="decision-drilldown"
+      data-testid="decision-evidence-drilldown"
+    >
+      <summary
+        className="decision-drilldown-summary"
+        aria-label="Expand study evidence drill-down"
+      >
         Inspect study evidence (horizons, matched sessions, citations)
       </summary>
-      <div className="decision-drilldown-body">
+      <div className="decision-drilldown-body" id="decision-evidence-drilldown-panel">
         <section className={`decision-subblock ${laneClass("deterministic")}`} data-testid="drilldown-match-fields">
           <h3 className="decision-subtitle">Query match fields</h3>
           <table className="decision-horizon-table">
@@ -290,7 +412,9 @@ function EvidenceDrillDownPanel({ drillDown }: { drillDown: DecisionEvidenceDril
           {horizons.map((row) =>
             row.statusBasisReasons.length > 0 ? (
               <details key={`${row.horizon}-basis`} className="decision-horizon-basis">
-                <summary>{row.horizon} status basis</summary>
+                <summary aria-label={`${row.horizon} status basis details`}>
+                  {row.horizon} status basis
+                </summary>
                 <ul className="decision-list">
                   {row.statusBasisReasons.map((reason) => (
                     <li key={reason} className="decision-list-item">
@@ -371,11 +495,18 @@ function EvidencePanel({ summary }: { summary: DecisionEvidenceSummary }) {
     <div className="decision-evidence" data-testid="decision-evidence">
       <div className="decision-evidence-header">
         <p className="decision-label">Deterministic evidence</p>
-        <p className="decision-value" data-testid="evidence-status-label">
-          {summary.evidenceStatusLabel}
-        </p>
+        <div className="decision-evidence-status-row">
+          <p className="decision-value" data-testid="evidence-status-label">
+            {summary.evidenceStatusLabel}
+          </p>
+          <DecisionBadge
+            label={summary.strengthDisplay}
+            tone={strengthTone(summary.strengthDisplay)}
+            testId="evidence-strength-badge"
+          />
+        </div>
         <p className="decision-muted" data-testid="evidence-strength">
-          Strength (display only): {summary.strengthDisplay} — {summary.strengthSummary}
+          {summary.strengthSummary}
         </p>
         {summary.evidenceStatusNote ? (
           <p className="decision-muted" data-testid="evidence-status-note">
@@ -486,33 +617,46 @@ function ArtifactIssuesPanel({
 }
 
 export function DecisionSurface({ view }: { view: DecisionSurfaceView }) {
-  const showIntegrityError =
-    view.status === "artifacts_missing" ||
-    view.status === "integrity_failed" ||
-    view.status === "missing_date" ||
-    view.status === "date_unavailable";
+  const showIntegrityError = isDecisionErrorStatus(view.status);
 
   return (
-    <DeskChrome>
+    <DeskChrome activeNav="decide">
       <article className="decision-surface" data-testid="decision-surface">
         <header className="decision-hero">
           <p className="desk-kicker">Evaluate → Decide</p>
           <h1 className="desk-title">Decision surface</h1>
           {view.sessionDate ? (
             <p className="desk-meta" data-testid="decision-session-date">
-              Session {view.sessionDate}
+              {view.isPublicDemo ? (
+                <>
+                  {PUBLIC_DEMO_SESSION_LABEL} · {view.sessionDate}
+                </>
+              ) : (
+                <>Session {view.sessionDate}</>
+              )}
               <span className="desk-banner-meta"> · {view.sourceLabel}</span>
             </p>
           ) : null}
           {view.isPublicDemo ? (
-            <p className="desk-banner desk-banner-demo" data-testid="decision-demo-banner">
+            <p
+              className="desk-banner desk-banner-demo decision-demo-banner"
+              data-testid="decision-demo-banner"
+              role="note"
+            >
               {PUBLIC_DEMO_COMPACT_BANNER}
             </p>
           ) : null}
         </header>
 
+        <PageStatusBanner view={view} />
+        <PageIntegrityRibbon view={view} />
+
         {showIntegrityError && view.errorMessage ? (
-          <section className="decision-block desk-state" data-testid="decision-error">
+          <section
+            className="decision-block desk-state decision-empty-state"
+            data-testid="decision-error"
+            role="alert"
+          >
             <p className="desk-banner desk-banner-error">{view.errorMessage}</p>
           </section>
         ) : null}
@@ -523,8 +667,14 @@ export function DecisionSurface({ view }: { view: DecisionSurfaceView }) {
         />
 
         {view.observe ? (
-          <section className="decision-block" data-testid="decision-observe">
-            <h2 className="decision-heading">Observe</h2>
+          <section
+            className="decision-block"
+            data-testid="decision-observe"
+            aria-labelledby="decision-observe-heading"
+          >
+            <h2 className="decision-heading" id="decision-observe-heading">
+              Observe
+            </h2>
             <div className="decision-observe-grid">
               <div className="decision-observe-item">
                 <p className="decision-label">Macro driver</p>
@@ -563,8 +713,15 @@ export function DecisionSurface({ view }: { view: DecisionSurfaceView }) {
         ) : null}
 
         {view.research ? (
-          <section className="decision-block" data-testid="decision-research">
-            <h2 className="decision-heading">Research</h2>
+          <section
+            className="decision-block"
+            data-testid="decision-research"
+            aria-labelledby="decision-research-heading"
+          >
+            <h2 className="decision-heading" id="decision-research-heading">
+              Research
+            </h2>
+            <ResearchRibbon view={view.research} />
             {view.research.evidenceSummary ? (
               <EvidencePanel summary={view.research.evidenceSummary} />
             ) : null}
@@ -573,7 +730,22 @@ export function DecisionSurface({ view }: { view: DecisionSurfaceView }) {
             ) : null}
             <div className="decision-memo" data-testid="decision-memo">
               <p className="decision-label">AI study memo</p>
-              <p className="decision-value">{view.research.memoHeadline}</p>
+              <div className="decision-memo-header">
+                <p className="decision-value">{view.research.memoHeadline}</p>
+                <DecisionBadge
+                  label={memoSourceShortLabel({
+                    memoStatus: view.research.memoStatus,
+                    memoSourceLabel: view.research.memoSourceLabel,
+                  })}
+                  tone={
+                    view.research.memoStatus === "abstained" ||
+                    view.research.memoStatus === "unavailable"
+                      ? "neutral"
+                      : "info"
+                  }
+                  testId="memo-source-badge"
+                />
+              </div>
               <p className="decision-muted" data-testid="memo-provenance">
                 {view.research.memoProvenanceLabel} · bundle {view.research.bundleId}
               </p>
@@ -586,16 +758,28 @@ export function DecisionSurface({ view }: { view: DecisionSurfaceView }) {
         ) : null}
 
         {view.policy ? (
-          <section className="decision-block" data-testid="decision-policy">
-            <h2 className="decision-heading">Policy constraint</h2>
+          <section
+            className="decision-block"
+            data-testid="decision-policy"
+            aria-labelledby="decision-policy-heading"
+          >
+            <h2 className="decision-heading" id="decision-policy-heading">
+              Policy constraint
+            </h2>
             <p className="decision-muted">Status: {view.policy.status}</p>
             <p className="desk-interpretation">{view.policy.message}</p>
           </section>
         ) : null}
 
         {view.stance ? (
-          <section className="decision-block decision-stance" data-testid="decision-stance">
-            <h2 className="decision-heading">Desk stance</h2>
+          <section
+            className="decision-block decision-stance"
+            data-testid="decision-stance"
+            aria-labelledby="decision-stance-heading"
+          >
+            <h2 className="decision-heading" id="decision-stance-heading">
+              Desk stance
+            </h2>
             <p className="decision-muted">
               Non-trade descriptive read · evidence {view.stance.evidenceStatus}
               {view.stance.structureCondition

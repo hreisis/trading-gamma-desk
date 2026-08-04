@@ -59,7 +59,7 @@ describe("production public demo mode", () => {
     expect(view.isLiveDriver).toBe(false);
     expect(view.source).toBe("fixture");
     expect(view.sourceLabel).toBe(PUBLIC_DEMO_BANNER);
-    expect(view.sourceLabel).toBe("Illustrative demo · synthetic scenario");
+    expect(view.sourceLabel).toBe("Synthetic Demo Data — illustrative, not market data.");
     expect(view.sourceLabel!.toLowerCase()).not.toContain("historical");
     expect(view.sourceLabel!).not.toContain(PUBLIC_DEMO_SESSION);
     expect(PUBLIC_DEMO_DISCLAIMER.toLowerCase()).toContain("synthetic");

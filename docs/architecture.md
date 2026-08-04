@@ -194,5 +194,5 @@ Deployment path, when wanted: the local run commits the snapshot (a few KB per s
 | M5 (M5-1A…M5-4) | ✅ Shipped |
 | M6 (M6-1…M6-4) | ✅ Shipped — exit criteria satisfied |
 | M7 | Planned — private repo |
-| M8 | **In progress** — M8-1 decision surface ✅; M8-2 uncertainty + study artifacts ✅; M8-3 auditable evidence drill-down ✅ |
+| M8 | ✅ Shipped — decision surface `/decide?date=` (M8-1…M8-4); real historical Study foundation **M8-5 queued** |
 | M9 | Planned — private repo |

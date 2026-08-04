@@ -259,7 +259,7 @@ export function MacroDesk({
 }) {
   if (view.status === "live_unavailable") {
     return (
-      <DeskChrome>
+      <DeskChrome activeNav="macro">
         <DeskStatusBanners view={view} />
         <section className="desk-state" data-testid="state-live-unavailable">
           <h1 className="desk-title">Live data unavailable</h1>
@@ -280,7 +280,7 @@ export function MacroDesk({
 
   if (view.status === "empty" || (view.driver === null && !view.error)) {
     return (
-      <DeskChrome>
+      <DeskChrome activeNav="macro">
         <DeskStatusBanners view={view} />
         {gammaView ? <GammaDesk view={gammaView} /> : null}
         <section className="desk-state" data-testid="state-empty">
@@ -296,7 +296,7 @@ export function MacroDesk({
 
   if (view.driver === null) {
     return (
-      <DeskChrome>
+      <DeskChrome activeNav="macro">
         <DeskStatusBanners view={view} />
         {gammaView ? <GammaDesk view={gammaView} /> : null}
         <section
@@ -322,7 +322,7 @@ export function MacroDesk({
   }
 
   return (
-    <DeskChrome>
+    <DeskChrome activeNav="macro">
       <DeskStatusBanners view={view} />
       {gammaView ? <GammaDesk view={gammaView} /> : null}
       <div data-testid={`state-${view.status}`}>
@@ -342,7 +342,7 @@ export function MacroDesk({
 
 export function DeskLoading() {
   return (
-    <DeskChrome>
+    <DeskChrome activeNav="macro">
       <p className="desk-banner" data-testid="state-loading">
         Loading macro desk…
       </p>
