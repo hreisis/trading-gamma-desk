@@ -1,0 +1,73 @@
+{
+  "kind": "AiStudyBriefing",
+  "schemaVersion": "0.1.0",
+  "generatedAt": "2026-07-29T16:00:00.000Z",
+  "sessionDate": "2026-07-29",
+  "status": "synthetic_demo",
+  "message": "Synthetic Demo Data — illustrative, not market data.",
+  "provider": "synthetic_demo",
+  "model": null,
+  "methodologyId": "ai_study_briefing_v1",
+  "methodologyVersion": "0.1.0",
+  "inputs": [
+    {
+      "id": "macro",
+      "status": "fixture",
+      "sourceLabel": "Synthetic Demo Data — illustrative, not market data.",
+      "note": "Synthetic demo macro fixture"
+    },
+    {
+      "id": "market_temperature",
+      "status": "unavailable",
+      "sourceLabel": "not_implemented",
+      "note": "Market Temperature is backlog — not computed in this MVP"
+    },
+    {
+      "id": "catalysts",
+      "status": "fixture",
+      "sourceLabel": "synthetic_fixtures",
+      "note": "Synthetic demo catalyst fixtures"
+    },
+    {
+      "id": "gamma_structure",
+      "status": "fixture",
+      "sourceLabel": "fixtures/gamma/providers/marketdata-app/spy-bounded-ui.json",
+      "note": "Synthetic bounded gamma fixture"
+    },
+    {
+      "id": "market_quotes",
+      "status": "fixture",
+      "sourceLabel": "synthetic_demo",
+      "note": "Synthetic demo market quotes"
+    },
+    {
+      "id": "historical_study",
+      "status": "fixture",
+      "sourceLabel": "fixtures/studies/evidence-bundle.m62.json",
+      "note": "Synthetic demo historical study fixture"
+    }
+  ],
+  "report": {
+    "marketRegime": "Illustrative rates-led easing regime (synthetic demo — not a live market call).",
+    "mainDrivers": [
+      "Synthetic cross-asset pattern: falling yields with equity resilience in the bundled demo driver.",
+      "Demo catalyst window includes scheduled inflation and FOMC-style events — fixture IDs only.",
+      "Bounded negative gamma context in the demo structure fixture — amplifier/compressor, not directional."
+    ],
+    "keyLevelsStructure": [
+      "Demo SPY spot and bounded call/put wall strikes come from the checked-in gamma fixture only.",
+      "Gamma flip remains unavailable in the demo bounded snapshot — do not treat walls as full-chain levels.",
+      "Expected range fields, when shown elsewhere in the product, must stay separate from this demo briefing."
+    ],
+    "upcomingRisks": [
+      "Synthetic catalyst headlines in the demo feed — not observed releases.",
+      "Fixture-backed historical study cohort is n=1 in the bundled evidence bundle.",
+      "Market Temperature is not available in this MVP."
+    ],
+    "scenarios": {
+      "bull": "Demo-only path if the illustrated easing + positive-equity-beta pattern persisted without a new shock (not a forecast).",
+      "base": "Demo status-quo path using the synthetic macro/structure context as packaged — illustrative only.",
+      "bear": "Demo stress path if the synthetic catalyst window delivered a negative surprise relative to the fixture setup (illustrative)."
+    }
+  }
+}

@@ -1567,3 +1567,47 @@ code {
 .alpaca-change-flat {
   color: var(--muted);
 }
+
+.ai-study-section h2 {
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+
+.ai-study-scenarios {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .ai-study-scenarios {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ai-study-scenario {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--bg-wash) 80%, transparent);
+}
+
+.ai-study-scenario h3 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+  color: var(--accent);
+}
+
+.ai-study-scenario p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.desk-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.desk-list li + li {
+  margin-top: 6px;
+}

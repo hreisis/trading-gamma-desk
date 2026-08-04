@@ -29,3 +29,4 @@ export * from "./study-memo-eval-report";
 export * from "./decision-surface";
 export * from "./real-archive";
 export * from "./alpaca-market";
+export * from "./ai-study-briefing";

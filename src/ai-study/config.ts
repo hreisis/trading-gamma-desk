@@ -1,0 +1,45 @@
+import {
+  resolveOpenAiApiKey,
+  OPENAI_RESPONSES_URL,
+  AI_BRIEF_TIMEOUT_MS,
+  AI_BRIEF_MAX_RETRIES,
+} from "@/catalyst/briefs/ai/config";
+import { resolveStudyMemoLlmModel } from "@/study-agent/config";
+
+export {
+  OPENAI_RESPONSES_URL,
+  resolveOpenAiApiKey,
+} from "@/catalyst/briefs/ai/config";
+
+export const AI_STUDY_MAX_OUTPUT_TOKENS = 1400;
+export const AI_STUDY_PARSE_RETRIES = 1;
+
+export function resolveAiStudyLlmModel(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const fromEnv = (env.AI_STUDY_LLM_MODEL ?? "").trim();
+  return fromEnv || resolveStudyMemoLlmModel(env);
+}
+
+export interface AiStudyLlmRuntimeConfig {
+  readonly apiKey: string | null;
+  readonly model: string;
+  readonly timeoutMs: number;
+  readonly maxRetries: number;
+  readonly maxOutputTokens: number;
+  readonly parseRetries: number;
+}
+
+export function loadAiStudyLlmConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides: Partial<AiStudyLlmRuntimeConfig> = {},
+): AiStudyLlmRuntimeConfig {
+  return {
+    apiKey: overrides.apiKey ?? resolveOpenAiApiKey(env),
+    model: overrides.model ?? resolveAiStudyLlmModel(env),
+    timeoutMs: overrides.timeoutMs ?? AI_BRIEF_TIMEOUT_MS,
+    maxRetries: overrides.maxRetries ?? AI_BRIEF_MAX_RETRIES,
+    maxOutputTokens: overrides.maxOutputTokens ?? AI_STUDY_MAX_OUTPUT_TOKENS,
+    parseRetries: overrides.parseRetries ?? AI_STUDY_PARSE_RETRIES,
+  };
+}
