@@ -72,7 +72,7 @@ export function resolveDeskRequest(
     dataRoot: options.dataRoot,
     fixturePath: options.fixturePath,
     preferFixture: source === "fixture",
-    allowFixture: source !== "live",
+    allowFixture: source === "fixture",
   };
   const view = loadMacroDesk(loadOptions);
   return { ...view, isPublicDemo: false };
