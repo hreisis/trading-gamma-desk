@@ -182,6 +182,13 @@ npm run catalyst:update -- --max-events 2
 | `/api/macro/latest` | Same view model as JSON |
 | `/api/catalysts` | Public `CatalystFeed` DTO (`?category=&status=&importance=&asset=&start=&end=`) — no cache paths, raw provider errors, or AI token usage |
 | `/decide?date=2026-07-29` | **M8 decision surface** — Observe + deterministic study evidence + auditable drill-down + AI memo + policy slot + non-trade stance; public demo uses fixtures only; **exact date required** (no latest) |
+| `/market` | Portfolio watchlist — Alpaca when `APCA_*` configured; synthetic fixtures in public demo |
+| `/news` | Market headlines — Alpaca News when `APCA_*` configured; synthetic fixtures in public demo |
+| `/ai-study` | AI market briefing — OpenAI when `OPENAI_API_KEY` configured locally; synthetic fixture in public demo |
+| `/api/alpaca/health` | Alpaca credential + connectivity status (synthetic unavailable in public demo) |
+| `/api/alpaca/market` | Watchlist quotes JSON for the Market panel |
+| `/api/news` | Market headlines JSON for the News panel |
+| `/api/ai-study` | AI Study briefing JSON |
 
 Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md). Decision surface demo: `/decide?date=2026-07-29`.
 

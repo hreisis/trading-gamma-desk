@@ -30,3 +30,8 @@ jobs:
       # flag would only ever be exercised on one developer's machine.
       - name: Build
         run: npm run build
+
+      # Public-demo next build + next-start HTTP smoke — bundled fixtures only;
+      # no Tiingo, Alpaca, OpenAI, or other credentials required.
+      - name: Public demo production smoke
+        run: npm run smoke:demo:prod

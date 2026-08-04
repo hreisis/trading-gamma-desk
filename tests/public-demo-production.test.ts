@@ -108,7 +108,7 @@ describe("public demo production build", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain(PUBLIC_DEMO_COMPACT_BANNER);
-    expect(html).toContain("not actual market or catalyst observations");
+    expect(html).toContain("not actual news, calendar prints, or market observations");
     expect(html).toContain(PUBLIC_DEMO_DRIVER.label);
     expect(html).toContain(
       `${PUBLIC_DEMO_DRIVER.confidence.score}/100 (uncalibrated)`,
