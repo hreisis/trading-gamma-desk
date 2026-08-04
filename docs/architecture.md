@@ -179,6 +179,14 @@ Deployment path, when wanted: the local run commits the snapshot (a few KB per s
 
 ---
 
+## Milestone status (public)
+
+| Milestone | Status |
+| --- | --- |
+| M8 | **In progress** — M8-1 decision surface ✅; M8-2 uncertainty display next |
+
+---
+
 ## Related docs
 
 - Product scope: `docs/product.md`

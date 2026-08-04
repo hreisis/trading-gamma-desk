@@ -1291,6 +1291,25 @@ Fixtures: `fixtures/studies/pipeline.m64.json`, `fixtures/studies/profiles/peer-
 
 ---
 
+## 3l. Decision surface (M8-1)
+
+Single SSR viewport contract for `/decide?date=` — fixture-driven, offline only. Types: `DecisionSurfaceView`, `DeskStance`, `PublicPolicySlot` in `src/contracts/decision-surface.ts`. Loader: `loadDecisionSurface` in `src/desk/load-decision-surface.ts`.
+
+| Rule | Notes |
+| --- | --- |
+| Route | `/decide?date=YYYY-MM-DD` — **exact session date required**; no `latest` fallback |
+| Data | Bundled fixtures only — no `data/` reads, fetch, scheduler, OpenAI, Alpaca, or M7 evaluator |
+| Observe | `DominantDriver`, catalyst headlines, bounded `MarketStructureState` (v2) |
+| Research | `StudyMemo` + evidence sections with citation paths |
+| Policy | `PublicPolicySlot` — `status: unavailable` in public repo (M7 private track) |
+| Stance | `buildDeskStance` — deterministic non-trade posture from evidence status + structure context |
+| Labels | Scores marked **uncalibrated**; preserve missing/unknown states |
+| Prohibited | No buy/sell, probability, sizing, or order language in stance or UI |
+
+Bundled session: `2026-07-29` (`PUBLIC_DEMO_SESSION`).
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json

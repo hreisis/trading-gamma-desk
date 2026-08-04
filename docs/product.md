@@ -59,7 +59,7 @@ Shipped work (M1–M3) established macro regime, catalyst evidence, and desk UI 
 | **M5** | Strategy research / replay / regime | Historical replay, regime-conditioned studies, evidence tables — still deterministic |
 | **M6** | Constrained LLM study agent | LLM organizes cited evidence into study briefs and decision memos; no math in the model |
 | **M7** | Private portfolio policy | Separate private repo: thresholds, sizing, allocation rules, instrument universe |
-| **M8** | Minimal decision interface | One surface for Evaluate → Decide: stance, constraints, evidence bullets, explicit uncertainty |
+| **M8** | Minimal decision interface | **In progress** — M8-1 decision surface ✅ (`/decide?date=`); M8-2 uncertainty display next |
 | **M9** | Shadow mode / review loop | Decision logs in private repo; compare to outcomes; optional calibration feed |
 
 M4–M6 are **product path**, not post-MVP backlog. M7–M9 require the **separate private repository** boundary above.

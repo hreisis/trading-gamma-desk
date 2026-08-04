@@ -170,8 +170,9 @@ npm run catalyst:update -- --max-events 2
 | `/?source=live` | Live only — empty if no drivers (no silent fixture). **Public demo:** macro page shows **Live data unavailable**; Catalyst UI is hidden on that page. `/api/catalysts` still returns `synthetic_demo` (API has no `?source=` gate) — intentional until a later M3 split. |
 | `/api/macro/latest` | Same view model as JSON |
 | `/api/catalysts` | Public `CatalystFeed` DTO (`?category=&status=&importance=&asset=&start=&end=`) — no cache paths, raw provider errors, or AI token usage |
+| `/decide?date=2026-07-29` | **M8-1 decision surface** — Observe + study research + policy-unavailable slot + non-trade stance; fixture-only; exact date required |
 
-Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md).
+Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md). Decision surface: `/decide?date=2026-07-29`.
 
 ---
 
@@ -266,7 +267,7 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 | **M5** Strategy research / replay (M5-1A ✅; M5-1B ✅) | 🔄 M5-2 next |
 | **M6** Constrained LLM study agent | Planned |
 | **M7** Private portfolio policy | Planned |
-| **M8** Minimal decision interface | Planned |
+| **M8** Minimal decision interface | **In progress** — M8-1 decision surface ✅ |
 | **M9** Shadow mode / review loop | Planned |
 
 Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope for the catalyst chain. Market Temperature stays in the backlog. See [product](docs/product.md) and [tasks](docs/tasks.md) for the full M4–M9 plan.

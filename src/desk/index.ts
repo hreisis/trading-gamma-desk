@@ -8,3 +8,6 @@ export * from "./load-macro-desk";
 export * from "./load-bounded-gamma";
 export * from "./format-gamma";
 export * from "./resolve-desk-request";
+export * from "./build-desk-stance";
+export * from "./decision-surface-fixtures";
+export * from "./load-decision-surface";

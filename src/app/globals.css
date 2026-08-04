@@ -1141,3 +1141,159 @@ code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* M8-1 decision surface — single hero column */
+.decision-surface {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.decision-hero {
+  margin-bottom: 1.5rem;
+}
+
+.decision-block {
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.decision-heading {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.decision-observe-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.decision-observe-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.decision-label {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.decision-value {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.decision-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.decision-subblock {
+  margin-top: 1rem;
+}
+
+.decision-subtitle {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.decision-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decision-list-item {
+  margin-bottom: 0.85rem;
+}
+
+.decision-list-item p {
+  margin: 0;
+}
+
+.decision-citations {
+  margin-top: 0.35rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.decision-stance .desk-interpretation {
+  font-size: 1.05rem;
+}
+
+.decision-evidence {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.decision-evidence-header {
+  margin-bottom: 0.75rem;
+}
+
+.decision-evidence-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+}
+
+.decision-evidence-meta dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.decision-evidence-meta dd {
+  margin: 0.15rem 0 0;
+  font-weight: 500;
+}
+
+.decision-horizon-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.decision-horizon-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.decision-horizon-table th,
+.decision-horizon-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.decision-horizon-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.decision-memo {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}

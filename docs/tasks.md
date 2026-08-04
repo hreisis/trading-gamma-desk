@@ -4,7 +4,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 6 — Constrained LLM study agent.** **M6-4** deterministic end-to-end study pipeline (✅). Next: **M6-5** (not started). No UI / live API wiring.
+**Milestone 6 — Constrained LLM study agent (✅ complete through M6-4).** M5-3/M5-4 and M6-1…M6-4 shipped. **M6 exit criteria satisfied.**
+
+**Next public milestone:** **M8 — Minimal decision interface** — **M8-1** decision surface (✅). Next: **M8-2** uncertainty display. **M7** private policy remains a separate private-repo track.
 
 ### Queued (not started)
 
@@ -186,9 +188,11 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 
 ## Milestone 8 — Minimal decision interface
 
+**Status:** **In progress** — M8-1 decision surface ✅; M8-2 uncertainty display next.
+
 | ID | Task | Done when |
 | --- | --- | --- |
-| M8-1 | Decision surface | Single viewport: Observe summary, study bullets, policy constraint, explicit stance |
+| M8-1 | Decision surface | `/decide?date=` SSR viewport: Observe (driver/catalyst/structure) + StudyMemo research w/ citations + public policy-unavailable slot + deterministic non-trade stance; fixture-only; exact date — ✅ |
 | M8-2 | Uncertainty display | Scores labelled uncalibrated; no probability bands without calibration |
 | M8-3 | Evidence path | Expand-original-evidence for every AI line |
 
