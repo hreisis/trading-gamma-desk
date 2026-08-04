@@ -1542,3 +1542,28 @@ code {
   cursor: pointer;
   color: var(--muted);
 }
+
+.desk-intro {
+  margin-bottom: 24px;
+}
+
+.desk-section-head {
+  margin-bottom: 8px;
+}
+
+.desk-inline-meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.alpaca-change-up {
+  color: var(--confirm);
+}
+
+.alpaca-change-down {
+  color: var(--contra);
+}
+
+.alpaca-change-flat {
+  color: var(--muted);
+}

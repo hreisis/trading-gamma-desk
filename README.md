@@ -81,6 +81,8 @@ npm run dev            # http://localhost:3000  (live mode when data/drivers exi
 
 Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fetch`, and `/?source=live` keep working.
 
+**Portfolio market panel:** open [`/market`](http://localhost:3000/market) for SPY, QQQ, BTC/USD, and optional `ALPACA_WATCHLIST` symbols via Alpaca snapshots. Missing `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY` shows **Alpaca not configured** — no Tiingo or desk fixture fallback on this surface. Public demo serves labelled synthetic quotes only. Free/paper accounts should set `CATALYST_MARKET_FEED=iex` in local `.env` (SIP requires paid entitlement).
+
 | Command | Purpose |
 | --- | --- |
 | `npm run daily` | Full refresh (`--force` replaces today’s snapshot) |
@@ -98,6 +100,9 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run catalyst:update` | M2-5B unified incremental update (manual; see below) |
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
+| `/market` | Portfolio watchlist — Alpaca when `APCA_*` configured; synthetic fixtures in public demo |
+| `GET /api/alpaca/health` | Alpaca credential + connectivity status |
+| `GET /api/alpaca/market` | Watchlist quotes JSON for the Market panel |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
 
 ### Official US macro calendar (M2-2A)
