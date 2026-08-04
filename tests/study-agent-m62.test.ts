@@ -196,7 +196,7 @@ describe("M6-2 rule-based fallback", () => {
       synthetic: true,
     });
     expect(result.source).toBe("rule_based_fallback");
-    expect(result.fallbackReason).toMatch(/unknown bundleFieldPath/i);
+    expect(result.fallbackReason).toMatch(/unknown citationId|nonexistent/i);
     expect(result.memo.provider).toBe(RULE_BASED_MEMO_PROVIDER);
     expect(result.memo.status).toBe("complete");
   });
@@ -206,12 +206,11 @@ describe("M6-2 rule-based fallback", () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({
         output_text: JSON.stringify({
-          headline: "Similar-regime cohort supported",
           evidence: [
             {
               id: "ev1",
-              text: "Evidence status is supported.",
-              bundleFieldPaths: ["bundle.evidenceStatus"],
+              text: "Evidence status is supported with primary horizon 5D.",
+              citationIds: ["evidence_status", "primary_horizon"],
             },
           ],
           inference: [],
@@ -219,7 +218,7 @@ describe("M6-2 rule-based fallback", () => {
             {
               id: "lim1",
               text: bundle.limitations[0]!,
-              bundleFieldPaths: ["bundle.limitations"],
+              citationIds: ["limitations"],
             },
           ],
           unknowns: [],

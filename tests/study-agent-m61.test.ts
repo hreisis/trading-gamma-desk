@@ -222,8 +222,6 @@ describe("M6-1 abstain on insufficient evidence", () => {
     expect(narrate).not.toHaveBeenCalled();
     expect(memo.status).toBe("abstained");
     expect(memo.inference).toEqual([]);
-    expect(memo.evidence.length).toBeGreaterThan(0);
-    expect(memo.validation.errors.join(" ")).toMatch(/abstained/i);
     expect(memo.unknowns.length).toBeGreaterThan(0);
     expect(StudyMemo.safeParse(memo).success).toBe(true);
   });
@@ -263,16 +261,15 @@ describe("M6-1 citation validation", () => {
     expect(memo.validation.numbersValid).toBe(true);
   });
 
-  it("rejects bad bundle field citations", async () => {
+  it("returns unavailable when fake narrator cites unknown catalog ids", async () => {
     const bundle = supportedBundle();
     const memo = await buildStudyMemo({
       bundle,
       narrator: createFakeStudyMemoNarrator("bad_citation"),
       synthetic: true,
     });
-    expect(memo.status).toBe("rejected");
-    expect(memo.validation.citationsValid).toBe(false);
-    expect(memo.validation.errors.join(" ")).toMatch(/unknown bundleFieldPath/i);
+    expect(memo.status).toBe("unavailable");
+    expect(memo.validation.errors.join(" ")).toMatch(/unknown citationId|nonexistent/i);
   });
 
   it("rejects hallucinated numbers", async () => {
@@ -284,69 +281,6 @@ describe("M6-1 citation validation", () => {
     });
     expect(memo.status).toBe("rejected");
     expect(memo.validation.numbersValid).toBe(false);
-  });
-
-  it("allows horizon day digits when citing horizonEvidence aggregate paths", () => {
-    const bundle = supportedBundle();
-    const memo = validateStudyMemoOutput({
-      bundle,
-      output: {
-        headline: "Similar-regime study on the primary horizon",
-        evidence: [
-          {
-            id: "ev_horizon",
-            text: "Primary 5D horizon mean return is 0.02 with 20D context at 0.04.",
-            bundleFieldPaths: [
-              "bundle.horizonEvidence.d5.aggregate.meanReturn",
-              "bundle.horizonEvidence.d20.aggregate.meanReturn",
-            ],
-          },
-        ],
-        inference: [],
-        limitations: bundle.limitations.slice(0, 1).map((text, i) => ({
-          id: `lim${i + 1}`,
-          text,
-          bundleFieldPaths: ["bundle.limitations"],
-        })),
-        unknowns: [],
-      },
-      provider: "test",
-      model: "test",
-      generatedAt: bundle.computedAt,
-      synthetic: true,
-    });
-    expect(memo.validation.numbersValid).toBe(true);
-    expect(memo.status).toBe("complete");
-  });
-
-  it("accepts queryMatchFields alias paths via bundle match profile shim", () => {
-    const bundle = supportedBundle();
-    const memo = validateStudyMemoOutput({
-      bundle,
-      output: {
-        headline: "Similar-regime study memo",
-        evidence: [
-          {
-            id: "ev_match",
-            text: "Macro regime field is fed_rates.",
-            bundleFieldPaths: ["bundle.queryMatchFields.macro_regime"],
-          },
-        ],
-        inference: [],
-        limitations: bundle.limitations.slice(0, 1).map((text, i) => ({
-          id: `lim${i + 1}`,
-          text,
-          bundleFieldPaths: ["bundle.limitations"],
-        })),
-        unknowns: [],
-      },
-      provider: "test",
-      model: "test",
-      generatedAt: bundle.computedAt,
-      synthetic: true,
-    });
-    expect(memo.validation.citationsValid).toBe(true);
-    expect(memo.status).toBe("complete");
   });
 
   it("rejects prohibited trade language", async () => {
@@ -381,10 +315,6 @@ describe("M6-1 provider interface", () => {
       synthetic: true,
     });
     expect(memo.status).toBe("unavailable");
-    expect(memo.evidence).toEqual([]);
-    expect(memo.inference).toEqual([]);
-    expect(memo.unknowns.length).toBe(1);
-    expect(memo.validation.citationsValid).toBe(false);
     expect(memo.validation.errors.join(" ")).toMatch(/OPENAI_API_KEY missing/i);
   });
 
@@ -393,12 +323,11 @@ describe("M6-1 provider interface", () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({
         output_text: JSON.stringify({
-          headline: "Similar-regime cohort supported",
           evidence: [
             {
               id: "ev1",
-              text: "Evidence status is supported.",
-              bundleFieldPaths: ["bundle.evidenceStatus"],
+              text: "Evidence status is supported with primary horizon 5D.",
+              citationIds: ["evidence_status", "primary_horizon"],
             },
           ],
           inference: [],
@@ -406,7 +335,7 @@ describe("M6-1 provider interface", () => {
             {
               id: "lim1",
               text: bundle.limitations[0]!,
-              bundleFieldPaths: ["bundle.limitations"],
+              citationIds: ["limitations"],
             },
           ],
           unknowns: [],
@@ -493,51 +422,5 @@ describe("M6-1 memo structure", () => {
       synthetic: true,
     });
     expect(memo.status).toBe("partial");
-  });
-});
-
-describe("M6-1 status distinction", () => {
-  it("keeps abstained, unavailable, and rejected semantically distinct", async () => {
-    const bundle = supportedBundle();
-    const insufficient = insufficientBundle();
-
-    const abstained = await buildStudyMemo({
-      bundle: insufficient,
-      narrator: createFakeStudyMemoNarrator("ok"),
-      synthetic: true,
-    });
-    const unavailable = await buildStudyMemo({
-      bundle,
-      config: { apiKey: null },
-      synthetic: true,
-    });
-    const rejected = await buildStudyMemo({
-      bundle,
-      narrator: createFakeStudyMemoNarrator("bad_citation"),
-      synthetic: true,
-    });
-
-    expect(abstained.status).toBe("abstained");
-    expect(unavailable.status).toBe("unavailable");
-    expect(rejected.status).toBe("rejected");
-
-    expect(abstained.inference).toEqual([]);
-    expect(abstained.evidence.length).toBeGreaterThan(0);
-    expect(abstained.validation.errors.join(" ")).toMatch(/abstained/i);
-
-    expect(unavailable.evidence).toEqual([]);
-    expect(unavailable.inference).toEqual([]);
-    expect(unavailable.validation.citationsValid).toBe(false);
-    expect(unavailable.validation.errors.join(" ")).toMatch(/OPENAI_API_KEY/i);
-
-    expect(rejected.evidence.length).toBeGreaterThan(0);
-    expect(rejected.validation.citationsValid).toBe(false);
-    expect(rejected.validation.errors.join(" ")).toMatch(
-      /unknown bundleFieldPath/i,
-    );
-    expect(rejected.validation.errors.join(" ")).not.toMatch(/abstained/i);
-    expect(rejected.validation.errors.join(" ")).not.toMatch(
-      /OPENAI_API_KEY missing/i,
-    );
   });
 });

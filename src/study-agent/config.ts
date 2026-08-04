@@ -15,6 +15,8 @@ export {
 export const DEFAULT_STUDY_MEMO_LLM_MODEL = "gpt-5.6-luna";
 
 export const STUDY_MEMO_TIMEOUT_MS = AI_BRIEF_TIMEOUT_MS;
+/** Retries after initial attempt for malformed/non-JSON/schema-invalid provider output only. */
+export const STUDY_MEMO_PARSE_RETRIES = 1;
 export const STUDY_MEMO_MAX_RETRIES = AI_BRIEF_MAX_RETRIES;
 export const STUDY_MEMO_MAX_OUTPUT_TOKENS = 1200;
 
@@ -31,6 +33,7 @@ export interface StudyMemoLlmRuntimeConfig {
   readonly timeoutMs: number;
   readonly maxRetries: number;
   readonly maxOutputTokens: number;
+  readonly parseRetries?: number;
 }
 
 export function loadStudyMemoLlmConfig(

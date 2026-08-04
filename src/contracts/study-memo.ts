@@ -60,6 +60,20 @@ export const StudyMemo = z.object({
 });
 
 /** Strict JSON schema fragment returned by the model (before local wrap). */
+export const StudyMemoNarratorRawBullet = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  /** Allowed citation IDs from the deterministic input catalog only. */
+  citationIds: z.array(z.string().min(1)).min(1),
+});
+
+export const StudyMemoNarratorRawOutput = z.object({
+  evidence: z.array(StudyMemoNarratorRawBullet).min(1),
+  inference: z.array(StudyMemoNarratorRawBullet),
+  limitations: z.array(StudyMemoNarratorRawBullet),
+  unknowns: z.array(StudyMemoNarratorRawBullet),
+});
+
 export const StudyMemoNarratorOutput = z.object({
   headline: z.string().min(1),
   evidence: z.array(StudyMemoBullet).min(1),
@@ -73,4 +87,6 @@ export type StudyMemoSectionKind = z.infer<typeof StudyMemoSectionKind>;
 export type StudyMemoBullet = z.infer<typeof StudyMemoBullet>;
 export type StudyMemoValidation = z.infer<typeof StudyMemoValidation>;
 export type StudyMemo = z.infer<typeof StudyMemo>;
+export type StudyMemoNarratorRawBullet = z.infer<typeof StudyMemoNarratorRawBullet>;
+export type StudyMemoNarratorRawOutput = z.infer<typeof StudyMemoNarratorRawOutput>;
 export type StudyMemoNarratorOutput = z.infer<typeof StudyMemoNarratorOutput>;

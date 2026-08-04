@@ -1,11 +1,19 @@
 import type { StudyEvidenceBundle } from "@/contracts";
 import type { StudyMemoNarratorOutput } from "@/contracts";
+import type { StudyMemoCitationEntry } from "./citation-catalog";
 
 export interface StudyMemoNarratorUsage {
   readonly inputTokens?: number;
   readonly outputTokens?: number;
   readonly totalTokens?: number;
 }
+
+export type StudyMemoNarratorFailureCategory =
+  | "missing_api_key"
+  | "http_error"
+  | "provider_parse"
+  | "citation_resolution"
+  | "provider_error";
 
 export type StudyMemoNarratorResult =
   | {
@@ -14,6 +22,7 @@ export type StudyMemoNarratorResult =
       readonly provider: string;
       readonly model: string;
       readonly usage?: StudyMemoNarratorUsage;
+      readonly attempts: number;
     }
   | {
       readonly ok: false;
@@ -21,6 +30,8 @@ export type StudyMemoNarratorResult =
       readonly model: string;
       readonly error: string;
       readonly unavailable?: boolean;
+      readonly attempts: number;
+      readonly failureCategory: StudyMemoNarratorFailureCategory;
     };
 
 export interface StudyMemoInputPacket {
@@ -39,6 +50,7 @@ export interface StudyMemoInputPacket {
   readonly limitations: readonly string[];
   readonly warnings: readonly string[];
   readonly sources: StudyEvidenceBundle["sources"];
+  readonly citationCatalog: readonly StudyMemoCitationEntry[];
 }
 
 export interface StudyMemoNarrator {

@@ -59,6 +59,25 @@ function numbersSupported(
   return { ok: true };
 }
 
+function isLimitationCorpusQuote(
+  bundle: StudyEvidenceBundle,
+  text: string,
+  label: string,
+  paths: readonly string[],
+): boolean {
+  if (label !== "limitations") return false;
+  if (!paths.some((path) => path === "bundle.limitations")) return false;
+  const corpus = bundle.limitations.join(" ").toLowerCase();
+  const prohibited = new RegExp(PROHIBITED.source, "gi");
+  const prediction = new RegExp(PREDICTION.source, "gi");
+  const matches = [
+    ...text.matchAll(prohibited),
+    ...text.matchAll(prediction),
+  ];
+  if (matches.length === 0) return false;
+  return matches.every((match) => corpus.includes(match[0]!.toLowerCase()));
+}
+
 function checkBullets(
   bundle: StudyEvidenceBundle,
   allowedPaths: ReadonlySet<string>,
@@ -91,8 +110,17 @@ function checkBullets(
       flags.numbersValid = false;
     }
     if (PROHIBITED.test(bullet.text) || PREDICTION.test(bullet.text)) {
-      errors.push(`${label} ${bullet.id}: prohibited inference/trading language`);
-      flags.prohibitedInferenceDetected = true;
+      if (
+        !isLimitationCorpusQuote(
+          bundle,
+          bullet.text,
+          label,
+          bullet.bundleFieldPaths,
+        )
+      ) {
+        errors.push(`${label} ${bullet.id}: prohibited inference/trading language`);
+        flags.prohibitedInferenceDetected = true;
+      }
     }
     if (PRICE_LITERAL.test(bullet.text)) {
       errors.push(`${label} ${bullet.id}: unsupported price literal`);
