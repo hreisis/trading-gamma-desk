@@ -255,6 +255,27 @@ describe("loadMarketNewsPanel", () => {
     expect(panel.status).toBe("error");
     expect(panel.message).toMatch(/credentials/i);
     expect(JSON.stringify(panel)).not.toMatch(/test-secret/);
+    expect(panel.diagnostics?.providerError).toMatch(/code=auth/i);
+  });
+
+  it("exposes provider diagnostics when Alpaca returns zero articles", async () => {
+    const panel = await loadMarketNewsPanel({
+      env: {
+        APCA_API_KEY_ID: "test-key",
+        APCA_API_SECRET_KEY: "test-secret",
+      } as unknown as NodeJS.ProcessEnv,
+      fetchImpl: mockFetch((url) => {
+        if (!url.includes("/v1beta1/news")) {
+          return jsonResponse(404, { message: "not found" });
+        }
+        return jsonResponse(200, { news: [], next_page_token: null });
+      }),
+    });
+
+    expect(panel.diagnostics?.macroRawCount).toBe(0);
+    expect(panel.diagnostics?.symbolRawCount).toBe(0);
+    expect(panel.diagnostics?.providerError).toMatch(/zero articles/i);
+    expect(panel.message).toMatch(/zero articles/i);
   });
 });
 

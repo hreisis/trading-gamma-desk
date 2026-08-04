@@ -78,6 +78,13 @@ export function buildAiStudyEvidenceCorpus(
     );
     push(
       entries,
+      "macro.confidenceDisplay",
+      "Confidence display",
+      `${m.confidenceScore}/100`,
+      "macro",
+    );
+    push(
+      entries,
       "macro.interpretation",
       "Macro interpretation",
       m.interpretation,

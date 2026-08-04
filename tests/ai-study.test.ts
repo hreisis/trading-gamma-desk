@@ -145,7 +145,7 @@ describe("loadAiStudyBriefing", () => {
     expect(briefing.report?.marketRegime.evidenceIds.length).toBeGreaterThan(0);
   });
 
-  it("surfaces OpenAI HTTP errors", async () => {
+  it("falls back to rule-based briefing when OpenAI HTTP errors", async () => {
     const briefing = await loadAiStudyBriefing({
       publicDemo: false,
       env: { OPENAI_API_KEY: "test-key" } as unknown as NodeJS.ProcessEnv,
@@ -160,8 +160,11 @@ describe("loadAiStudyBriefing", () => {
       fetchImpl: () => Promise.resolve(jsonResponse(401, { error: "bad key" })),
     });
 
-    expect(briefing.status).toBe("error");
+    expect(briefing.status).toBe("ready");
+    expect(briefing.provider).toBe("rule_based");
     expect(briefing.message).toMatch(/OpenAI HTTP 401/i);
+    expect(briefing.message).toMatch(/rule-based grounded fallback/i);
+    expect(briefing.grounding?.numbersValid).toBe(true);
   });
 
   it("accepts mocked OpenAI success payload", async () => {

@@ -49,23 +49,24 @@ export function calendarDte(sessionDate: string, expiration: string): number {
   return days;
 }
 
-export function extractVendorUpdatedRange(body: unknown): {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parsePositiveUnixInts(values: readonly unknown[]): number[] {
+  const nums = values.map((v) => Number(v));
+  if (nums.some((n) => !Number.isFinite(n) || n <= 0 || !Number.isInteger(n))) {
+    throw new Error("vendor updated timestamps are unusable");
+  }
+  return nums;
+}
+
+function rangeFromUnix(nums: readonly number[]): {
   minUnix: number;
   maxUnix: number;
   minIso: string;
   maxIso: string;
 } {
-  if (!body || typeof body !== "object") {
-    throw new Error("vendor body must be an object to read updated timestamps");
-  }
-  const updated = (body as { updated?: unknown }).updated;
-  if (!Array.isArray(updated) || updated.length === 0) {
-    throw new Error("vendor updated timestamps absent or empty");
-  }
-  const nums = updated.map((v) => Number(v));
-  if (nums.some((n) => !Number.isFinite(n) || n <= 0 || !Number.isInteger(n))) {
-    throw new Error("vendor updated timestamps are unusable");
-  }
   const minUnix = Math.min(...nums);
   const maxUnix = Math.max(...nums);
   return {
@@ -74,4 +75,59 @@ export function extractVendorUpdatedRange(body: unknown): {
     minIso: unixSecToIso(minUnix),
     maxIso: unixSecToIso(maxUnix),
   };
+}
+
+function readParallelUpdatedTimestamps(body: Record<string, unknown>): number[] {
+  const optionSymbol = body.optionSymbol;
+  const rowCount = Array.isArray(optionSymbol) ? optionSymbol.length : 0;
+  if (rowCount === 0) return [];
+
+  const updated = body.updated;
+  if (!Array.isArray(updated) || updated.length !== rowCount) {
+    return [];
+  }
+  return parsePositiveUnixInts(updated);
+}
+
+/**
+ * Read vendor freshness timestamps without inventing wall-clock asOf.
+ * Accepts scalar metadata `updated` (expirations endpoint) or parallel-array
+ * per-contract timestamps (options chain). Never accepts missing/empty data.
+ */
+export function extractVendorUpdatedRange(body: unknown): {
+  minUnix: number;
+  maxUnix: number;
+  minIso: string;
+  maxIso: string;
+} {
+  if (!isRecord(body)) {
+    throw new Error("vendor body must be an object to read updated timestamps");
+  }
+
+  const updated = body.updated;
+  if (
+    typeof updated === "number" &&
+    Number.isFinite(updated) &&
+    updated > 0 &&
+    Number.isInteger(updated)
+  ) {
+    return rangeFromUnix([updated]);
+  }
+
+  if (Array.isArray(updated) && updated.length > 0) {
+    return rangeFromUnix(parsePositiveUnixInts(updated));
+  }
+
+  const rowUpdated = readParallelUpdatedTimestamps(body);
+  if (rowUpdated.length > 0) {
+    return rangeFromUnix(rowUpdated);
+  }
+
+  throw new Error("vendor updated timestamps absent or empty");
+}
+
+export function defaultBoundedExpiration(sessionDate: string): string {
+  return sessionDateFromIso(
+    new Date(Date.parse(`${sessionDate}T12:00:00-04:00`) + 86_400_000).toISOString(),
+  );
 }

@@ -117,7 +117,7 @@ export const AiStudyBriefing = z.object({
   timezone: z.literal("America/New_York"),
   status: AiStudyBriefingStatus,
   message: z.string().min(1),
-  provider: z.enum(["openai", "synthetic_demo", "unavailable"]),
+  provider: z.enum(["openai", "rule_based", "synthetic_demo", "unavailable"]),
   model: z.string().nullable(),
   methodologyId: z.literal(AI_STUDY_METHODOLOGY_ID),
   methodologyVersion: z.literal(AI_STUDY_METHODOLOGY_VERSION),

@@ -66,6 +66,20 @@ export const MarketNewsPanel = z.object({
   message: z.string().min(1),
   provider: z.enum(["alpaca", "synthetic_demo", "unavailable"]),
   sections: z.array(MarketNewsSection),
+  diagnostics: z
+    .object({
+      macroRawCount: z.number().int().nonnegative(),
+      symbolRawCount: z.number().int().nonnegative(),
+      categorizedCounts: z.object({
+        macro: z.number().int().nonnegative(),
+        indices: z.number().int().nonnegative(),
+        crypto: z.number().int().nonnegative(),
+        watchlist: z.number().int().nonnegative(),
+      }),
+      providerStatus: z.string().optional(),
+      providerError: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type MarketNewsTopic = z.infer<typeof MarketNewsTopic>;

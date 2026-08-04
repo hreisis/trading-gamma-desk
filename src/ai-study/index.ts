@@ -3,6 +3,7 @@ export * from "./collect-inputs";
 export * from "./prompt";
 export * from "./openai-generator";
 export * from "./fake-generator";
+export * from "./rule-based-briefing";
 export * from "./load-briefing";
 export * from "./demo-fixture";
 export * from "./validate";

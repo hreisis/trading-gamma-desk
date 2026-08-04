@@ -12,6 +12,10 @@ import { buildAiStudyEvidenceCorpus } from "./evidence-corpus";
 import { generateAiStudyWithFake } from "./fake-generator";
 import { generateAiStudyWithOpenAi } from "./openai-generator";
 import {
+  buildRuleBasedAiStudyReport,
+  RULE_BASED_AI_STUDY_MODEL,
+} from "./rule-based-briefing";
+import {
   AI_STUDY_TIMEZONE,
   resolveAiStudyMarketStatus,
 } from "./session";
@@ -151,19 +155,31 @@ export async function loadAiStudyBriefing(
       });
 
   if (!generated.ok) {
+    const evidence = buildAiStudyEvidenceCorpus(packet.facts, packet.inputs);
+    const fallbackReport = buildRuleBasedAiStudyReport(packet);
+    const fallbackValidated = validateAiStudyReport({
+      report: fallbackReport,
+      evidence,
+    });
+    const status = resolveBriefingStatus({
+      packetAligned: packet.sessionAlignment.aligned,
+      mode: packet.mode,
+      groundingOk: fallbackValidated.ok,
+      hasReport: true,
+    });
     return baseBriefing({
       generatedAt,
       sessionDate: packet.sessionDate,
       ...sessionFields,
-      status: "error",
-      message: generated.error,
-      provider: "unavailable",
-      model: config.model,
+      status,
+      message: `LLM generation failed (${generated.error}) — rule-based grounded fallback.`,
+      provider: "rule_based",
+      model: RULE_BASED_AI_STUDY_MODEL,
       inputs: [...packet.inputs],
       sessionAlignment: packet.sessionAlignment,
       usage: generated.usage,
-      grounding: null,
-      report: null,
+      grounding: fallbackValidated.grounding,
+      report: fallbackReport,
     });
   }
 
@@ -172,6 +188,34 @@ export async function loadAiStudyBriefing(
     report: generated.report,
     evidence,
   });
+  if (!validated.ok) {
+    const fallbackReport = buildRuleBasedAiStudyReport(packet);
+    const fallbackValidated = validateAiStudyReport({
+      report: fallbackReport,
+      evidence,
+    });
+    const status = resolveBriefingStatus({
+      packetAligned: packet.sessionAlignment.aligned,
+      mode: packet.mode,
+      groundingOk: fallbackValidated.ok,
+      hasReport: true,
+    });
+    return baseBriefing({
+      generatedAt,
+      sessionDate: packet.sessionDate,
+      ...sessionFields,
+      status,
+      message: `LLM briefing failed grounding (${validated.grounding.errors[0] ?? "invalid claims"}) — rule-based grounded fallback.`,
+      provider: "rule_based",
+      model: RULE_BASED_AI_STUDY_MODEL,
+      inputs: [...packet.inputs],
+      sessionAlignment: packet.sessionAlignment,
+      usage: generated.usage,
+      grounding: fallbackValidated.grounding,
+      report: fallbackReport,
+    });
+  }
+
   const grounding = validated.grounding;
   const groundingOk = validated.ok;
   const status = resolveBriefingStatus({

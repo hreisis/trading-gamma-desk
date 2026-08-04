@@ -92,6 +92,57 @@ function containsSecret(text: string, token: string | null): boolean {
   return text.includes(token);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function vendorStatusFailure(
+  body: unknown,
+  httpStatus: number,
+): { code: string; error: string } | null {
+  if (!isRecord(body)) {
+    if (httpStatus === 401 || httpStatus === 403) {
+      return {
+        code: "auth",
+        error: `MarketData.app HTTP ${httpStatus}: check MARKETDATA_API_TOKEN`,
+      };
+    }
+    return null;
+  }
+
+  const status = body.s;
+  if (status === "ok") return null;
+  if (status === "no_data") {
+    return { code: "no_data", error: "MarketData.app s=no_data" };
+  }
+  if (status === "error") {
+    const detail =
+      typeof body.errmsg === "string" && body.errmsg.length > 0
+        ? body.errmsg
+        : "vendor error";
+    if (httpStatus === 401 || httpStatus === 403) {
+      return {
+        code: "auth",
+        error: `${detail} (HTTP ${httpStatus})`,
+      };
+    }
+    return { code: "vendor_status", error: detail };
+  }
+  if (httpStatus === 401 || httpStatus === 403) {
+    return {
+      code: "auth",
+      error: `MarketData.app HTTP ${httpStatus}: check MARKETDATA_API_TOKEN`,
+    };
+  }
+  if (status !== undefined) {
+    return {
+      code: "vendor_status",
+      error: `MarketData.app unexpected s=${String(status)}`,
+    };
+  }
+  return null;
+}
+
 /**
  * Fetch one bounded MarketData.app chain → normalize → quality → Gamma Engine → snapshot.
  * Does not write on failure. Never logs or serializes the API token.
@@ -161,6 +212,20 @@ export async function runBoundedGammaProvider(
       ok: false,
       code: "token_leak",
       error: "refusing to continue: request path unexpectedly contained token",
+      path: null,
+      wrote: false,
+    };
+  }
+
+  const vendorFailure = vendorStatusFailure(
+    fetchResult.body,
+    fetchResult.httpStatus,
+  );
+  if (vendorFailure) {
+    return {
+      ok: false,
+      code: vendorFailure.code,
+      error: vendorFailure.error,
       path: null,
       wrote: false,
     };

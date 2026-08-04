@@ -109,6 +109,26 @@ export async function loadMarketNewsPanel(
     const anyStale = sections.some((section) =>
       section.items.some((item) => item.status === "stale"),
     );
+    const categorizedCounts = {
+      macro: buckets.macro.length,
+      indices: buckets.indices.length,
+      crypto: buckets.crypto.length,
+      watchlist: buckets.watchlist.length,
+    };
+    const totalCategorized =
+      categorizedCounts.macro +
+      categorizedCounts.indices +
+      categorizedCounts.crypto +
+      categorizedCounts.watchlist;
+    const totalRaw = macroItems.length + symbolItems.length;
+    const diagnosticsMessage =
+      totalRaw === 0
+        ? "Alpaca returned zero articles for macro and symbol queries"
+        : totalCategorized === 0
+          ? `Alpaca returned ${totalRaw} articles but categorization matched none of the configured topics`
+          : totalCategorized < totalRaw
+            ? `Alpaca returned ${totalRaw} articles; ${totalCategorized} matched configured topics after dedupe/categorization`
+            : undefined;
 
     return {
       kind: "MarketNewsPanel",
@@ -122,10 +142,18 @@ export async function loadMarketNewsPanel(
             ? "Alpaca news loaded — some headlines are stale"
             : "Alpaca news loaded"
           : status === "partial"
-            ? "Alpaca news partially loaded"
-            : "No recent Alpaca headlines matched the configured topics",
+            ? diagnosticsMessage ?? "Alpaca news partially loaded"
+            : diagnosticsMessage ??
+              "No recent Alpaca headlines matched the configured topics",
       provider: "alpaca",
       sections,
+      diagnostics: {
+        macroRawCount: macroItems.length,
+        symbolRawCount: symbolItems.length,
+        categorizedCounts,
+        providerStatus: status,
+        providerError: diagnosticsMessage,
+      },
     };
   } catch (error: unknown) {
     const message =
@@ -134,6 +162,10 @@ export async function loadMarketNewsPanel(
         : error instanceof Error
           ? error.message
           : "Alpaca news fetch failed";
+    const errorCode =
+      error instanceof AlpacaClientError ? error.code : "unknown";
+    const httpStatus =
+      error instanceof AlpacaClientError ? error.statusCode ?? null : null;
 
     const credentialHint =
       error instanceof AlpacaClientError
@@ -167,6 +199,20 @@ export async function loadMarketNewsPanel(
           : message,
       provider: "unavailable",
       sections,
+      diagnostics: {
+        macroRawCount: 0,
+        symbolRawCount: 0,
+        categorizedCounts: {
+          macro: 0,
+          indices: 0,
+          crypto: 0,
+          watchlist: 0,
+        },
+        providerStatus: "error",
+        providerError: httpStatus
+          ? `${message} (code=${errorCode}, http=${httpStatus})`
+          : `${message} (code=${errorCode})`,
+      },
     };
   }
 }

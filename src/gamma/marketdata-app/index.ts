@@ -9,3 +9,4 @@ export * from "./fetch";
 export * from "./paths";
 export * from "./args";
 export * from "./run";
+export * from "./resolve-expiration";

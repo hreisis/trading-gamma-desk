@@ -35,6 +35,21 @@ export interface FetchBoundedChainResult {
   readonly requestPath: string;
 }
 
+export interface FetchExpirationsInput {
+  readonly symbol: string;
+  readonly token: string;
+  readonly fetchImpl?: FetchLike;
+  readonly baseUrl?: string;
+  readonly timeoutMs?: number;
+}
+
+export interface FetchExpirationsResult {
+  readonly httpStatus: number;
+  readonly body: unknown;
+  readonly expirations: readonly string[];
+  readonly requestPath: string;
+}
+
 function readRateLimitHeader(
   headers: Headers,
   name: string,
@@ -45,32 +60,28 @@ function readRateLimitHeader(
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * One bounded options-chain GET. Token is sent only in Authorization header —
- * never embedded in the URL or returned in logs.
- */
-export async function fetchBoundedMarketDataAppChain(
-  input: FetchBoundedChainInput,
-): Promise<FetchBoundedChainResult> {
+async function fetchMarketDataAppJson(input: {
+  readonly path: string;
+  readonly token: string;
+  readonly fetchImpl?: FetchLike;
+  readonly baseUrl?: string;
+  readonly timeoutMs?: number;
+}): Promise<{
+  readonly httpStatus: number;
+  readonly body: unknown;
+  readonly requestPath: string;
+  readonly creditsConsumed: number | null;
+  readonly creditsRemaining: number | null;
+}> {
   if (!input.token) {
     throw new MarketDataAppFetchError(
       "missing_token",
       "MARKETDATA_API_TOKEN (or MARKETDATA_APP_TOKEN) is required",
     );
   }
-  if (input.strikes.length === 0) {
-    throw new MarketDataAppFetchError("empty_strikes", "strike list is empty");
-  }
 
   const baseUrl = input.baseUrl ?? MARKETDATA_APP_BASE_URL;
-  const symbol = encodeURIComponent(input.symbol.toUpperCase());
-  const strikeParam = input.strikes.join(",");
-  const path =
-    `/v1/options/chain/${symbol}/` +
-    `?expiration=${encodeURIComponent(input.expiration)}` +
-    `&strike=${encodeURIComponent(strikeParam)}`;
-  const url = `${baseUrl}${path}`;
-
+  const url = `${baseUrl}${input.path}`;
   const fetchImpl = input.fetchImpl ?? fetch;
   const timeoutMs = input.timeoutMs ?? MARKETDATA_APP_TIMEOUT_MS;
   const controller = new AbortController();
@@ -105,15 +116,6 @@ export async function fetchBoundedMarketDataAppChain(
     clearTimeout(timer);
   }
 
-  const creditsConsumed = readRateLimitHeader(
-    response.headers,
-    "x-api-ratelimit-consumed",
-  );
-  const creditsRemaining = readRateLimitHeader(
-    response.headers,
-    "x-api-ratelimit-remaining",
-  );
-
   let body: unknown;
   try {
     body = await response.json();
@@ -129,8 +131,113 @@ export async function fetchBoundedMarketDataAppChain(
   return {
     httpStatus: response.status,
     body,
-    creditsConsumed,
-    creditsRemaining,
+    requestPath: input.path,
+    creditsConsumed: readRateLimitHeader(
+      response.headers,
+      "x-api-ratelimit-consumed",
+    ),
+    creditsRemaining: readRateLimitHeader(
+      response.headers,
+      "x-api-ratelimit-remaining",
+    ),
+  };
+}
+
+function readVendorExpirations(body: unknown): readonly string[] {
+  if (!body || typeof body !== "object") {
+    throw new MarketDataAppFetchError(
+      "vendor_status",
+      "MarketData.app expirations body must be an object",
+    );
+  }
+  const record = body as { s?: unknown; expirations?: unknown; errmsg?: unknown };
+  if (record.s === "no_data") {
+    throw new MarketDataAppFetchError("no_data", "MarketData.app s=no_data");
+  }
+  if (record.s === "error") {
+    const detail =
+      typeof record.errmsg === "string" && record.errmsg.length > 0
+        ? record.errmsg
+        : "vendor error";
+    throw new MarketDataAppFetchError("vendor_status", detail);
+  }
+  if (record.s !== "ok" || !Array.isArray(record.expirations)) {
+    throw new MarketDataAppFetchError(
+      "vendor_status",
+      `MarketData.app unexpected expirations response s=${String(record.s)}`,
+    );
+  }
+  return record.expirations.filter(
+    (value): value is string =>
+      typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value),
+  );
+}
+
+/** List available option expirations for bounded-gamma expiry discovery. */
+export async function fetchMarketDataAppExpirations(
+  input: FetchExpirationsInput,
+): Promise<FetchExpirationsResult> {
+  const symbol = encodeURIComponent(input.symbol.toUpperCase());
+  const path = `/v1/options/expirations/${symbol}/`;
+  const result = await fetchMarketDataAppJson({
+    path,
+    token: input.token,
+    fetchImpl: input.fetchImpl,
+    baseUrl: input.baseUrl,
+    timeoutMs: input.timeoutMs,
+  });
+  if (result.httpStatus === 401 || result.httpStatus === 403) {
+    throw new MarketDataAppFetchError(
+      "auth",
+      `MarketData.app HTTP ${result.httpStatus}: check MARKETDATA_API_TOKEN`,
+      result.httpStatus,
+    );
+  }
+  return {
+    httpStatus: result.httpStatus,
+    body: result.body,
+    expirations: readVendorExpirations(result.body),
+    requestPath: path,
+  };
+}
+
+/**
+ * One bounded options-chain GET. Token is sent only in Authorization header —
+ * never embedded in the URL or returned in logs.
+ */
+export async function fetchBoundedMarketDataAppChain(
+  input: FetchBoundedChainInput,
+): Promise<FetchBoundedChainResult> {
+  if (!input.token) {
+    throw new MarketDataAppFetchError(
+      "missing_token",
+      "MARKETDATA_API_TOKEN (or MARKETDATA_APP_TOKEN) is required",
+    );
+  }
+  if (input.strikes.length === 0) {
+    throw new MarketDataAppFetchError("empty_strikes", "strike list is empty");
+  }
+
+  const symbol = encodeURIComponent(input.symbol.toUpperCase());
+  const strikeParam = input.strikes.join(",");
+  const path =
+    `/v1/options/chain/${symbol}/` +
+    `?expiration=${encodeURIComponent(input.expiration)}` +
+    `&strike=${encodeURIComponent(strikeParam)}`;
+
+  const result = await fetchMarketDataAppJson({
+    path,
+    token: input.token,
+    fetchImpl: input.fetchImpl,
+    baseUrl: input.baseUrl,
+    timeoutMs: input.timeoutMs,
+  });
+
+  return {
+    httpStatus: result.httpStatus,
+    body: result.body,
+    creditsConsumed: result.creditsConsumed,
+    creditsRemaining: result.creditsRemaining,
     requestPath: path,
   };
 }

@@ -12,13 +12,19 @@ const PROHIBITED =
   /\b(buy|sell|long|short|overweight|underweight|take profit|stop.?loss)\b/i;
 const PREDICTION =
   /\b(will rally|will fall|will rise|will drop|predict|forecast|expect returns|trade signal|go long|go short)\b/i;
+const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
+
+function maskIsoDateNumerics(text: string): string {
+  return text.replace(ISO_DATE, (date) => date.replace(/\d/g, "D"));
+}
 
 function extractNumericTokens(text: string): string[] {
   const out: string[] = [];
+  const masked = maskIsoDateNumerics(text);
   const re =
     /\$?-?\d{1,3}(?:,\d{3})*(?:\.\d+)?%?|\d+(?:\.\d+)?(?:\s*[-–to]+\s*\d+(?:\.\d+)?)?/gi;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
+  while ((m = re.exec(masked)) !== null) {
     const token = m[0]!.trim();
     if (token) out.push(token);
   }
@@ -35,6 +41,27 @@ function normalizeNumToken(token: string): string {
     .replace(/–/g, "-");
 }
 
+function isSupportedConfidenceToken(
+  token: string,
+  citedEvidence: readonly AiStudyEvidenceEntry[],
+): boolean {
+  const normalized = normalizeNumToken(token);
+  const scoreMatch = /^(\d+)\/100$/.exec(normalized);
+  if (scoreMatch) {
+    const score = scoreMatch[1]!;
+    return citedEvidence.some(
+      (entry) =>
+        (entry.id === "macro.confidenceScore" ||
+          entry.id === "macro.confidenceDisplay") &&
+        entry.value === score,
+    );
+  }
+  if (normalized === "100") {
+    return citedEvidence.some((entry) => entry.id === "macro.confidenceScore");
+  }
+  return false;
+}
+
 function numbersSupportedForClaim(
   text: string,
   citedEvidence: readonly AiStudyEvidenceEntry[],
@@ -45,6 +72,7 @@ function numbersSupportedForClaim(
     const n = normalizeNumToken(token);
     if (!n) continue;
     if (/^\d{4}$/.test(n)) continue;
+    if (isSupportedConfidenceToken(token, citedEvidence)) continue;
     if (corpus.includes(token.replace(/,/g, ""))) continue;
     const corpusNorm = normalizeNumToken(corpus);
     if (corpusNorm.includes(n)) continue;
@@ -64,6 +92,22 @@ function numbersSupportedForClaim(
     return { ok: false, bad: token };
   }
   return { ok: true };
+}
+
+function isExplicitConditionalScenario(label: string, text: string): boolean {
+  if (!label.startsWith("scenarios.")) return false;
+  const trimmed = text.trim();
+  return (
+    /^conditional\b/i.test(trimmed) ||
+    /^status-quo\b/i.test(trimmed) ||
+    /\bconditional path\b/i.test(trimmed)
+  );
+}
+
+function hasProhibitedLanguage(label: string, text: string): boolean {
+  if (PROHIBITED.test(text)) return true;
+  if (isExplicitConditionalScenario(label, text)) return false;
+  return PREDICTION.test(text);
 }
 
 function checkClaim(
@@ -94,7 +138,7 @@ function checkClaim(
     errors.push(`${label}: unsupported number/token ${num.bad}`);
     flags.numbersValid = false;
   }
-  if (PROHIBITED.test(claim.text) || PREDICTION.test(claim.text)) {
+  if (hasProhibitedLanguage(label, claim.text)) {
     errors.push(`${label}: prohibited inference language`);
     flags.prohibitedLanguageDetected = true;
   }

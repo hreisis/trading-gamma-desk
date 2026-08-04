@@ -5,9 +5,9 @@ import { fetchOfficialCalendar } from "@/catalyst/fetch-calendar";
 import { loadCatalystFeed } from "@/catalyst/load";
 import { fetchOfficialResults } from "@/catalyst/results/fetch-results";
 import { resolveMarketDataApiToken } from "@/gamma/marketdata-app/config";
+import { resolveBoundedGammaExpiration } from "@/gamma/marketdata-app/resolve-expiration";
 import { runBoundedGammaProvider } from "@/gamma/marketdata-app/run";
 import { boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
-import { sessionDateFromIso } from "@/gamma/marketdata-app/time";
 import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
 import { runDailyPipeline } from "@/pipeline/run-daily";
 import { loadMacroDesk } from "./load-macro-desk";
@@ -226,25 +226,13 @@ function parseOptionalNumber(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function resolveGammaFetchParams(env: NodeJS.ProcessEnv): {
-  readonly expiration: string;
+function resolveGammaStrikeParams(env: NodeJS.ProcessEnv): {
   readonly strikeMin: number;
   readonly strikeMax: number;
 } {
-  const sessionDate = resolveCurrentMarketSessionDate();
-  const configuredExpiration = (env.GAMMA_BOUNDED_EXPIRATION ?? "").trim();
-  const expiration =
-    configuredExpiration ||
-    sessionDateFromIso(
-      new Date(
-        Date.parse(`${sessionDate}T12:00:00-04:00`) + 86_400_000,
-      ).toISOString(),
-    );
-
-  const strikeMin = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MIN) ?? 620;
-  const strikeMax = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MAX) ?? 720;
-
-  return { expiration, strikeMin, strikeMax };
+  const strikeMin = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MIN) ?? 700;
+  const strikeMax = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MAX) ?? 820;
+  return { strikeMin, strikeMax };
 }
 
 const gammaRefreshByKey = new Map<string, Promise<void>>();
@@ -265,7 +253,14 @@ async function ensureBoundedGammaSnapshot(options: {
     };
   }
 
-  const params = resolveGammaFetchParams(options.env);
+  const params = resolveGammaStrikeParams(options.env);
+  const sessionDate = resolveCurrentMarketSessionDate();
+  const expiration = await resolveBoundedGammaExpiration({
+    symbol: options.symbol,
+    sessionDate,
+    configuredExpiration: options.env.GAMMA_BOUNDED_EXPIRATION,
+    token,
+  });
 
   let pending = gammaRefreshByKey.get(key);
   if (!pending) {
@@ -273,7 +268,7 @@ async function ensureBoundedGammaSnapshot(options: {
       ensureDir(options.dataRoot);
       const result = await runBoundedGammaProvider({
         symbol: options.symbol,
-        expiration: params.expiration,
+        expiration: expiration.expiration,
         strikeMin: params.strikeMin,
         strikeMax: params.strikeMax,
         strikeStep: 1,

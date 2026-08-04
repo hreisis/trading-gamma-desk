@@ -206,7 +206,27 @@ describe("bounded MarketData.app Gamma provider", () => {
       ),
     });
     expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("vendor_status");
     expect(readFileSync(prior, "utf8")).toContain("prior-valid");
+  });
+
+  it("fails auth responses with auth code instead of missing_asof", async () => {
+    const result = await runBoundedGammaProvider({
+      symbol: "SPY",
+      expiration: "2026-07-31",
+      strikeMin: 743,
+      strikeMax: 750,
+      token: TOKEN,
+      write: false,
+      fetchImpl: mockFetch(async () =>
+        jsonResponse(401, { s: "error", errmsg: "Invalid token" }),
+      ),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("auth");
+    expect(result.code).not.toBe("missing_asof");
   });
 
   it("fails on network error", async () => {
