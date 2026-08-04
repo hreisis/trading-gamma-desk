@@ -11,6 +11,7 @@ Synthetic, commit-safe inputs for PIT research archive, exact-date offline repla
 | `profiles/peer-m64.json` | Peer match profile for M6-4 pipeline corpus |
 | `pipeline.m64.json` | Golden `StudyPipelineManifest` (M6-4) |
 | `evidence-bundle.m62.json` | Golden `StudyEvidenceBundle` for M6-2 memo workflow |
+| `eval/*.json` | Six offline eval bundles for memo quality assessment (M8 eval) |
 
 Build locally (gitignored output):
 

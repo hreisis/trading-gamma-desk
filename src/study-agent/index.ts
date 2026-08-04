@@ -12,3 +12,5 @@ export * from "./memo-store";
 export * from "./cli";
 export * from "./integration-smoke";
 export * from "./integration-smoke-paths";
+export * from "./eval-fixtures";
+export * from "./study-memo-eval";

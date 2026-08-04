@@ -1,0 +1,191 @@
+{
+  "kind": "StudyEvidenceBundle",
+  "schemaVersion": "0.1.0",
+  "bundleId": "evidence|study|research|2026-07-29|0.1.0|SPY|0.1.0|0.1.0",
+  "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+  "computedAt": "2026-08-30T12:00:00.000Z",
+  "methodologyId": "study_evidence_bundle_v1",
+  "methodologyVersion": "0.1.0",
+  "queryContext": {
+    "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+    "sessionDate": "2026-07-29",
+    "symbol": "SPY",
+    "matchProfile": {
+      "kind": "StudyMatchProfile",
+      "schemaVersion": "0.1.0",
+      "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+      "sessionDate": "2026-07-29",
+      "fields": {
+        "macro_regime": {
+          "status": "available",
+          "value": "fed_rates"
+        },
+        "gamma_regime": {
+          "status": "available",
+          "value": "positive"
+        },
+        "structure_status": {
+          "status": "available",
+          "value": "available"
+        },
+        "bounded_gamma_availability": {
+          "status": "available",
+          "value": "incomplete"
+        },
+        "bounded_scope": {
+          "status": "available",
+          "value": "bounded_single_expiry"
+        },
+        "catalyst_ids": {
+          "status": "available",
+          "value": "syn-cpi-2026-07-15|syn-fomc-2026-07-30"
+        }
+      }
+    }
+  },
+  "matchCriteria": {
+    "factors": [
+      "macro_regime",
+      "gamma_regime",
+      "bounded_gamma_availability",
+      "catalyst_ids"
+    ],
+    "excludeQueryStudy": true,
+    "minMatureSampleSize": 1
+  },
+  "cohortQuality": {
+    "status": "empty",
+    "matchedStudyCount": 0,
+    "rejectedStudyCount": 0,
+    "matchedStudyIds": [],
+    "differentFactorCount": 0,
+    "primaryHorizonMatureCount": 0,
+    "warnings": [
+      "1D: matureCount=0 < minMatureSampleSize=1",
+      "5D: matureCount=0 < minMatureSampleSize=1",
+      "20D: matureCount=0 < minMatureSampleSize=1"
+    ],
+    "reasons": [
+      "no studies matched PIT criteria"
+    ]
+  },
+  "primaryHorizon": "5D",
+  "horizonEvidence": {
+    "d1": {
+      "horizon": "1D",
+      "aggregate": {
+        "horizon": "1D",
+        "matureCount": 0,
+        "sampleSize": 0,
+        "status": "insufficient_data",
+        "meanReturn": null,
+        "medianReturn": null,
+        "positiveRate": null,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null,
+        "reason": "matureCount=0 < minMatureSampleSize=1"
+      },
+      "evidenceStatus": "insufficient_evidence",
+      "statusBasis": {
+        "ruleId": "rule.insufficient.no_matches",
+        "primaryHorizon": "1D",
+        "medianReturn": null,
+        "meanReturn": null,
+        "positiveRate": null,
+        "reasons": [
+          "matchedStudyCount=0"
+        ]
+      }
+    },
+    "d5": {
+      "horizon": "5D",
+      "aggregate": {
+        "horizon": "5D",
+        "matureCount": 0,
+        "sampleSize": 0,
+        "status": "insufficient_data",
+        "meanReturn": null,
+        "medianReturn": null,
+        "positiveRate": null,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null,
+        "reason": "matureCount=0 < minMatureSampleSize=1"
+      },
+      "evidenceStatus": "insufficient_evidence",
+      "statusBasis": {
+        "ruleId": "rule.insufficient.no_matches",
+        "primaryHorizon": "5D",
+        "medianReturn": null,
+        "meanReturn": null,
+        "positiveRate": null,
+        "reasons": [
+          "matchedStudyCount=0"
+        ]
+      }
+    },
+    "d20": {
+      "horizon": "20D",
+      "aggregate": {
+        "horizon": "20D",
+        "matureCount": 0,
+        "sampleSize": 0,
+        "status": "insufficient_data",
+        "meanReturn": null,
+        "medianReturn": null,
+        "positiveRate": null,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null,
+        "reason": "matureCount=0 < minMatureSampleSize=1"
+      },
+      "evidenceStatus": "insufficient_evidence",
+      "statusBasis": {
+        "ruleId": "rule.insufficient.no_matches",
+        "primaryHorizon": "20D",
+        "medianReturn": null,
+        "meanReturn": null,
+        "positiveRate": null,
+        "reasons": [
+          "matchedStudyCount=0"
+        ]
+      }
+    }
+  },
+  "evidenceStatus": "insufficient_evidence",
+  "statusBasis": {
+    "ruleId": "rule.insufficient.no_matches",
+    "primaryHorizon": "5D",
+    "medianReturn": null,
+    "meanReturn": null,
+    "positiveRate": null,
+    "reasons": [
+      "matchedStudyCount=0"
+    ]
+  },
+  "limitations": [
+    "Similar-regime matching is exact equality on explicit PIT fields — not ML similarity.",
+    "Forward outcomes are aggregated only after matching; they never influence match selection.",
+    "Unavailable match fields exclude candidates — no fabricated matches.",
+    "Evidence status describes historical cohort statistics only — not a buy/sell signal or forward prediction.",
+    "Status rules use fixed thresholds on median/mean return and positive rate; not outcome-calibrated probabilities.",
+    "Insufficient-data warnings from the similar-regime study are preserved in cohortQuality.warnings."
+  ],
+  "sources": [
+    {
+      "kind": "similar_regime_study",
+      "refId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+      "schemaVersion": "0.1.0"
+    },
+    {
+      "kind": "daily_research_archive",
+      "refId": "research|2026-07-29|0.1.0",
+      "relativePath": "fixtures/studies/archive/2026-07-29/daily-research.json",
+      "schemaVersion": "0.1.0"
+    }
+  ]
+}

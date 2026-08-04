@@ -1,0 +1,194 @@
+{
+  "kind": "StudyEvidenceBundle",
+  "schemaVersion": "0.1.0",
+  "bundleId": "evidence|study|research|2026-07-29|0.1.0|SPY|0.1.0|0.1.0",
+  "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+  "computedAt": "2026-08-30T12:00:00.000Z",
+  "methodologyId": "study_evidence_bundle_v1",
+  "methodologyVersion": "0.1.0",
+  "queryContext": {
+    "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+    "sessionDate": "2026-07-29",
+    "symbol": "SPY",
+    "matchProfile": {
+      "kind": "StudyMatchProfile",
+      "schemaVersion": "0.1.0",
+      "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+      "sessionDate": "2026-07-29",
+      "fields": {
+        "macro_regime": {
+          "status": "available",
+          "value": "fed_rates"
+        },
+        "gamma_regime": {
+          "status": "available",
+          "value": "positive"
+        },
+        "structure_status": {
+          "status": "available",
+          "value": "available"
+        },
+        "bounded_gamma_availability": {
+          "status": "available",
+          "value": "incomplete"
+        },
+        "bounded_scope": {
+          "status": "available",
+          "value": "bounded_single_expiry"
+        },
+        "catalyst_ids": {
+          "status": "available",
+          "value": "syn-cpi-2026-07-15|syn-fomc-2026-07-30"
+        }
+      }
+    }
+  },
+  "matchCriteria": {
+    "factors": [
+      "macro_regime",
+      "gamma_regime",
+      "bounded_gamma_availability",
+      "catalyst_ids"
+    ],
+    "excludeQueryStudy": true,
+    "minMatureSampleSize": 1
+  },
+  "cohortQuality": {
+    "status": "adequate",
+    "matchedStudyCount": 1,
+    "rejectedStudyCount": 0,
+    "matchedStudyIds": [
+      "study|eval-thin-n1|SPY|0.1.0"
+    ],
+    "differentFactorCount": 0,
+    "primaryHorizonMatureCount": 1,
+    "warnings": [],
+    "reasons": [
+      "5D matureCount=1 meets minMatureSampleSize"
+    ]
+  },
+  "primaryHorizon": "5D",
+  "horizonEvidence": {
+    "d1": {
+      "horizon": "1D",
+      "aggregate": {
+        "horizon": "1D",
+        "matureCount": 1,
+        "sampleSize": 1,
+        "status": "available",
+        "meanReturn": 0.01,
+        "medianReturn": 0.01,
+        "positiveRate": 1,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null
+      },
+      "evidenceStatus": "supported",
+      "statusBasis": {
+        "ruleId": "rule.supported.positive_cohort",
+        "primaryHorizon": "1D",
+        "medianReturn": 0.01,
+        "meanReturn": 0.01,
+        "positiveRate": 1,
+        "reasons": [
+          "medianReturn=0.01 > 0",
+          "meanReturn=0.01 > 0",
+          "positiveRate=1 >= 0.6"
+        ]
+      }
+    },
+    "d5": {
+      "horizon": "5D",
+      "aggregate": {
+        "horizon": "5D",
+        "matureCount": 1,
+        "sampleSize": 1,
+        "status": "available",
+        "meanReturn": 0.02,
+        "medianReturn": 0.02,
+        "positiveRate": 1,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null
+      },
+      "evidenceStatus": "supported",
+      "statusBasis": {
+        "ruleId": "rule.supported.positive_cohort",
+        "primaryHorizon": "5D",
+        "medianReturn": 0.02,
+        "meanReturn": 0.02,
+        "positiveRate": 1,
+        "reasons": [
+          "medianReturn=0.02 > 0",
+          "meanReturn=0.02 > 0",
+          "positiveRate=1 >= 0.6"
+        ]
+      }
+    },
+    "d20": {
+      "horizon": "20D",
+      "aggregate": {
+        "horizon": "20D",
+        "matureCount": 1,
+        "sampleSize": 1,
+        "status": "available",
+        "meanReturn": 0.03,
+        "medianReturn": 0.03,
+        "positiveRate": 1,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null
+      },
+      "evidenceStatus": "supported",
+      "statusBasis": {
+        "ruleId": "rule.supported.positive_cohort",
+        "primaryHorizon": "20D",
+        "medianReturn": 0.03,
+        "meanReturn": 0.03,
+        "positiveRate": 1,
+        "reasons": [
+          "medianReturn=0.03 > 0",
+          "meanReturn=0.03 > 0",
+          "positiveRate=1 >= 0.6"
+        ]
+      }
+    }
+  },
+  "evidenceStatus": "supported",
+  "statusBasis": {
+    "ruleId": "rule.supported.positive_cohort",
+    "primaryHorizon": "5D",
+    "medianReturn": 0.02,
+    "meanReturn": 0.02,
+    "positiveRate": 1,
+    "reasons": [
+      "medianReturn=0.02 > 0",
+      "meanReturn=0.02 > 0",
+      "positiveRate=1 >= 0.6"
+    ]
+  },
+  "limitations": [
+    "Similar-regime matching is exact equality on explicit PIT fields — not ML similarity.",
+    "Forward outcomes are aggregated only after matching; they never influence match selection.",
+    "Unavailable match fields exclude candidates — no fabricated matches.",
+    "Evidence status describes historical cohort statistics only — not a buy/sell signal or forward prediction.",
+    "Status rules use fixed thresholds on median/mean return and positive rate; not outcome-calibrated probabilities.",
+    "Insufficient-data warnings from the similar-regime study are preserved in cohortQuality.warnings."
+  ],
+  "sources": [
+    {
+      "kind": "similar_regime_study",
+      "refId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+      "schemaVersion": "0.1.0"
+    },
+    {
+      "kind": "daily_research_archive",
+      "refId": "research|2026-07-29|0.1.0",
+      "relativePath": "fixtures/studies/archive/2026-07-29/daily-research.json",
+      "schemaVersion": "0.1.0"
+    }
+  ]
+}

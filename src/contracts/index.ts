@@ -25,4 +25,5 @@ export * from "./study-evidence-bundle";
 export * from "./study-memo";
 export * from "./study-memo-integration-smoke";
 export * from "./study-pipeline";
+export * from "./study-memo-eval-report";
 export * from "./decision-surface";

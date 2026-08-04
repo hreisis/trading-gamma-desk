@@ -1,0 +1,191 @@
+{
+  "kind": "StudyEvidenceBundle",
+  "schemaVersion": "0.1.0",
+  "bundleId": "evidence|study|research|2026-07-29|0.1.0|SPY|0.1.0|0.1.0",
+  "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+  "computedAt": "2026-08-30T12:00:00.000Z",
+  "methodologyId": "study_evidence_bundle_v1",
+  "methodologyVersion": "0.1.0",
+  "queryContext": {
+    "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+    "sessionDate": "2026-07-29",
+    "symbol": "SPY",
+    "matchProfile": {
+      "kind": "StudyMatchProfile",
+      "schemaVersion": "0.1.0",
+      "studyId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+      "sessionDate": "2026-07-29",
+      "fields": {
+        "macro_regime": {
+          "status": "available",
+          "value": "fed_rates"
+        },
+        "gamma_regime": {
+          "status": "available",
+          "value": "positive"
+        },
+        "structure_status": {
+          "status": "available",
+          "value": "available"
+        },
+        "bounded_gamma_availability": {
+          "status": "available",
+          "value": "incomplete"
+        },
+        "bounded_scope": {
+          "status": "available",
+          "value": "bounded_single_expiry"
+        },
+        "catalyst_ids": {
+          "status": "available",
+          "value": "syn-cpi-2026-07-15|syn-fomc-2026-07-30"
+        }
+      }
+    }
+  },
+  "matchCriteria": {
+    "factors": [
+      "macro_regime",
+      "gamma_regime",
+      "bounded_gamma_availability",
+      "catalyst_ids"
+    ],
+    "excludeQueryStudy": true,
+    "minMatureSampleSize": 1
+  },
+  "cohortQuality": {
+    "status": "adequate",
+    "matchedStudyCount": 2,
+    "rejectedStudyCount": 0,
+    "matchedStudyIds": [
+      "study|eval-mixed-neg|SPY|0.1.0",
+      "study|eval-mixed-pos|SPY|0.1.0"
+    ],
+    "differentFactorCount": 0,
+    "primaryHorizonMatureCount": 2,
+    "warnings": [],
+    "reasons": [
+      "5D matureCount=2 meets minMatureSampleSize"
+    ]
+  },
+  "primaryHorizon": "5D",
+  "horizonEvidence": {
+    "d1": {
+      "horizon": "1D",
+      "aggregate": {
+        "horizon": "1D",
+        "matureCount": 2,
+        "sampleSize": 2,
+        "status": "available",
+        "meanReturn": 0,
+        "medianReturn": 0,
+        "positiveRate": 0.5,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null
+      },
+      "evidenceStatus": "mixed",
+      "statusBasis": {
+        "ruleId": "rule.mixed.conflicting_or_weak",
+        "primaryHorizon": "1D",
+        "medianReturn": 0,
+        "meanReturn": 0,
+        "positiveRate": 0.5,
+        "reasons": [
+          "cohort metrics do not meet supported or not_supported thresholds",
+          "positiveRate band requires >= 0.6 (supported) or <= 0.4 (not_supported) with aligned mean/median sign"
+        ]
+      }
+    },
+    "d5": {
+      "horizon": "5D",
+      "aggregate": {
+        "horizon": "5D",
+        "matureCount": 2,
+        "sampleSize": 2,
+        "status": "available",
+        "meanReturn": 0,
+        "medianReturn": 0,
+        "positiveRate": 0.5,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null
+      },
+      "evidenceStatus": "mixed",
+      "statusBasis": {
+        "ruleId": "rule.mixed.conflicting_or_weak",
+        "primaryHorizon": "5D",
+        "medianReturn": 0,
+        "meanReturn": 0,
+        "positiveRate": 0.5,
+        "reasons": [
+          "cohort metrics do not meet supported or not_supported thresholds",
+          "positiveRate band requires >= 0.6 (supported) or <= 0.4 (not_supported) with aligned mean/median sign"
+        ]
+      }
+    },
+    "d20": {
+      "horizon": "20D",
+      "aggregate": {
+        "horizon": "20D",
+        "matureCount": 2,
+        "sampleSize": 2,
+        "status": "available",
+        "meanReturn": 0,
+        "medianReturn": 0,
+        "positiveRate": 0.5,
+        "meanMfe": null,
+        "medianMfe": null,
+        "meanMae": null,
+        "medianMae": null
+      },
+      "evidenceStatus": "mixed",
+      "statusBasis": {
+        "ruleId": "rule.mixed.conflicting_or_weak",
+        "primaryHorizon": "20D",
+        "medianReturn": 0,
+        "meanReturn": 0,
+        "positiveRate": 0.5,
+        "reasons": [
+          "cohort metrics do not meet supported or not_supported thresholds",
+          "positiveRate band requires >= 0.6 (supported) or <= 0.4 (not_supported) with aligned mean/median sign"
+        ]
+      }
+    }
+  },
+  "evidenceStatus": "mixed",
+  "statusBasis": {
+    "ruleId": "rule.mixed.conflicting_or_weak",
+    "primaryHorizon": "5D",
+    "medianReturn": 0,
+    "meanReturn": 0,
+    "positiveRate": 0.5,
+    "reasons": [
+      "cohort metrics do not meet supported or not_supported thresholds",
+      "positiveRate band requires >= 0.6 (supported) or <= 0.4 (not_supported) with aligned mean/median sign"
+    ]
+  },
+  "limitations": [
+    "Similar-regime matching is exact equality on explicit PIT fields — not ML similarity.",
+    "Forward outcomes are aggregated only after matching; they never influence match selection.",
+    "Unavailable match fields exclude candidates — no fabricated matches.",
+    "Evidence status describes historical cohort statistics only — not a buy/sell signal or forward prediction.",
+    "Status rules use fixed thresholds on median/mean return and positive rate; not outcome-calibrated probabilities.",
+    "Insufficient-data warnings from the similar-regime study are preserved in cohortQuality.warnings."
+  ],
+  "sources": [
+    {
+      "kind": "similar_regime_study",
+      "refId": "study|research|2026-07-29|0.1.0|SPY|0.1.0",
+      "schemaVersion": "0.1.0"
+    },
+    {
+      "kind": "daily_research_archive",
+      "refId": "research|2026-07-29|0.1.0",
+      "relativePath": "fixtures/studies/archive/2026-07-29/daily-research.json",
+      "schemaVersion": "0.1.0"
+    }
+  ]
+}
