@@ -59,7 +59,7 @@ Shipped work (M1–M6) established macro regime, catalyst evidence, desk UI foun
 | **M5** | Strategy research / replay / regime | ✅ PIT archive, forward outcomes, similar-regime study, evidence bundle — all deterministic |
 | **M6** | Constrained LLM study agent | ✅ Cited study memos from `StudyEvidenceBundle` only; validation + fallback; integration smoke; end-to-end `studies:pipeline` |
 | **M7** | Private portfolio policy | **Planned (private repo)** — thresholds, sizing, allocation rules, instrument universe; parallel track, not blocking M8 |
-| **M8** | Minimal decision interface | **In progress** — M8-1 decision surface ✅; M8-2 uncertainty + study artifacts ✅; M8-3 evidence path next |
+| **M8** | Minimal decision interface | **In progress** — M8-1 decision surface ✅; M8-2 uncertainty + study artifacts ✅; M8-3 auditable evidence drill-down ✅ |
 | **M9** | Shadow mode / review loop | Decision logs in private repo; compare to outcomes; optional calibration feed |
 
 M4–M6 are **shipped on the public product path**. M7–M9 require the **separate private repository** boundary for policy and logs; **M8** is the next milestone in this public repo.
@@ -129,7 +129,7 @@ Non-negotiable product principles:
 | M5-4 evidence bundle | ✅ Shipped |
 | M6-1…M6-4 study agent + pipeline | ✅ Shipped |
 | M6 exit criteria | ✅ Satisfied |
-| **Next public milestone** | **M8-3** evidence path |
+| **Next public milestone** | **M8** complete (M8-3 drill-down) — **M9** shadow/review loop next |
 | M8-1 decision surface | ✅ Shipped (`/decide?date=`) |
 | M8-2 uncertainty + study artifacts | ✅ Shipped (exact-date `data/` loads, evidence panel, integrity errors, stance suppression) |
 | M7 private policy | Planned — separate private repo |

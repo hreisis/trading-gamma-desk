@@ -1,4 +1,4 @@
-import type { CatalystFeed, DominantDriver, StudyEvidenceBundle, StudyMemo } from "@/contracts";
+import type { CatalystFeed, DominantDriver, SimilarRegimeStudy, StudyEvidenceBundle, StudyMemo } from "@/contracts";
 import { join } from "node:path";
 import {
   DecisionSurfaceView,
@@ -16,15 +16,20 @@ import {
   buildDecisionEvidenceSummary,
   memoProvenanceLabel,
 } from "./decision-evidence-display";
+import { buildDecisionEvidenceDrillDown } from "./build-decision-evidence-drilldown";
+import type { PeerSessionContext } from "./build-decision-evidence-drilldown";
 import {
   DECISION_SURFACE_DRIVER,
   DECISION_SURFACE_EVIDENCE_BUNDLE,
   DECISION_SURFACE_EVIDENCE_FIXTURE_PATH,
   DECISION_SURFACE_FIXTURE_SESSION,
   DECISION_SURFACE_MEMO,
+  DECISION_SURFACE_PEER_SESSIONS,
+  DECISION_SURFACE_SIMILAR_REGIME_STUDY,
   DECISION_SURFACE_SOURCE_LABEL,
   PUBLIC_POLICY_UNAVAILABLE_MESSAGE,
 } from "./decision-surface-fixtures";
+import { loadDecisionStudyContext } from "./load-decision-study-context";
 import { loadBoundedGammaDeskView } from "./load-bounded-gamma";
 import { loadDecisionArtifacts } from "./load-decision-artifacts";
 import { loadSessionBoundedGamma } from "./load-session-bounded-gamma";
@@ -42,7 +47,7 @@ export interface LoadDecisionSurfaceOptions {
 function baseViewFields(publicDemo: boolean, isSynthetic: boolean) {
   return {
     kind: "DecisionSurfaceView" as const,
-    schemaVersion: "0.2.0" as const,
+    schemaVersion: "0.3.0" as const,
     isPublicDemo: publicDemo,
     isSynthetic,
     artifactIssues: [] as ArtifactIntegrityIssue[],
@@ -120,12 +125,21 @@ function buildResearchSection(input: {
   readonly bundle: StudyEvidenceBundle;
   readonly memo: StudyMemo | null;
   readonly pipelineMemoSource?: string | null;
+  readonly similarRegimeStudy?: SimilarRegimeStudy | null;
+  readonly peerSessions?: readonly PeerSessionContext[];
 }): DecisionResearchSection {
   const evidenceSummary = buildDecisionEvidenceSummary(input.bundle);
+  const evidenceDrillDown = buildDecisionEvidenceDrillDown({
+    bundle: input.bundle,
+    memo: input.memo,
+    similarRegimeStudy: input.similarRegimeStudy,
+    peerSessions: input.peerSessions,
+  });
 
   if (!input.memo) {
     return {
       evidenceSummary,
+      evidenceDrillDown,
       memoHeadline: "Study memo unavailable",
       memoStatus: "unavailable",
       memoStatusLabel: "unavailable",
@@ -150,6 +164,7 @@ function buildResearchSection(input: {
 
   return {
     evidenceSummary,
+    evidenceDrillDown,
     memoHeadline: input.memo.headline,
     memoStatus: input.memo.status,
     memoStatusLabel: prov.statusLabel,
@@ -251,6 +266,8 @@ function loadDemoDecisionSurface(
     bundle: DECISION_SURFACE_EVIDENCE_BUNDLE,
     memo: DECISION_SURFACE_MEMO,
     pipelineMemoSource: "rule_based_fallback",
+    similarRegimeStudy: DECISION_SURFACE_SIMILAR_REGIME_STUDY,
+    peerSessions: [...DECISION_SURFACE_PEER_SESSIONS],
   });
 
   const policy = buildPolicySlot(sessionDate);
@@ -340,11 +357,23 @@ function loadLiveDecisionSurface(input: {
       })
     : undefined;
 
+  const studyContext = artifacts.bundle
+    ? loadDecisionStudyContext({
+        sessionDate,
+        symbol,
+        dataRoot,
+        matchedStudyIds: artifacts.bundle.cohortQuality.matchedStudyIds,
+        pipelineManifestPath: artifacts.pipelineRun?.manifestPath ?? null,
+      })
+    : null;
+
   const research = artifacts.bundle
     ? buildResearchSection({
         bundle: artifacts.bundle,
         memo: artifacts.memo,
         pipelineMemoSource: artifacts.pipelineRun?.memoSource,
+        similarRegimeStudy: studyContext?.similarRegimeStudy,
+        peerSessions: studyContext?.peerSessions,
       })
     : undefined;
 

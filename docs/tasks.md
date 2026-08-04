@@ -6,7 +6,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 **Milestone 6 — Constrained LLM study agent (✅ complete through M6-4).** M5-3/M5-4 and M6-1…M6-4 shipped: deterministic similar-regime evidence, constrained memo agent, integration smoke, and end-to-end `studies:pipeline`. **M6 exit criteria satisfied** (see below).
 
-**Next public milestone:** **M8 — Minimal decision interface** — **M8-1** decision surface (✅), **M8-2** uncertainty + exact-date study artifacts (✅). Next: **M8-3** evidence path. **M7** private policy remains a separate private-repo track.
+**Next public milestone:** **M8 — Minimal decision interface** — **M8-1** decision surface (✅), **M8-2** uncertainty + exact-date study artifacts (✅), **M8-3** auditable evidence drill-down (✅). **M7** private policy remains a separate private-repo track.
 
 ### Queued (not started)
 
@@ -202,7 +202,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | --- | --- | --- |
 | M8-1 | Decision surface | `/decide?date=` SSR viewport: Observe (driver/catalyst/structure) + StudyMemo research w/ citations + public policy-unavailable slot + deterministic non-trade stance; fixture-only; exact date — ✅ |
 | M8-2 | Uncertainty + study artifacts | Non-demo `/decide` loads exact-date driver, structure, `StudyEvidenceBundle`, and `StudyMemo` from `data/`; deterministic evidence panel (status, cohort, horizons, MFE/MAE, limitations); display-only strength; memo provenance labels; artifact integrity errors; stance suppressed on study integrity failure; demo stays fixture-only — ✅ |
-| M8-3 | Evidence path | Expand-original-evidence for every AI line |
+| M8-3 | Evidence path | Expandable auditable drill-down on `/decide`: full horizons + MFE/MAE, matched sessions, match/similarity fields, limitations/unknowns, memo citation resolution — ✅ |
 
 **Exit criteria (M8):** Operator can Evaluate → Decide from one minimal UI without dashboard clutter.
 

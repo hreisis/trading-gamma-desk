@@ -3,9 +3,13 @@ import { IsoDate } from "./common";
 import { EvidenceStatus, CohortQualityStatus } from "./study-evidence-bundle";
 import { ForwardHorizon } from "./study-outcome";
 import { StructureConditionState } from "./market-structure-state-v2";
-import { StudyMemoBullet, StudyMemoStatus } from "./study-memo";
+import { StudyMatchFactorKey } from "./similar-regime-study";
+import {
+  StudyMemoBullet,
+  StudyMemoStatus,
+} from "./study-memo";
 
-export const DECISION_SURFACE_VIEW_SCHEMA_VERSION = "0.2.0";
+export const DECISION_SURFACE_VIEW_SCHEMA_VERSION = "0.3.0";
 
 export const DecisionSurfaceStatus = z.enum([
   "ready",
@@ -116,8 +120,95 @@ export const DecisionObserveSummary = z.object({
   structureUnavailableReason: z.string().optional(),
 });
 
+export const EvidenceDrillDownLane = z.enum([
+  "deterministic",
+  "inference",
+  "limitations",
+  "unknowns",
+]);
+
+export const MatchFieldDisplay = z.object({
+  factor: StudyMatchFactorKey,
+  queryValue: z.string(),
+  status: z.enum(["available", "unavailable"]),
+  unavailableReason: z.string().optional(),
+});
+
+export const MatchCriteriaDisplay = z.object({
+  factors: z.array(StudyMatchFactorKey),
+  excludeQueryStudy: z.boolean(),
+  minMatureSampleSize: z.number().int().positive(),
+});
+
+export const DifferentFactorDisplay = z.object({
+  factor: StudyMatchFactorKey,
+  distinctValues: z.array(z.string().min(1)),
+});
+
+export const SimilarityDetailDisplay = z.object({
+  matchedFactors: z.array(StudyMatchFactorKey),
+  differentFactors: z.array(DifferentFactorDisplay),
+  rejectedStudyCount: z.number().int().nonnegative(),
+  statusBasisReasons: z.array(z.string()),
+  statusBasisRuleId: z.string().min(1),
+});
+
+export const HorizonEvidenceDrillDown = HorizonEvidenceDisplay.extend({
+  medianMfe: z.string(),
+  medianMae: z.string(),
+  statusBasisReasons: z.array(z.string()),
+});
+
+export const PeerHorizonOutcomeDisplay = z.object({
+  horizon: ForwardHorizon,
+  maturity: z.enum(["mature", "immature", "unavailable", "unknown"]),
+  return: z.string(),
+  mfe: z.string(),
+  mae: z.string(),
+  unavailableReason: z.string().optional(),
+});
+
+export const MatchedSessionDisplay = z.object({
+  studyId: z.string().min(1),
+  sessionDate: IsoDate,
+  matchFields: z.array(MatchFieldDisplay),
+  horizons: z.array(PeerHorizonOutcomeDisplay).length(3),
+  missingDataNotes: z.array(z.string()),
+  profileStatus: z.enum(["available", "partial", "unavailable"]),
+  outcomeStatus: z.enum(["available", "partial", "unavailable"]),
+});
+
+export const CitationFieldPreview = z.object({
+  path: z.string().min(1),
+  displayValue: z.string(),
+  resolved: z.boolean(),
+});
+
+export const MemoBulletDrillDown = z.object({
+  id: z.string().min(1),
+  text: z.string().min(1),
+  lane: EvidenceDrillDownLane,
+  citations: z.array(CitationFieldPreview).min(1),
+});
+
+export const DecisionEvidenceDrillDown = z.object({
+  queryMatchFields: z.array(MatchFieldDisplay),
+  matchCriteria: MatchCriteriaDisplay,
+  similarity: SimilarityDetailDisplay,
+  horizons: z.object({
+    d1: HorizonEvidenceDrillDown,
+    d5: HorizonEvidenceDrillDown,
+    d20: HorizonEvidenceDrillDown,
+  }),
+  matchedSessions: z.array(MatchedSessionDisplay),
+  bundleLimitations: z.array(z.string()),
+  cohortUnknowns: z.array(z.string()),
+  memoBullets: z.array(MemoBulletDrillDown),
+});
+
 export const DecisionResearchSection = z.object({
   evidenceSummary: DecisionEvidenceSummary,
+  evidenceDrillDown: DecisionEvidenceDrillDown,
   memoHeadline: z.string().min(1),
   memoStatus: StudyMemoStatus,
   memoStatusLabel: z.string().min(1),
@@ -157,5 +248,16 @@ export type DecisionEvidenceSummary = z.infer<typeof DecisionEvidenceSummary>;
 export type PublicPolicySlot = z.infer<typeof PublicPolicySlot>;
 export type DeskStance = z.infer<typeof DeskStance>;
 export type DecisionObserveSummary = z.infer<typeof DecisionObserveSummary>;
+export type EvidenceDrillDownLane = z.infer<typeof EvidenceDrillDownLane>;
+export type MatchFieldDisplay = z.infer<typeof MatchFieldDisplay>;
+export type MatchCriteriaDisplay = z.infer<typeof MatchCriteriaDisplay>;
+export type DifferentFactorDisplay = z.infer<typeof DifferentFactorDisplay>;
+export type SimilarityDetailDisplay = z.infer<typeof SimilarityDetailDisplay>;
+export type HorizonEvidenceDrillDown = z.infer<typeof HorizonEvidenceDrillDown>;
+export type PeerHorizonOutcomeDisplay = z.infer<typeof PeerHorizonOutcomeDisplay>;
+export type MatchedSessionDisplay = z.infer<typeof MatchedSessionDisplay>;
+export type CitationFieldPreview = z.infer<typeof CitationFieldPreview>;
+export type MemoBulletDrillDown = z.infer<typeof MemoBulletDrillDown>;
+export type DecisionEvidenceDrillDown = z.infer<typeof DecisionEvidenceDrillDown>;
 export type DecisionResearchSection = z.infer<typeof DecisionResearchSection>;
 export type DecisionSurfaceView = z.infer<typeof DecisionSurfaceView>;

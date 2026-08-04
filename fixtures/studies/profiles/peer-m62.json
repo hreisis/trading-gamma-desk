@@ -1,0 +1,23 @@
+{
+  "kind": "StudyMatchProfile",
+  "schemaVersion": "0.1.0",
+  "studyId": "study|peer-m62|SPY|0.1.0",
+  "sessionDate": "2026-07-15",
+  "fields": {
+    "macro_regime": { "status": "available", "value": "fed_rates" },
+    "gamma_regime": { "status": "available", "value": "positive" },
+    "structure_status": { "status": "available", "value": "available" },
+    "bounded_gamma_availability": {
+      "status": "available",
+      "value": "incomplete"
+    },
+    "bounded_scope": {
+      "status": "available",
+      "value": "bounded_single_expiry"
+    },
+    "catalyst_ids": {
+      "status": "available",
+      "value": "syn-cpi-2026-07-15|syn-fomc-2026-07-30"
+    }
+  }
+}
