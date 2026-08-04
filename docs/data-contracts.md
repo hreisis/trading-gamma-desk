@@ -1269,6 +1269,28 @@ npm run studies:memo:smoke -- --live --dry-run --date 2026-07-29
 
 ---
 
+## 3k. End-to-end study pipeline (M6-4)
+
+Deterministic orchestrator wiring M5-1B…M5-4 + M6-2 memo validation. Runner: `runStudyPipeline` in `src/studies/run-pipeline.ts`. Manifest: `StudyPipelineManifest` in `src/contracts/study-pipeline.ts`.
+
+```bash
+npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
+```
+
+| Rule | Notes |
+| --- | --- |
+| Input | Explicit `--date` + `--manifest` — **no latest fallback**, no network fetch |
+| Archive | `query.archivePath` (pre-built) or `query.sourcesManifest` (build + write to `data/studies/archive/{date}/`) |
+| Prices | `query.priceSeriesPath` + `priceSeriesAsOfSessionDate`; peer corpus may override per entry |
+| Match | `similarRegime.corpus[]` loads explicit `profilePath` JSON; outcomes built from price corpus |
+| Memo | Default `memo.forceFallback: true` — rule-based validated memo (credentials unset in CI) |
+| Output | Atomic writes: `definitions/`, `outcomes/`, `similar-regime/`, `evidence/`, `memos/`, `pipeline/{date}/run.json` |
+| Flags | `--dry-run` skips all writes |
+
+Fixtures: `fixtures/studies/pipeline.m64.json`, `fixtures/studies/profiles/peer-m64.json`.
+
+---
+
 ## 4. MarketThesis (composed open thesis)
 
 ```json

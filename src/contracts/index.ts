@@ -24,3 +24,4 @@ export * from "./similar-regime-study";
 export * from "./study-evidence-bundle";
 export * from "./study-memo";
 export * from "./study-memo-integration-smoke";
+export * from "./study-pipeline";
