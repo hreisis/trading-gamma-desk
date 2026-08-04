@@ -3,7 +3,8 @@ import { RegimeSignatureConfig } from "@/contracts";
 import { lookbackStart } from "./dates";
 import { fetchTreasuryYields } from "./treasury";
 import { fetchVix } from "./cboe";
-import { fetchTiingoBtc, fetchTiingoEtf } from "./tiingo";
+import { fetchTiingoBtc, fetchTiingoEtf, fetchTiingoSpy } from "./tiingo";
+import { writeSpyBars } from "./spy-bars";
 import { assembleSnapshot, type MacroSnapshot } from "./assemble";
 import {
   writeBars,
@@ -89,6 +90,13 @@ export async function runMacroIngest(
   ];
 
   const barPaths = seriesList.map((series) => writeBars(series, dataRoot));
+
+  const spy = await fetchTiingoSpy(startDate, endDate, {
+    token: options.token,
+    fetchImpl: options.fetchImpl,
+  });
+  barPaths.push(writeSpyBars(spy, dataRoot));
+
   const snapshot = assembleSnapshot(seriesList, config);
   const path = snapshotPath(dataRoot, snapshot.marketSessionDate);
   if (options.force && existsSync(path)) {

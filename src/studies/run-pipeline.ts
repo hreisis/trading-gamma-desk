@@ -22,6 +22,10 @@ import { buildSimilarRegimeStudy } from "./build-similar-regime-study";
 import { buildStudyDefinition } from "./build-definition";
 import { buildStudyEvidenceBundle } from "./build-evidence-bundle";
 import { buildStudyForwardOutcome } from "./build-outcome";
+import {
+  assertPriceSeriesAsOfMatch,
+  resolvePriceSourceKind,
+} from "./build-price-series";
 import { buildStudyMatchProfile } from "./match-profile";
 import { loadStudySourcesFromFile } from "./load-sources";
 import {
@@ -73,10 +77,15 @@ function readManifest(path: string, repoRoot: string): StudyPipelineManifest {
 function readPriceSeries(
   relativePath: string,
   repoRoot: string,
+  expectedAsOf?: string,
 ): StudyPriceSeries {
-  return StudyPriceSeries.parse(
+  const series = StudyPriceSeries.parse(
     JSON.parse(readFileSync(join(repoRoot, relativePath), "utf8")),
   );
+  if (expectedAsOf !== undefined) {
+    assertPriceSeriesAsOfMatch(series, expectedAsOf);
+  }
+  return series;
 }
 
 function readMatchProfile(
@@ -182,13 +191,21 @@ export async function runStudyPipeline(
     manifest.query.archivePath ??
     join("studies", "archive", options.sessionDate, "daily-research.json");
 
-  const queryPrices = readPriceSeries(manifest.query.priceSeriesPath, repoRoot);
+  const queryPrices = readPriceSeries(
+    manifest.query.priceSeriesPath,
+    repoRoot,
+    manifest.query.priceSeriesAsOfSessionDate,
+  );
+  const queryPriceSourceKind = resolvePriceSourceKind(
+    queryPrices,
+    manifest.query.priceSeriesPath,
+  );
   const definition = buildStudyDefinition({
     archive,
     symbol,
     archiveRelativePath: queryArchiveRelativePath,
     builtAt: computedAt,
-    synthetic: true,
+    synthetic: queryPrices.synthetic,
   });
 
   const queryOutcome = buildStudyForwardOutcome({
@@ -196,6 +213,7 @@ export async function runStudyPipeline(
     priceSeries: queryPrices,
     priceSeriesAsOfSessionDate: manifest.query.priceSeriesAsOfSessionDate,
     computedAt,
+    priceSourceKind: queryPriceSourceKind,
     priceRelativePath: manifest.query.priceSeriesPath,
   });
 
@@ -212,7 +230,8 @@ export async function runStudyPipeline(
     const priceAsOf =
       entry.priceSeriesAsOfSessionDate ??
       manifest.query.priceSeriesAsOfSessionDate;
-    const prices = readPriceSeries(pricePath, repoRoot);
+    const prices = readPriceSeries(pricePath, repoRoot, priceAsOf);
+    const priceSourceKind = resolvePriceSourceKind(prices, pricePath);
     const peerDefinition = buildPeerDefinition({
       profile,
       symbol,
@@ -224,6 +243,7 @@ export async function runStudyPipeline(
       priceSeries: prices,
       priceSeriesAsOfSessionDate: priceAsOf,
       computedAt,
+      priceSourceKind,
       priceRelativePath: pricePath,
     });
     return { profile, outcome };

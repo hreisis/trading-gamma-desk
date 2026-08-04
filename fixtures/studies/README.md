@@ -6,7 +6,8 @@ Synthetic, commit-safe inputs for PIT research archive, exact-date offline repla
 | --- | --- |
 | `sources.m51b.json` | Manifest pointing at replay corpus + bounded gamma fixture |
 | `archive/2026-07-29/daily-research.json` | Golden `DailyResearchArchive` (M5-1B) |
-| `prices/spy.m52.json` | Synthetic adjClose series for M5-2 forward outcomes |
+| `prices/spy.m52.json` | Synthetic adjClose series for M5-2 forward outcomes (demo/CI) |
+| `pipeline.m85a-real-prices.json` | **Local example only** — swaps in real `data/studies/prices/SPY/{asOf}/price-series.json` for query prices. Archive (`fixtures/studies/archive/…`), peer corpus (`peer-m64.json`), and cohort remain **fixture-backed**; does not imply a real Study conclusion. Requires prior `npm run ingest` + `studies:ingest-prices`. Not used in CI. |
 | `similar-regime-corpus.m53.json` | PIT match profiles for M5-3 similar-regime tests |
 | `profiles/peer-m64.json` | Peer match profile for M6-4 pipeline corpus |
 | `pipeline.m64.json` | Golden `StudyPipelineManifest` (M6-4) |
@@ -35,6 +36,12 @@ End-to-end pipeline (archive → evidence → validated memo):
 
 ```bash
 npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
+```
+
+Real SPY price series (requires `npm run ingest` + `TIINGO_TOKEN`; gitignored output):
+
+```bash
+npm run studies:ingest-prices -- --date 2026-08-29
 ```
 
 No network, no latest-fallback. OpenAI optional for memo only when key is set locally; pipeline defaults to rule-based memo.

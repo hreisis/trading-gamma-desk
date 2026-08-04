@@ -14,7 +14,7 @@ Module chain (deterministic compute → interpreted outputs): **Driver → Catal
 
 **Public portfolio demo:** **Synthetic Demo Data — illustrative, not market data.** All demo research uses bundled fixtures only; never reads `data/`. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
 
-**Study validation status:** M8 ships the decision UI and pipeline wiring. Local acceptance on 2026-07-29 confirms non-demo `/decide` loads `data/` artifacts, but Study inputs remain partly fixture-backed (archive, peer corpus, SPY prices). Real historical Study validation is **M8-5 (queued)** — not claimed as passed.
+**Study validation status:** M8 ships the decision UI and pipeline wiring. Local acceptance on 2026-07-29 confirms non-demo `/decide` loads `data/` artifacts, but Study archive and peer corpus remain fixture-backed. **M8-5a** adds real Tiingo SPY bars + exact-date `StudyPriceSeries` (`studies:ingest-prices`). Real historical Study validation (multi-session archive) is **M8-5b (queued)** — not claimed as passed.
 
 ### Regime vs catalyst vs confidence
 
@@ -84,7 +84,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | Command | Purpose |
 | --- | --- |
 | `npm run daily` | Full refresh (`--force` replaces today’s snapshot) |
-| `npm run ingest` | Pull + compute snapshot only |
+| `npm run ingest` | Pull + compute snapshot + cache SPY bars (`data/bars/SPY.json`) |
 | `npm run interpret` | Snapshot → atomic driver write |
 | `npm run catalyst:fetch` | Pull BLS/BEA/FOMC **schedules** → `data/catalyst/calendar-latest.json` |
 | `npm run catalyst:results:fetch` | Pull BLS CPI/Employment **actuals** → `data/catalyst/results-latest.json` |
@@ -281,6 +281,7 @@ Deterministic PIT research and constrained LLM memos — **offline/fixture path*
 ```bash
 npm run studies:build -- --date 2026-07-29 --manifest fixtures/studies/sources.m51b.json
 npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
+npm run studies:ingest-prices -- --date 2026-08-29   # real SPY price series (requires ingest + TIINGO_TOKEN)
 npm run studies:memo -- --date 2026-07-29 --bundle fixtures/studies/evidence-bundle.m62.json
 ```
 

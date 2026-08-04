@@ -4,6 +4,7 @@ import { sessionDateFromIsoPrefix } from "./dates";
 import { fetchValidated, type FetchLike } from "./http";
 import { assertJsonArray } from "./validate";
 import { IngestError, type RawBar, type SymbolSeries } from "./types";
+import type { SpyBarSeries } from "./spy-bars";
 
 export const TIINGO_ETF_TICKERS: Readonly<
   Record<"GOLD" | "COPPER" | "OIL" | "USD", string>
@@ -165,6 +166,52 @@ export async function fetchTiingoEtf(
     instrument: definition.instrument,
     isProxy: definition.isProxy,
     source: `tiingo/daily/${ticker}`,
+    bars,
+  };
+}
+
+export async function fetchTiingoSpy(
+  startDate: string,
+  endDate: string,
+  options: {
+    readonly token?: string;
+    readonly fetchImpl?: FetchLike;
+  } = {},
+): Promise<Omit<SpyBarSeries, "writtenAt">> {
+  const token = options.token ?? tokenFromEnv();
+  if (!token) {
+    throw new IngestError("auth", "TIINGO_TOKEN is empty");
+  }
+
+  const ticker = "spy";
+  const source = `tiingo/daily/${ticker}`;
+  const validated = await fetchValidated(
+    etfUrl(ticker, startDate, endDate),
+    {
+      label: `Tiingo ${ticker}`,
+      contentTypeIncludes: "application/json",
+    },
+    { headers: authHeaders(token), fetchImpl: options.fetchImpl },
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(validated.body);
+  } catch {
+    throw new IngestError("payload_shape", `Tiingo ${ticker}: body is not JSON`);
+  }
+  assertJsonArray(`Tiingo ${ticker}`, parsed, 20);
+
+  const bars = parseTiingoEtfRows(
+    parsed as Record<string, unknown>[],
+    source,
+  );
+
+  return {
+    symbol: "SPY",
+    instrument: "SPY",
+    isProxy: false,
+    source,
     bars,
   };
 }

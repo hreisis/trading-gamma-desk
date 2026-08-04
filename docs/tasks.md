@@ -218,7 +218,7 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | Bounded structure | ❌ Unavailable for exact date — gamma snapshot `sessionDate` 2026-07-30 ≠ query 2026-07-29 → `/decide` status `partial` |
 | Study archive | ❌ Fixture — `fixtures/studies/archive/2026-07-29/daily-research.json` |
 | Peer corpus | ❌ Fixture — single peer from `fixtures/studies/profiles/peer-m64.json` |
-| SPY outcomes (1D/5D/20D) | ❌ Fixture price series — `fixtures/studies/prices/spy.m52.json` (`synthetic: true`) |
+| SPY outcomes (1D/5D/20D) | Real prices available via M8-5a (`studies:ingest-prices`); acceptance manifest still uses fixture `spy.m52.json` |
 | Cohort | n=1 matched peer (`2026-07-22`); 1 mature sample per horizon |
 | Memo | Rule-based fallback (`complete`); evidence cites fixture-backed bundle |
 | Non-demo missing artifacts | Shows unavailable — never falls back to bundled fixtures |
@@ -230,11 +230,30 @@ npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeli
 GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
 ```
 
-Default `npm test` skips this suite unless `GAMMADESK_REAL_ACCEPTANCE=1`. **Real historical Study validation deferred to M8-5.**
+Default `npm test` skips this suite unless `GAMMADESK_REAL_ACCEPTANCE=1`. **Real historical Study validation deferred to M8-5b.**
 
-### M8-5 (queued — not started)
+### M8-5a (shipped) — real SPY price ingestion
 
-Real historical data foundation: ingest real SPY bars, build multi-session PIT archive from actual desk/catalyst/structure artifacts, remove fixture inputs from non-demo manifests, compute outcomes without look-ahead, require non-synthetic provenance, re-run acceptance with honest cohort reporting. See planning notes in product/architecture docs.
+Real Tiingo daily SPY bars + exact-date `StudyPriceSeries` artifacts for non-demo Study outcomes. **Does not** replace archive or peer corpus.
+
+| Deliverable | Status |
+| --- | --- |
+| SPY Tiingo ingest → `data/bars/SPY.json` | ✅ via `npm run ingest` |
+| Exact-date price series CLI | ✅ `npm run studies:ingest-prices -- --date YYYY-MM-DD` |
+| Artifact | ✅ `data/studies/prices/SPY/{asOf}/price-series.json` with `local_store` provenance |
+| Pipeline integration | ✅ Non-demo manifests may reference real price-series; fixture demo/CI preserved |
+| Tests | ✅ `tests/studies-m85a.test.ts` (offline fixtures — not real-data acceptance) |
+
+```bash
+npm run ingest   # requires TIINGO_TOKEN — writes data/bars/SPY.json
+npm run studies:ingest-prices -- --date 2026-08-29
+```
+
+Real SPY prices alone do **not** make the Study cohort real. Archive + peer corpus remain fixture-backed until M8-5b.
+
+### M8-5b (queued — not started)
+
+Multi-session PIT archive from actual desk/catalyst/structure artifacts, remove fixture inputs from non-demo manifests, compute outcomes without look-ahead, require non-synthetic provenance across archive + corpus, re-run acceptance with honest cohort reporting. See planning notes in product/architecture docs.
 
 ---
 

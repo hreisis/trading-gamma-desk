@@ -164,7 +164,7 @@ A pull that fails validation is a hard error. It must never degrade into a parti
 
 ### Run model and persistence
 
-Milestone 1 is **local-first**: `npm run ingest` (`scripts/ingest-macro.ts`) pulls Treasury + CBOE VIX + Tiingo, persists raw bars to `data/bars/<SYMBOL>.json`, then writes an immutable compute snapshot to `data/snapshots/<marketSessionDate>.json`. The snapshot holds features, classification and methodology versions so a past conclusion can be recomputed; interpretation (M1-8) is not required to freeze the numbers. Files are a valid store here only because writes are single-writer and local. Use `--force` only when deliberately replacing a session.
+Milestone 1 is **local-first**: `npm run ingest` (`scripts/ingest-macro.ts`) pulls Treasury + CBOE VIX + Tiingo (macro proxies + BTC + **SPY**), persists raw bars to `data/bars/<SYMBOL>.json` (SPY at `data/bars/SPY.json` for Study outcomes), then writes an immutable compute snapshot to `data/snapshots/<marketSessionDate>.json`. The snapshot holds features, classification and methodology versions so a past conclusion can be recomputed; interpretation (M1-8) is not required to freeze the numbers. Files are a valid store here only because writes are single-writer and local. Use `--force` only when deliberately replacing a session.
 
 Deployment path, when wanted: the local run commits the snapshot (a few KB per session) and the deployed app serves it read-only. **Runtime filesystem writes on serverless hosts are not a database** — if scheduled online updates become a requirement, that is the point at which object storage or Postgres enters, and it is a Milestone 2+ decision, not an M1 design constraint.
 
@@ -194,5 +194,5 @@ Deployment path, when wanted: the local run commits the snapshot (a few KB per s
 | M5 (M5-1A…M5-4) | ✅ Shipped |
 | M6 (M6-1…M6-4) | ✅ Shipped — exit criteria satisfied |
 | M7 | Planned — private repo |
-| M8 | ✅ Shipped — decision surface `/decide?date=` (M8-1…M8-4); real historical Study foundation **M8-5 queued** |
+| M8 | ✅ Shipped — decision surface `/decide?date=` (M8-1…M8-4); **M8-5a** real SPY price ingest + `StudyPriceSeries`; **M8-5b** multi-session archive queued |
 | M9 | Planned — private repo |

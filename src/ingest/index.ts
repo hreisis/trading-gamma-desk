@@ -8,3 +8,4 @@ export * from "./tiingo";
 export * from "./store";
 export * from "./assemble";
 export * from "./run";
+export * from "./spy-bars";

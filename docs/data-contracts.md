@@ -1060,7 +1060,48 @@ PIT study anchor + **separate** forward outcome artifacts. Zod: `src/contracts/s
 | Leakage | Reject when entry session > asOf; truncate series at asOf before compute |
 | IDs | `studyId = study\|{archiveId}\|{symbol}\|{methodologyVersion}`; `outcomeId = outcome\|{studyId}\|{asOf}` |
 
-Fixtures: `fixtures/studies/prices/spy.m52.json`.
+Fixtures: `fixtures/studies/prices/spy.m52.json` (synthetic, demo/CI).
+
+### StudyPriceSeries — real SPY (M8-5a)
+
+PIT-truncated price artifact for non-demo Study outcomes. Builder: `buildStudyPriceSeriesFromSpyBars` in `src/studies/build-price-series.ts`. CLI: `npm run studies:ingest-prices -- --date YYYY-MM-DD`.
+
+**Cache:** `data/bars/SPY.json` (Tiingo daily, gitignored — populated by `npm run ingest`).
+
+**Artifact path:** `data/studies/prices/SPY/{asOfSessionDate}/price-series.json` (atomic write, gitignored).
+
+```json
+{
+  "kind": "StudyPriceSeries",
+  "schemaVersion": "0.1.0",
+  "symbol": "SPY",
+  "instrument": "SPY",
+  "source": "tiingo/daily/spy",
+  "synthetic": false,
+  "bars": [{ "sessionDate": "2026-07-29", "adjClose": 545.5 }],
+  "provenance": {
+    "sourceKind": "local_store",
+    "asOfSessionDate": "2026-07-29",
+    "ingestedAt": "2026-08-01T12:00:00.000Z",
+    "firstSessionDate": "2026-07-15",
+    "lastSessionDate": "2026-07-29",
+    "barCount": 12,
+    "sourceArtifactRef": {
+      "relativePath": "bars/SPY.json",
+      "vendor": "tiingo/daily/spy"
+    }
+  }
+}
+```
+
+| Rule | Notes |
+| --- | --- |
+| `--date` | Required exact `asOfSessionDate` — **no latest fallback** |
+| Truncation | Read cached bars ≤ asOf only; output last bar must equal asOf |
+| Rejects | Fixture/synthetic inputs; duplicate/unordered sessions; invalid OHLC; missing exact asOf coverage |
+| Provenance | Required when `synthetic: false`; flows into `StudyForwardOutcome.provenance.priceSourceKind: local_store` |
+| Manifest | Non-demo manifests may reference `data/studies/prices/SPY/{asOf}/price-series.json` (`fixtures/studies/pipeline.m85a-real-prices.json` example) |
+| Scope | Real SPY prices alone **do not** make the Study cohort real — archive + peer corpus remain fixture-backed until **M8-5b** |
 
 ---
 
@@ -1324,8 +1365,9 @@ Proves non-demo `/decide` renders `data/` pipeline artifacts when present. **Not
 | `data/drivers/2026-07-29.json` | Real macro (Tiingo) |
 | `data/catalyst/*` | Real cached catalyst artifacts |
 | Bounded gamma exact-date | Unavailable (snapshot sessionDate mismatch) |
-| Study archive / peer corpus / SPY prices | Fixture-backed in current `pipeline.m64.json` manifest |
-| Cohort at acceptance | n=1; outcomes from synthetic SPY price fixture |
+| Study archive / peer corpus | Fixture-backed in current `pipeline.m64.json` manifest |
+| SPY prices | Real ingest available (M8-5a) — `data/studies/prices/SPY/{asOf}/price-series.json`; demo/CI still uses `fixtures/studies/prices/spy.m52.json` |
+| Cohort at acceptance | n=1; archive/peer still fixture-backed |
 
 Test (opt-in — skipped in default CI; requires local `data/` artifacts):
 
@@ -1333,7 +1375,7 @@ Test (opt-in — skipped in default CI; requires local `data/` artifacts):
 GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
 ```
 
-Real historical foundation: **M8-5 (queued)**.
+Real historical foundation: **M8-5b (queued)** for multi-session PIT archive. **M8-5a (shipped)** — real Tiingo SPY bars + exact-date `StudyPriceSeries`.
 
 ---
 

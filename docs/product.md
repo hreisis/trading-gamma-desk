@@ -135,7 +135,7 @@ Non-negotiable product principles:
 | M8-3 auditable evidence drill-down | ✅ Shipped (expandable horizons, matched sessions, citation resolution) |
 | M8-4 UI polish + smoke | ✅ Shipped (ribbons, nav, responsive layout, synthetic demo labeling, state smoke tests) |
 
-**M8 Study validation:** UI and pipeline wiring complete. **Real historical Study validation not passed** — 2026-07-29 local acceptance documented fixture-backed archive, peer corpus, SPY prices, and n=1 cohort; exact-date structure unavailable. **M8-5 queued.**
+**M8 Study validation:** UI and pipeline wiring complete. **Real historical Study validation not passed** — 2026-07-29 local acceptance documented fixture-backed archive, peer corpus, and n=1 cohort; exact-date structure unavailable. **M8-5a** ships real Tiingo SPY prices + exact-date `StudyPriceSeries` (real prices alone do not make the cohort real). **M8-5b queued** for multi-session PIT archive.
 | M7 private policy | Planned — separate private repo |
 
 ---

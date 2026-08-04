@@ -73,6 +73,19 @@ export const StudyPriceBar = z.object({
   adjClose: z.number().finite().positive(),
 });
 
+export const StudyPriceSeriesProvenance = z.object({
+  sourceKind: z.literal("local_store"),
+  asOfSessionDate: IsoDate,
+  ingestedAt: IsoDateTime,
+  firstSessionDate: IsoDate,
+  lastSessionDate: IsoDate,
+  barCount: z.number().int().positive(),
+  sourceArtifactRef: z.object({
+    relativePath: z.string().min(1),
+    vendor: z.string().min(1),
+  }),
+});
+
 export const StudyPriceSeries = z
   .object({
     kind: z.literal("StudyPriceSeries"),
@@ -82,6 +95,7 @@ export const StudyPriceSeries = z
     source: z.string().min(1),
     synthetic: z.boolean(),
     bars: z.array(StudyPriceBar).min(1),
+    provenance: StudyPriceSeriesProvenance.optional(),
   })
   .superRefine((series, ctx) => {
     const seen = new Set<string>();
@@ -100,6 +114,72 @@ export const StudyPriceSeries = z
           code: "custom",
           message: "bars must be strictly increasing by sessionDate",
           path: ["bars", i, "sessionDate"],
+        });
+      }
+    }
+
+    if (!series.synthetic) {
+      if (series.source.startsWith("fixtures/")) {
+        ctx.addIssue({
+          code: "custom",
+          message: "non-synthetic price series cannot reference fixture source path",
+          path: ["source"],
+        });
+      }
+      if (!series.provenance) {
+        ctx.addIssue({
+          code: "custom",
+          message: "non-synthetic price series requires provenance",
+          path: ["provenance"],
+        });
+      }
+    }
+
+    if (series.synthetic && series.provenance?.sourceKind === "local_store") {
+      ctx.addIssue({
+        code: "custom",
+        message: "synthetic price series cannot claim local_store provenance",
+        path: ["provenance", "sourceKind"],
+      });
+    }
+
+    if (series.provenance) {
+      const prov = series.provenance;
+      const first = series.bars[0]!.sessionDate;
+      const last = series.bars[series.bars.length - 1]!.sessionDate;
+      if (prov.firstSessionDate !== first) {
+        ctx.addIssue({
+          code: "custom",
+          message: "provenance.firstSessionDate must match first bar",
+          path: ["provenance", "firstSessionDate"],
+        });
+      }
+      if (prov.lastSessionDate !== last) {
+        ctx.addIssue({
+          code: "custom",
+          message: "provenance.lastSessionDate must match last bar",
+          path: ["provenance", "lastSessionDate"],
+        });
+      }
+      if (prov.asOfSessionDate !== last) {
+        ctx.addIssue({
+          code: "custom",
+          message: "provenance.asOfSessionDate must equal last bar sessionDate",
+          path: ["provenance", "asOfSessionDate"],
+        });
+      }
+      if (prov.barCount !== series.bars.length) {
+        ctx.addIssue({
+          code: "custom",
+          message: "provenance.barCount must match bars.length",
+          path: ["provenance", "barCount"],
+        });
+      }
+      if (prov.sourceArtifactRef.relativePath.startsWith("fixtures/")) {
+        ctx.addIssue({
+          code: "custom",
+          message: "provenance sourceArtifactRef cannot reference fixtures/",
+          path: ["provenance", "sourceArtifactRef", "relativePath"],
         });
       }
     }
@@ -212,6 +292,9 @@ export type OutcomeNumeric = z.infer<typeof OutcomeNumeric>;
 export type MfeMaeOutcome = z.infer<typeof MfeMaeOutcome>;
 export type HorizonMaturity = z.infer<typeof HorizonMaturity>;
 export type StudyPriceBar = z.infer<typeof StudyPriceBar>;
+export type StudyPriceSeriesProvenance = z.infer<
+  typeof StudyPriceSeriesProvenance
+>;
 export type StudyPriceSeries = z.infer<typeof StudyPriceSeries>;
 export type StudyDefinition = z.infer<typeof StudyDefinition>;
 export type StudyForwardOutcome = z.infer<typeof StudyForwardOutcome>;

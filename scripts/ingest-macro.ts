@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   );
   console.log(`snapshot:          ${result.snapshotPath}`);
   console.log(
-    `bars:              ${result.barPaths.length} series under ${DEFAULT_DATA_ROOT}/bars/`,
+    `bars:              ${result.barPaths.length} series under ${DEFAULT_DATA_ROOT}/bars/ (incl. SPY)`,
   );
 }
 
