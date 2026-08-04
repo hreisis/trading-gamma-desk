@@ -106,6 +106,7 @@ export function demoFlagFromRequest(request: Request): boolean {
   return resolvePublicDemoMode({
     demoQuery: url.searchParams.get("demo"),
     demoPath: url.pathname.startsWith("/demo"),
+    env: {},
   });
 }
 
