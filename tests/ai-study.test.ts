@@ -6,6 +6,7 @@ import {
   loadAiStudyBriefing,
   loadSyntheticAiStudyBriefing,
 } from "@/ai-study";
+import { buildAiStudyEvidenceCorpus } from "@/ai-study/evidence-corpus";
 import { claimText } from "@/ai-study/claim-utils";
 import type { AiStudyNarratorRawOutput } from "@/contracts/ai-study-briefing";
 import { PUBLIC_DEMO_BANNER } from "@/desk/public-demo";
@@ -21,32 +22,65 @@ function claim(text: string, evidenceIds: string[]) {
   return { text, evidenceIds };
 }
 
-function mockOpenAiSuccess(): FetchLike {
+function buildGroundedOpenAiSuccessReport(
+  packet: Awaited<ReturnType<typeof collectAiStudyInputs>>,
+): {
+  readonly report: AiStudyNarratorRawOutput;
+  readonly expectedRegime: string;
+} {
+  const evidence = buildAiStudyEvidenceCorpus(packet.facts, packet.inputs);
+  const pickId = (id: string, fallback: string) =>
+    evidence.some((entry) => entry.id === id) ? id : fallback;
+  const macroLabelId = pickId("macro.label", "input.macro.status");
+  const macroInterpId = pickId("macro.interpretation", macroLabelId);
+  const gammaStatusId = pickId("input.gamma_structure.status", "input.gamma_structure.status");
+  const catalystStatusId = pickId("input.catalysts.status", "input.catalysts.status");
+  const regimeEntry = evidence.find((entry) => entry.id === macroLabelId);
+  const expectedRegime = regimeEntry?.value ?? "unavailable";
+
   const report: AiStudyNarratorRawOutput = {
-    marketRegime: claim("Rates-led easing with mixed cross-asset confirmation.", [
-      "macro.label",
-    ]),
+    marketRegime: claim(String(expectedRegime), [macroLabelId]),
     mainDrivers: [
-      claim("Macro driver label from packet.", ["macro.interpretation"]),
-      claim("Cross-asset context from supplied macro facts only.", ["macro.label"]),
+      claim("Dominant driver interpretation from provided macro packet.", [
+        macroInterpId,
+      ]),
+      claim("Catalyst calendar rows supplied in the input packet only.", [
+        catalystStatusId,
+      ]),
     ],
     keyLevelsStructure: [
-      claim("Structure levels omitted when bounded gamma is unavailable for session.", [
-        "macro.label",
+      claim(
+        "Structure section references bounded gamma facts when present; otherwise marked unavailable.",
+        [gammaStatusId],
+      ),
+    ],
+    upcomingRisks: [
+      claim("Upcoming catalysts limited to those explicitly listed in the input packet.", [
+        catalystStatusId,
       ]),
     ],
-    upcomingRisks: [claim("Listed catalysts only when present in packet.", ["macro.label"])],
     scenarios: {
-      bull: claim("Conditional upside if provided macro context persists.", [
-        "macro.label",
+      bull: claim(
+        "Conditional path if provided macro and structure context persist without new shocks.",
+        [macroLabelId, gammaStatusId],
+      ),
+      base: claim("Status-quo path using the supplied cross-asset and structure facts only.", [
+        macroLabelId,
       ]),
-      base: claim("Base case using supplied inputs only.", ["macro.label"]),
       bear: claim(
-        "Conditional downside if macro risk direction in packet intensifies.",
-        ["macro.riskDirection"],
+        "Conditional path if catalyst or structure inputs in the packet deteriorate.",
+        [catalystStatusId],
       ),
     },
   };
+
+  return { report, expectedRegime };
+}
+
+function mockOpenAiSuccess(
+  packet: Awaited<ReturnType<typeof collectAiStudyInputs>>,
+): FetchLike {
+  const { report } = buildGroundedOpenAiSuccessReport(packet);
   return () =>
     Promise.resolve(
       jsonResponse(200, {
@@ -168,10 +202,22 @@ describe("loadAiStudyBriefing", () => {
   });
 
   it("accepts mocked OpenAI success payload", async () => {
+    const env = { OPENAI_API_KEY: "test-key" } as unknown as NodeJS.ProcessEnv;
+    const sessionDate = "2026-07-29";
+    const now = new Date("2026-08-04T18:00:00.000Z");
+    const packet = await collectAiStudyInputs({
+      publicDemo: false,
+      sessionDate,
+      env,
+      now,
+    });
+    const { expectedRegime } = buildGroundedOpenAiSuccessReport(packet);
+
     const briefing = await loadAiStudyBriefing({
       publicDemo: false,
-      sessionDate: "2026-07-29",
-      env: { OPENAI_API_KEY: "test-key" } as unknown as NodeJS.ProcessEnv,
+      sessionDate,
+      env,
+      now,
       config: {
         apiKey: "test-key",
         model: "gpt-test",
@@ -180,12 +226,16 @@ describe("loadAiStudyBriefing", () => {
         maxOutputTokens: 500,
         parseRetries: 0,
       },
-      fetchImpl: mockOpenAiSuccess(),
+      fetchImpl: mockOpenAiSuccess(packet),
     });
 
     expect(briefing.mode).toBe("historical");
-    expect(["ready", "error"]).toContain(briefing.status);
-    expect(claimText(briefing.report!.marketRegime)).toContain("Rates-led easing");
+    expect(briefing.provider).toBe("openai");
+    expect(briefing.model).toBe("gpt-test");
+    expect(briefing.status).toBe("ready");
+    expect(briefing.grounding?.citationsValid).toBe(true);
+    expect(briefing.grounding?.numbersValid).toBe(true);
+    expect(claimText(briefing.report!.marketRegime)).toBe(expectedRegime);
   });
 });
 
