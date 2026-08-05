@@ -12,6 +12,7 @@ export * from "./production-runtime";
 export * from "./build-desk-stance";
 export * from "./decision-surface-fixtures";
 export * from "./decision-evidence-display";
+export * from "./build-runtime-decision-study";
 export * from "./load-decision-surface";
 export * from "./load-decision-artifacts";
 export * from "./load-session-driver";

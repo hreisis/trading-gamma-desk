@@ -708,6 +708,15 @@ export function DecisionSurface({ view }: { view: DecisionSurfaceView }) {
                   </p>
                 )}
               </div>
+              {view.observe.marketQuotesHeadline ? (
+                <div className="decision-observe-item">
+                  <p className="decision-label">Market quotes</p>
+                  <p className="decision-value">{view.observe.marketQuotesHeadline}</p>
+                  {view.observe.marketQuotesDetail ? (
+                    <p className="decision-muted">{view.observe.marketQuotesDetail}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </section>
         ) : null}

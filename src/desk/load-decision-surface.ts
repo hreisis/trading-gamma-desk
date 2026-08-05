@@ -1,5 +1,15 @@
-import type { CatalystFeed, DominantDriver, SimilarRegimeStudy, StudyEvidenceBundle, StudyMemo } from "@/contracts";
+import type {
+  AlpacaMarketPanel,
+  BoundedGammaProviderSnapshot,
+  CatalystFeed,
+  DominantDriver,
+  SimilarRegimeStudy,
+  StudyEvidenceBundle,
+  StudyMemo,
+} from "@/contracts";
 import { join } from "node:path";
+import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
+import { loadAlpacaMarketPanel } from "@/alpaca";
 import {
   DecisionSurfaceView,
   type ArtifactIntegrityIssue,
@@ -29,12 +39,20 @@ import {
   DECISION_SURFACE_SOURCE_LABEL,
   PUBLIC_POLICY_UNAVAILABLE_MESSAGE,
 } from "./decision-surface-fixtures";
+import { buildRuntimeDecisionStudy } from "./build-runtime-decision-study";
 import { loadDecisionStudyContext } from "./load-decision-study-context";
 import { loadBoundedGammaDeskView } from "./load-bounded-gamma";
 import { loadDecisionArtifacts } from "./load-decision-artifacts";
 import { loadSessionBoundedGamma } from "./load-session-bounded-gamma";
 import { loadSessionDriver } from "./load-session-driver";
 import { isPublicDemoMode } from "./public-demo";
+import {
+  ensureMacroDriverArtifact,
+  isServerlessHost,
+  loadBoundedGammaDeskViewAsync,
+  loadCatalystFeedAsync,
+  resolveRuntimeDataRoot,
+} from "./production-runtime";
 
 export interface LoadDecisionSurfaceOptions {
   readonly sessionDate?: string | null;
@@ -79,6 +97,32 @@ function dateUnavailableView(
   });
 }
 
+function buildMarketQuotesObserve(panel: AlpacaMarketPanel): {
+  headline: string;
+  detail?: string;
+} {
+  const available = panel.quotes.filter((quote) => quote.status === "available");
+  if (available.length === 0) {
+    return { headline: panel.message };
+  }
+  const detail = available
+    .slice(0, 4)
+    .map((quote) => {
+      const pct =
+        quote.dailyChangePct === null
+          ? "—"
+          : `${quote.dailyChangePct >= 0 ? "+" : ""}${quote.dailyChangePct.toFixed(2)}%`;
+      const price =
+        quote.latestPrice === null ? "—" : quote.latestPrice.toFixed(2);
+      return `${quote.symbol} ${price} (${pct})`;
+    })
+    .join(" · ");
+  return {
+    headline: `${available.length} watchlist quotes · ${panel.status}`,
+    detail,
+  };
+}
+
 function buildCatalystHeadline(feed: CatalystFeed): {
   headline: string;
   detail?: string;
@@ -105,8 +149,12 @@ function buildObserveSummary(input: {
   readonly structureSummary?: string;
   readonly structureCondition?: DecisionObserveSummary["structureCondition"];
   readonly structureUnavailableReason?: string;
+  readonly marketQuotes?: AlpacaMarketPanel;
 }): DecisionObserveSummary {
   const catalyst = buildCatalystHeadline(input.catalystFeed);
+  const quotes = input.marketQuotes
+    ? buildMarketQuotesObserve(input.marketQuotes)
+    : null;
   return {
     sessionDate: input.sessionDate,
     driverRegime: regimeLabel(input.driver.primaryRegime),
@@ -118,6 +166,8 @@ function buildObserveSummary(input: {
     structureSummary: input.structureSummary,
     structureCondition: input.structureCondition,
     structureUnavailableReason: input.structureUnavailableReason,
+    marketQuotesHeadline: quotes?.headline,
+    marketQuotesDetail: quotes?.detail,
   };
 }
 
@@ -419,6 +469,230 @@ function loadLiveDecisionSurface(input: {
 
 function boundedGammaDataRoot(dataRoot: string): string {
   return join(dataRoot, "gamma", "providers", "marketdata-app");
+}
+
+function resolveStructureContext(
+  gammaSnapshot: BoundedGammaProviderSnapshot | null,
+): {
+  structureSummary?: string;
+  structureCondition?: DecisionObserveSummary["structureCondition"];
+  structureUnavailableReason?: string;
+  structureForStance: ReturnType<typeof buildMarketStructureStateV2> | null;
+  structureReady: boolean;
+} {
+  if (!gammaSnapshot || gammaSnapshot.status === "unavailable") {
+    return {
+      structureUnavailableReason: "Bounded gamma snapshot unavailable.",
+      structureForStance: null,
+      structureReady: false,
+    };
+  }
+
+  const structure = buildMarketStructureStateV2({
+    bounded: gammaSnapshot,
+  });
+
+  return {
+    structureSummary: structure.interpretation.summary,
+    structureCondition: structure.condition,
+    structureForStance: structure,
+    structureReady: true,
+  };
+}
+
+async function ensureMacroDriverForSession(input: {
+  readonly sessionDate: string;
+  readonly dataRoot: string;
+  readonly env: NodeJS.ProcessEnv;
+}): Promise<readonly ArtifactIntegrityIssue[]> {
+  const currentSession = resolveCurrentMarketSessionDate();
+  if (input.sessionDate !== currentSession) {
+    return [];
+  }
+
+  const refresh = await ensureMacroDriverArtifact({
+    dataRoot: input.dataRoot,
+    env: input.env,
+  });
+  if (refresh.ok) {
+    return [];
+  }
+
+  return [
+    {
+      artifact: "driver",
+      severity: "missing",
+      message:
+        refresh.error ??
+        "Macro driver refresh failed — configure TIINGO_TOKEN for serverless ingest.",
+    },
+  ];
+}
+
+async function loadRuntimeDecisionSurface(input: {
+  readonly sessionDate: string;
+  readonly publicDemo: boolean;
+  readonly dataRoot: string;
+  readonly symbol: string;
+  readonly env: NodeJS.ProcessEnv;
+}): Promise<DecisionSurfaceView> {
+  const { sessionDate, publicDemo, dataRoot, symbol, env } = input;
+  const issues: ArtifactIntegrityIssue[] = [];
+
+  issues.push(
+    ...(await ensureMacroDriverForSession({ sessionDate, dataRoot, env })),
+  );
+
+  let driverLoad = loadSessionDriver(sessionDate, dataRoot);
+  issues.push(...driverLoad.issues);
+
+  if (
+    sessionDate === resolveCurrentMarketSessionDate() &&
+    driverLoad.driver?.primaryRegime === "insufficient_data"
+  ) {
+    await ensureMacroDriverArtifact({ dataRoot, env });
+    driverLoad = loadSessionDriver(sessionDate, dataRoot);
+    issues.push(...driverLoad.issues.filter((issue) => issue.severity !== "stale"));
+  }
+
+  const gammaView = await loadBoundedGammaDeskViewAsync({
+    symbol,
+    dataRoot: boundedGammaDataRoot(dataRoot),
+    env,
+    publicDemo: false,
+  });
+
+  if (gammaView.status !== "ready" || !gammaView.snapshot) {
+    issues.push({
+      artifact: "structure",
+      severity: gammaView.status === "empty" ? "missing" : "invalid",
+      message:
+        gammaView.error?.message ??
+        "Bounded gamma snapshot unavailable from live provider.",
+    });
+  }
+
+  const catalystFeed = toPublicCatalystFeed(
+    await loadCatalystFeedAsync({}, { publicDemo: false, dataRoot, env }),
+  );
+  const marketPanel = await loadAlpacaMarketPanel({ env, publicDemo: false });
+
+  const structure = resolveStructureContext(gammaView.snapshot);
+  if (
+    gammaView.snapshot &&
+    gammaView.snapshot.sessionDate !== sessionDate &&
+    structure.structureReady
+  ) {
+    issues.push({
+      artifact: "structure",
+      severity: "stale",
+      message: `Vendor gamma session ${gammaView.snapshot.sessionDate} lags requested ${sessionDate}; structure shown from latest provider snapshot.`,
+    });
+  }
+
+  const observe = driverLoad.driver
+    ? buildObserveSummary({
+        sessionDate,
+        driver: driverLoad.driver,
+        catalystFeed,
+        structureSummary: structure.structureSummary,
+        structureCondition: structure.structureCondition,
+        structureUnavailableReason: structure.structureUnavailableReason,
+        marketQuotes: marketPanel,
+      })
+    : undefined;
+
+  let research: DecisionResearchSection | undefined;
+  let stance: DecisionSurfaceView["stance"];
+  let studyIntegrityOk = false;
+
+  if (driverLoad.driver) {
+    const runtimeStudy = await buildRuntimeDecisionStudy({
+      sessionDate,
+      symbol,
+      driver: driverLoad.driver,
+      gammaSnapshot: gammaView.snapshot,
+      catalystFeed,
+    });
+
+    research = buildResearchSection({
+      bundle: runtimeStudy.bundle,
+      memo: runtimeStudy.memo,
+      pipelineMemoSource: runtimeStudy.memoSource,
+      similarRegimeStudy: runtimeStudy.similarRegimeStudy,
+      peerSessions: runtimeStudy.peerSessions,
+    });
+
+    studyIntegrityOk = true;
+    stance = buildDeskStance({
+      sessionDate,
+      evidenceStatus: runtimeStudy.bundle.evidenceStatus,
+      structure: structure.structureForStance,
+    });
+  }
+
+  const status = resolveNonDemoStatus({
+    issues,
+    studyIntegrityOk,
+    driverPresent: driverLoad.driver !== null,
+    structureReady: structure.structureReady,
+  });
+
+  const errorMessage =
+    status === "integrity_failed"
+      ? `Study artifact integrity failed for ${sessionDate}. Review artifact issues below.`
+      : undefined;
+
+  const sourceLabel = isServerlessHost(env)
+    ? "Live desk runtime · serverless"
+    : `Live desk runtime · ${dataRoot}`;
+
+  return DecisionSurfaceView.parse({
+    ...baseViewFields(publicDemo, false),
+    status,
+    sessionDate,
+    sourceLabel,
+    errorMessage,
+    artifactIssues: issues,
+    studyIntegrityOk,
+    observe,
+    research,
+    policy: buildPolicySlot(sessionDate),
+    stance,
+  });
+}
+
+/**
+ * Async decision surface loader for production/serverless — live macro, gamma,
+ * catalysts, market quotes, and runtime historical-study evidence.
+ */
+export async function loadDecisionSurfaceAsync(
+  options: LoadDecisionSurfaceOptions = {},
+): Promise<DecisionSurfaceView> {
+  const publicDemo = options.publicDemo ?? isPublicDemoMode(options.env);
+  const sessionDate = options.sessionDate?.trim() || null;
+  const env = options.env ?? process.env;
+
+  if (!sessionDate) {
+    return missingDateView(publicDemo);
+  }
+
+  if (publicDemo) {
+    if (sessionDate !== DECISION_SURFACE_FIXTURE_SESSION) {
+      return dateUnavailableView(sessionDate, publicDemo);
+    }
+    return loadDemoDecisionSurface(sessionDate, publicDemo);
+  }
+
+  const dataRoot = options.dataRoot ?? resolveRuntimeDataRoot(env);
+  const symbol = options.symbol ?? "SPY";
+  return loadRuntimeDecisionSurface({
+    sessionDate,
+    publicDemo,
+    dataRoot,
+    symbol,
+    env,
+  });
 }
 
 /**

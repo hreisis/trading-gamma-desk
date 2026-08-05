@@ -118,6 +118,8 @@ export const DecisionObserveSummary = z.object({
   structureSummary: z.string().optional(),
   structureCondition: StructureConditionState.optional(),
   structureUnavailableReason: z.string().optional(),
+  marketQuotesHeadline: z.string().optional(),
+  marketQuotesDetail: z.string().optional(),
 });
 
 export const EvidenceDrillDownLane = z.enum([

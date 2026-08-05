@@ -1,10 +1,11 @@
 import { DecisionSurface } from "@/app/components/DecisionSurface";
 import {
-  loadDecisionSurface,
+  loadDecisionSurfaceAsync,
   parseDecisionSurfaceDateParam,
 } from "@/desk";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function DecidePage({
   searchParams,
@@ -13,7 +14,7 @@ export default async function DecidePage({
 }) {
   const params = await searchParams;
   const sessionDate = parseDecisionSurfaceDateParam(params.date);
-  const view = loadDecisionSurface({ sessionDate, publicDemo: false });
+  const view = await loadDecisionSurfaceAsync({ sessionDate, publicDemo: false });
 
   return <DecisionSurface view={view} />;
 }
