@@ -129,19 +129,32 @@ export async function loadAiStudyBriefing(
   }
 
   if (!config.apiKey && !options.useFakeGenerator) {
+    const evidence = buildAiStudyEvidenceCorpus(packet.facts, packet.inputs);
+    const fallbackReport = buildRuleBasedAiStudyReport(packet);
+    const fallbackValidated = validateAiStudyReport({
+      report: fallbackReport,
+      evidence,
+    });
+    const status = resolveBriefingStatus({
+      packetAligned: packet.sessionAlignment.aligned,
+      mode: packet.mode,
+      groundingOk: fallbackValidated.ok,
+      hasReport: true,
+    });
     return baseBriefing({
       generatedAt,
       sessionDate: packet.sessionDate,
       ...sessionFields,
-      status: "unavailable",
-      message: "OPENAI_API_KEY missing — AI Study unavailable",
-      provider: "unavailable",
-      model: null,
+      status,
+      message:
+        "OPENAI_API_KEY missing — rule-based grounded briefing from desk inputs.",
+      provider: "rule_based",
+      model: RULE_BASED_AI_STUDY_MODEL,
       inputs: [...packet.inputs],
       sessionAlignment: packet.sessionAlignment,
       usage: null,
-      grounding: null,
-      report: null,
+      grounding: fallbackValidated.grounding,
+      report: fallbackReport,
     });
   }
 

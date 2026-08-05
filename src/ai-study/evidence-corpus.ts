@@ -149,6 +149,13 @@ export function buildAiStudyEvidenceCorpus(
       push(entries, "gamma.structure.regime", "Structure regime", v2.regime, "gamma");
       push(entries, "gamma.structure.spot", "Structure spot", v2.spot, "gamma");
       push(entries, "gamma.structure.flip", "Gamma flip", v2.flip, "gamma");
+      push(
+        entries,
+        "gamma.interpretationSummary",
+        "Structure interpretation",
+        v2.interpretationSummary,
+        "gamma",
+      );
     }
   }
 

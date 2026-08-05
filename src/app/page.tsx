@@ -28,13 +28,17 @@ export default async function Home({
           await loadCatalystFeedAsync({}, { publicDemo: view.isPublicDemo }),
         );
 
-  const gammaView = await loadBoundedGammaDeskViewAsync({
-    symbol: "SPY",
-    forceFixture: params.gamma === "fixture",
-    publicDemo: view.isPublicDemo,
-  });
+  const gammaViews = await Promise.all(
+    (["SPY", "QQQ"] as const).map((symbol) =>
+      loadBoundedGammaDeskViewAsync({
+        symbol,
+        forceFixture: params.gamma === "fixture",
+        publicDemo: view.isPublicDemo,
+      }),
+    ),
+  );
 
   return (
-    <MacroDesk view={view} catalystFeed={catalystFeed} gammaView={gammaView} />
+    <MacroDesk view={view} catalystFeed={catalystFeed} gammaViews={gammaViews} />
   );
 }

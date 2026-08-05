@@ -7,6 +7,7 @@ import type {
   AiStudySessionAlignment,
 } from "@/contracts/ai-study-briefing";
 import { loadCatalystFeed, loadCatalystFeedAsync } from "@/catalyst";
+import { filterTier1Catalysts } from "@/catalyst/public-feed";
 import { loadSessionDriver } from "@/desk/load-session-driver";
 import { loadSessionBoundedGamma } from "@/desk/load-session-bounded-gamma";
 import {
@@ -167,7 +168,7 @@ function summarizeCatalystsFromFeed(
   provenance: AiStudyInputProvenance;
   facts: readonly Record<string, unknown>[];
 } {
-  const events = feed.catalysts.slice(0, 8).map((c) => ({
+  const events = filterTier1Catalysts(feed.catalysts).slice(0, 8).map((c) => ({
     id: c.id,
     headline: c.headline,
     category: c.category,

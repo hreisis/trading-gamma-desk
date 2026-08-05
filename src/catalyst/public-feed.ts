@@ -2,10 +2,18 @@ import {
   CatalystFeed,
   type CatalystFeed as CatalystFeedDto,
 } from "@/contracts";
+import type { Catalyst } from "@/contracts";
 import type { CatalystFeedResponse } from "./types";
 
 const PATHISH =
   /(?:^|\s)(?:data\/|\/Users\/|\/home\/|\/var\/|\/tmp\/|[A-Za-z]:\\)/;
+
+function stripPathishDisclaimer(disclaimer: string): string {
+  // Internal loader may append cache-missing messages with filesystem paths.
+  const cut = disclaimer.search(PATHISH);
+  if (cut === -1) return disclaimer;
+  return disclaimer.slice(0, cut).trim();
+}
 
 function publicSourceName(
   type: CatalystFeedResponse["source"]["type"],
@@ -15,11 +23,29 @@ function publicSourceName(
   return "official_calendar";
 }
 
-function stripPathishDisclaimer(disclaimer: string): string {
-  // Internal loader may append cache-missing messages with filesystem paths.
-  const cut = disclaimer.search(PATHISH);
-  if (cut === -1) return disclaimer;
-  return disclaimer.slice(0, cut).trim();
+/** Tier-1 macro catalysts for the desk surface (FOMC, CPI, PCE, payrolls, GDP). */
+const TIER1_RELEASE_FAMILIES = new Set([
+  "cpi",
+  "employment_situation",
+  "fomc_policy",
+  "gdp",
+  "personal_income_outlays",
+]);
+
+const TIER1_HEADLINE =
+  /\b(fomc|consumer price index|\bcpi\b|personal income and outlays|\bpce\b|employment situation|nonfarm|payrolls|gross domestic product|\bgdp\b)/i;
+
+export function isTier1Catalyst(catalyst: Catalyst): boolean {
+  const family = (catalyst as Catalyst & { releaseFamily?: string })
+    .releaseFamily;
+  if (family && TIER1_RELEASE_FAMILIES.has(family)) return true;
+  return TIER1_HEADLINE.test(catalyst.headline);
+}
+
+export function filterTier1Catalysts(
+  catalysts: readonly Catalyst[],
+): Catalyst[] {
+  return catalysts.filter(isTier1Catalyst);
 }
 
 function layerWithoutError<T extends { error?: string }>(
@@ -134,7 +160,9 @@ export function toPublicCatalystFeed(
         : {}),
     },
     count: feed.count,
-    catalysts: feed.catalysts,
+    catalysts: feed.isPublicDemo
+      ? feed.catalysts
+      : filterTier1Catalysts(feed.catalysts),
     ...(feed.documents ? { documents: feed.documents } : {}),
     ...(feed.briefs ? { briefs: feed.briefs } : {}),
     ...(feed.aiBriefs
@@ -206,5 +234,8 @@ export function toPublicCatalystFeed(
       : {}),
   };
 
-  return CatalystFeed.parse(publicFeed);
+  return CatalystFeed.parse({
+    ...publicFeed,
+    count: publicFeed.catalysts.length,
+  });
 }

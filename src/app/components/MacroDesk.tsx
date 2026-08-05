@@ -252,13 +252,30 @@ export function MacroDesk({
   view,
   catalystFeed,
   gammaView,
+  gammaViews,
   demoMode,
 }: {
   view: MacroDeskView;
   catalystFeed?: CatalystFeedDto | null;
   gammaView?: BoundedGammaDeskView | null;
+  gammaViews?: readonly BoundedGammaDeskView[];
   demoMode?: boolean;
 }) {
+  const gammaPanels =
+    gammaViews ?? (gammaView ? [gammaView] : []);
+
+  function GammaSection() {
+    return (
+      <>
+        {gammaPanels.map((panel) => (
+          <GammaDesk
+            key={panel.snapshot?.symbol ?? panel.sourceLabel}
+            view={panel}
+          />
+        ))}
+      </>
+    );
+  }
   if (view.status === "live_unavailable") {
     return (
       <DeskChrome activeNav="macro" demoMode={demoMode}>
@@ -283,7 +300,7 @@ export function MacroDesk({
     return (
       <DeskChrome activeNav="macro" demoMode={demoMode}>
         <DeskStatusBanners view={view} />
-        {gammaView ? <GammaDesk view={gammaView} /> : null}
+        {gammaPanels.length > 0 ? <GammaSection /> : null}
         <section className="desk-state" data-testid="state-empty">
           <h1 className="desk-title">No macro driver</h1>
           <p className="desk-interpretation">
@@ -299,7 +316,7 @@ export function MacroDesk({
     return (
       <DeskChrome activeNav="macro" demoMode={demoMode}>
         <DeskStatusBanners view={view} />
-        {gammaView ? <GammaDesk view={gammaView} /> : null}
+        {gammaPanels.length > 0 ? <GammaSection /> : null}
         <section
           className="desk-state"
           data-testid={`state-${view.status}`}
@@ -325,7 +342,7 @@ export function MacroDesk({
   return (
     <DeskChrome activeNav="macro" demoMode={demoMode}>
       <DeskStatusBanners view={view} />
-      {gammaView ? <GammaDesk view={gammaView} /> : null}
+      {gammaPanels.length > 0 ? <GammaSection /> : null}
       <div data-testid={`state-${view.status}`}>
         <DriverBody
           driver={view.driver}

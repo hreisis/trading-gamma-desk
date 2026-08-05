@@ -41,6 +41,35 @@ function normalizeNumToken(token: string): string {
     .replace(/–/g, "-");
 }
 
+function evidenceNumericValues(
+  citedEvidence: readonly AiStudyEvidenceEntry[],
+): number[] {
+  const values: number[] = [];
+  for (const entry of citedEvidence) {
+    const direct = Number(normalizeNumToken(entry.value));
+    if (Number.isFinite(direct)) values.push(direct);
+    for (const match of entry.value.matchAll(/-?\d+(?:\.\d+)?/g)) {
+      const n = Number(match[0]);
+      if (Number.isFinite(n)) values.push(n);
+    }
+  }
+  return values;
+}
+
+/** LLMs often round pct moves (e.g. -0.2486 → "0.25%") or drop the sign. */
+function percentTokenMatchesEvidence(
+  token: string,
+  citedEvidence: readonly AiStudyEvidenceEntry[],
+): boolean {
+  const n = Number(normalizeNumToken(token));
+  if (!Number.isFinite(n)) return false;
+  for (const candidate of evidenceNumericValues(citedEvidence)) {
+    if (Math.abs(candidate - n) <= 0.06) return true;
+    if (Math.abs(Math.abs(candidate) - Math.abs(n)) <= 0.06) return true;
+  }
+  return false;
+}
+
 function isSupportedConfidenceToken(
   token: string,
   citedEvidence: readonly AiStudyEvidenceEntry[],
@@ -73,6 +102,9 @@ function numbersSupportedForClaim(
     if (!n) continue;
     if (/^\d{4}$/.test(n)) continue;
     if (isSupportedConfidenceToken(token, citedEvidence)) continue;
+    if (/%$/.test(token) && percentTokenMatchesEvidence(token, citedEvidence)) {
+      continue;
+    }
     if (corpus.includes(token.replace(/,/g, ""))) continue;
     const corpusNorm = normalizeNumToken(corpus);
     if (corpusNorm.includes(n)) continue;

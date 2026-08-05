@@ -13,7 +13,7 @@ export function DeskChrome({
   demoMode,
 }: {
   children: React.ReactNode;
-  activeNav?: "macro" | "decide" | "market" | "news" | "ai-study";
+  activeNav?: "macro" | "decide" | "market" | "ai-study";
   demoMode?: boolean;
 }) {
   const decideDate = demoMode
@@ -46,13 +46,6 @@ export function DeskChrome({
               aria-current={activeNav === "market" ? "page" : undefined}
             >
               Market
-            </a>
-            <a
-              className={activeNav === "news" ? "desk-nav-link is-active" : "desk-nav-link"}
-              href={navHref("/news", demoMode)}
-              aria-current={activeNav === "news" ? "page" : undefined}
-            >
-              News
             </a>
             <a
               className={

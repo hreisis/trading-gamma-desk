@@ -11,6 +11,7 @@ import { boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
 import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
 import { runDailyPipeline } from "@/pipeline/run-daily";
 import { loadMacroDesk } from "./load-macro-desk";
+import { loadSessionDriver } from "./load-session-driver";
 import {
   loadBoundedGammaDeskView,
   type BoundedGammaDeskView,
@@ -49,13 +50,23 @@ function macroDriversDir(dataRoot: string): string {
   return join(dataRoot, "drivers");
 }
 
-function hasMacroDriver(dataRoot: string): boolean {
-  const view = loadMacroDesk({
-    dataRoot,
-    allowFixture: false,
-    preferFixture: false,
-  });
-  return view.status === "ready" && view.driver !== null;
+function hasMacroDriverForSession(
+  dataRoot: string,
+  sessionDate: string,
+): boolean {
+  const loaded = loadSessionDriver(sessionDate, dataRoot);
+  if (!loaded.driver) return false;
+  if (
+    loaded.issues.some(
+      (issue) => issue.severity === "missing" || issue.severity === "mismatched",
+    )
+  ) {
+    return false;
+  }
+  if (loaded.driver.primaryRegime === "insufficient_data") {
+    return false;
+  }
+  return true;
 }
 
 const macroRefreshByRoot = new Map<string, Promise<{ ok: boolean; error?: string }>>();
@@ -67,8 +78,9 @@ export async function ensureMacroDriverArtifact(options: {
   const env = options.env ?? process.env;
   const dataRoot = options.dataRoot ?? resolveRuntimeDataRoot(env);
   ensureDir(macroDriversDir(dataRoot));
+  const sessionDate = resolveCurrentMarketSessionDate();
 
-  if (hasMacroDriver(dataRoot)) {
+  if (hasMacroDriverForSession(dataRoot, sessionDate)) {
     return { refreshed: false, ok: true };
   }
 
@@ -86,7 +98,7 @@ export async function ensureMacroDriverArtifact(options: {
     pending = (async () => {
       try {
         await runDailyPipeline({ dataRoot, token });
-        return { ok: hasMacroDriver(dataRoot) };
+        return { ok: hasMacroDriverForSession(dataRoot, sessionDate) };
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         return { ok: false, error: message };
@@ -117,7 +129,16 @@ export async function resolveDeskRequestAsync(
     publicDemo: false,
   });
 
-  if (sync.status !== "empty" || options.source === "live") {
+  const currentSession = resolveCurrentMarketSessionDate();
+  const macroSessionStale =
+    sync.driver !== null && sync.driver.marketSessionDate !== currentSession;
+
+  if (
+    sync.status !== "empty" &&
+    options.source !== "live" &&
+    !macroSessionStale &&
+    !sync.sessionStale
+  ) {
     return sync;
   }
 
@@ -226,13 +247,48 @@ function parseOptionalNumber(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function resolveGammaStrikeParams(env: NodeJS.ProcessEnv): {
+function resolveGammaStrikeParams(
+  symbol: string,
+  env: NodeJS.ProcessEnv,
+): {
   readonly strikeMin: number;
   readonly strikeMax: number;
 } {
-  const strikeMin = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MIN) ?? 700;
-  const strikeMax = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MAX) ?? 820;
-  return { strikeMin, strikeMax };
+  const envMin = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MIN);
+  const envMax = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MAX);
+  if (envMin !== null && envMax !== null) {
+    return { strikeMin: envMin, strikeMax: envMax };
+  }
+  if (symbol === "QQQ") {
+    return { strikeMin: 660, strikeMax: 780 };
+  }
+  return { strikeMin: 700, strikeMax: 820 };
+}
+
+function boundedGammaNeedsRefresh(
+  view: BoundedGammaDeskView,
+  sessionDate: string,
+): boolean {
+  if (view.status === "empty") return true;
+  const snap = view.snapshot;
+  if (!snap) return true;
+  if (snap.status === "unavailable") return true;
+
+  const generatedAt = Date.parse(snap.generatedAt);
+  const staleByAge =
+    Number.isFinite(generatedAt) &&
+    Date.now() - generatedAt > RUNTIME_ARTIFACT_TTL_MS;
+
+  if (snap.sessionDate !== sessionDate) {
+    // Vendor session may lag the calendar session until the chain updates.
+    return staleByAge;
+  }
+
+  if (snap.status === "incomplete") {
+    return staleByAge;
+  }
+
+  return false;
 }
 
 const gammaRefreshByKey = new Map<string, Promise<void>>();
@@ -253,7 +309,7 @@ async function ensureBoundedGammaSnapshot(options: {
     };
   }
 
-  const params = resolveGammaStrikeParams(options.env);
+  const params = resolveGammaStrikeParams(options.symbol, options.env);
   const sessionDate = resolveCurrentMarketSessionDate();
   const expiration = await resolveBoundedGammaExpiration({
     symbol: options.symbol,
@@ -310,10 +366,11 @@ export async function loadBoundedGammaDeskViewAsync(
     publicDemo: options.publicDemo ?? false,
   });
 
+  const sessionDate = resolveCurrentMarketSessionDate();
   if (
     options.publicDemo ||
     options.forceFixture ||
-    sync.status !== "empty"
+    !boundedGammaNeedsRefresh(sync, sessionDate)
   ) {
     return sync;
   }

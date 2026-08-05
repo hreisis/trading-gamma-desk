@@ -144,7 +144,7 @@ describe("loadAiStudyBriefing", () => {
     expect(briefing.inputs.some((i) => i.status === "fixture")).toBe(true);
   });
 
-  it("returns unavailable when OPENAI_API_KEY is missing", async () => {
+  it("returns rule-based briefing when OPENAI_API_KEY is missing", async () => {
     const briefing = await loadAiStudyBriefing({
       publicDemo: false,
       env: {} as NodeJS.ProcessEnv,
@@ -158,9 +158,11 @@ describe("loadAiStudyBriefing", () => {
       },
     });
 
-    expect(briefing.status).toBe("unavailable");
-    expect(briefing.message).toMatch(/OPENAI_API_KEY missing/i);
-    expect(briefing.report).toBeNull();
+    expect(briefing.status).toBe("ready");
+    expect(briefing.provider).toBe("rule_based");
+    expect(briefing.message).toMatch(/rule-based grounded briefing/i);
+    expect(briefing.report).not.toBeNull();
+    expect(claimText(briefing.report!.marketRegime).length).toBeGreaterThan(0);
   });
 
   it("generates briefing with fake generator in tests", async () => {

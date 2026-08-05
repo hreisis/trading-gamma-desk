@@ -8,7 +8,7 @@ export default async function NewsPage() {
   const panel = await loadMarketNewsPanel({ publicDemo: false });
 
   return (
-    <DeskChrome activeNav="news">
+    <DeskChrome>
       <section className="desk-intro">
         <h1 className="desk-title">Market news</h1>
         <p className="desk-section-note">
