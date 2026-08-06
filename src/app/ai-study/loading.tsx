@@ -2,7 +2,7 @@ import { DeskChrome } from "@/app/components/DeskChrome";
 
 export default function AiStudyLoading() {
   return (
-    <DeskChrome activeNav="ai-study">
+    <DeskChrome>
       <section className="desk-state" data-testid="ai-study-loading">
         <h1 className="desk-title">Generating AI Study…</h1>
         <p className="desk-section-note">

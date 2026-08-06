@@ -73,7 +73,7 @@ describe("catalyst feed SSR markup", () => {
     const feed = toPublicCatalystFeed(loadCatalystFeed({}, { publicDemo: true }));
     const html = renderFeed(feed);
 
-    expect(html).toContain("Catalyst feed");
+    expect(html).toContain("Catalysts");
     expect(html).toContain(feed.banner);
     expect(html).toContain('data-testid="catalyst-list"');
     expect(html).toContain('data-testid="catalyst-event-card"');
@@ -93,7 +93,7 @@ describe("catalyst feed SSR markup", () => {
       createElement(CatalystFeed, { feed, suppressDemoChrome: true }),
     );
     expect(html).not.toContain('data-testid="catalyst-banner"');
-    expect(html).toContain("Catalyst feed");
+    expect(html).toContain("Catalysts");
     expect(html).toContain(feed.disclaimer);
   });
 

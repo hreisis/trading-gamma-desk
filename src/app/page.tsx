@@ -1,19 +1,21 @@
 import { MacroDesk } from "@/app/components/MacroDesk";
+import { loadAiStudyBriefing } from "@/ai-study";
+import { loadAlpacaMarketPanel } from "@/alpaca";
 import { toPublicCatalystFeed } from "@/catalyst";
 import {
   loadBoundedGammaDeskViewAsync,
   loadCatalystFeedAsync,
   resolveDeskRequestAsync,
 } from "@/desk";
+import { parseDeskPanelId } from "@/app/components/desk/desk-panel-types";
 
-/** Always resolve at request time (env + query). */
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; gamma?: string; demo?: string }>;
+  searchParams: Promise<{ source?: string; gamma?: string; demo?: string; panel?: string }>;
 }) {
   const params = await searchParams;
   const view = await resolveDeskRequestAsync({
@@ -38,7 +40,19 @@ export default async function Home({
     ),
   );
 
+  const [marketPanel, aiBriefing] = await Promise.all([
+    loadAlpacaMarketPanel({ publicDemo: view.isPublicDemo }),
+    loadAiStudyBriefing({ publicDemo: view.isPublicDemo }),
+  ]);
+
   return (
-    <MacroDesk view={view} catalystFeed={catalystFeed} gammaViews={gammaViews} />
+    <MacroDesk
+      view={view}
+      catalystFeed={catalystFeed}
+      gammaViews={gammaViews}
+      marketPanel={marketPanel}
+      aiBriefing={aiBriefing}
+      initialPanel={parseDeskPanelId(params.panel)}
+    />
   );
 }

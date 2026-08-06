@@ -65,6 +65,7 @@ describe("GammaDesk SSR markup", () => {
     expect(html).toContain('data-testid="bounded-put-wall"');
     expect(html).toContain('data-testid="gamma-availability"');
     expect(html).toContain("Incomplete");
+    expect(html).toContain('data-testid="gex-profile-chart"');
     expect(html).toContain('data-testid="gex-strike-chart"');
     expect(html).toContain('data-testid="gex-strike-table"');
     expect(html).toContain("1 DTE");

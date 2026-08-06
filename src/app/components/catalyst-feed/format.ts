@@ -28,6 +28,20 @@ export function formatScheduledAtEt(iso: string): string {
   return `${month} ${day}, ${year} · ${hour}:${minute} ${dayPeriod} ET`;
 }
 
+/** Compact schedule label for signal scan rows (e.g. Aug 12). */
+export function formatScheduledShort(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return formatScheduledAt(iso);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: AMERICA_NEW_YORK,
+    month: "short",
+    day: "numeric",
+  }).formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("month")} ${get("day")}`;
+}
+
 export function formatPct(pct: number | null | undefined): string {
   if (pct === null || pct === undefined || !Number.isFinite(pct)) return "—";
   const sign = pct > 0 ? "+" : "";

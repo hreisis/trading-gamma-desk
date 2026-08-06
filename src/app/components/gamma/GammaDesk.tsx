@@ -8,301 +8,308 @@ import {
   gammaAvailabilityLabel,
   gammaRegimeLabel,
 } from "@/desk/format-gamma";
+import { gammaRegimeRiskLight } from "../signal-display";
+import { RiskTrafficLight } from "../RiskTrafficLight";
+import { GexProfileChart } from "./GexProfileChart";
 import { GexStrikeChart } from "./GexStrikeChart";
+import {
+  gammaRegimeSignLabel,
+  gammaRegimeStabilityLabel,
+  readGammaFlipStrike,
+} from "./gamma-regime-display";
 
 const METHOD_NOTE =
-  "Derived from one bounded expiration and strike range; not a full-option-chain market estimate. Some vendor Greeks may be excluded by data-quality checks.";
+  "Derived from one bounded expiration and strike range; not a full-option-chain market estimate.";
 
-function WallCard({
-  title,
-  wall,
+function wallValue(
+  wall: BoundedGammaProviderSnapshot["boundedCallWall"],
+): string {
+  if (wall.status === "unavailable") return "—";
+  return formatSpot(wall.strike);
+}
+
+function KeyLevelsStrip({
+  snapshot,
+  flipStrike,
 }: {
-  title: string;
-  wall: BoundedGammaProviderSnapshot["boundedCallWall"];
+  snapshot: BoundedGammaProviderSnapshot;
+  flipStrike: number | null;
 }) {
-  const incomplete = wall.status === "incomplete";
   return (
-    <div
-      className={`gs-metric${incomplete ? " gs-metric-incomplete" : ""}`}
-      data-testid={title.includes("Call") ? "bounded-call-wall" : "bounded-put-wall"}
-    >
-      <p className="gs-metric-label">{title}</p>
-      {wall.status === "unavailable" ? (
-        <p className="gs-metric-value gs-metric-muted">Unavailable</p>
-      ) : (
-        <>
-          <p className="gs-metric-value">{wall.strike}</p>
-          <p className="gs-metric-sub">
-            {formatGexCompact(wall.gex ?? null)}
-            {incomplete ? " · incomplete" : ""}
-          </p>
-        </>
-      )}
-    </div>
+    <dl className="gex-key-levels" data-testid="gamma-key-levels">
+      <div className="gex-key-level">
+        <dt>Spot</dt>
+        <dd className="gex-key-value" data-testid="gamma-spot">
+          {formatSpot(snapshot.spot)}
+        </dd>
+      </div>
+      <div className="gex-key-level">
+        <dt>Call Wall</dt>
+        <dd
+          className="gex-key-value gex-key-call"
+          data-testid="bounded-call-wall"
+        >
+          {wallValue(snapshot.boundedCallWall)}
+        </dd>
+      </div>
+      <div className="gex-key-level">
+        <dt>Put Wall</dt>
+        <dd
+          className="gex-key-value gex-key-put"
+          data-testid="bounded-put-wall"
+        >
+          {wallValue(snapshot.boundedPutWall)}
+        </dd>
+      </div>
+      <div className="gex-key-level">
+        <dt>Gamma Flip</dt>
+        <dd className="gex-key-value" data-testid="gamma-flip">
+          {flipStrike !== null ? formatSpot(flipStrike) : "—"}
+        </dd>
+      </div>
+    </dl>
   );
 }
 
-function ReadyBody({
+function CompactBody({
   snapshot,
   sourceLabel,
   isFixture,
+  variant,
 }: {
   snapshot: BoundedGammaProviderSnapshot;
   sourceLabel: string;
   isFixture: boolean;
+  variant: "spy" | "qqq" | "default";
 }) {
   const suspect = snapshot.coverage.suspectVendorGreeksCount ?? 0;
-  const statusClass =
-    snapshot.status === "incomplete"
-      ? "gs-status gs-status-incomplete"
-      : snapshot.status === "unavailable"
-        ? "gs-status gs-status-unavailable"
-        : snapshot.status === "partial"
-          ? "gs-status gs-status-partial"
-          : "gs-status gs-status-available";
-
-  const plainLimitations = snapshot.limitations.filter(
-    (l) =>
-      /suspect|BOUNDED|bounded|excluded|incomplete|not full-chain|data-quality/i.test(
-        l,
-      ),
-  );
+  const regimeLight = gammaRegimeRiskLight(snapshot.gammaRegime);
+  const flipStrike = readGammaFlipStrike(snapshot);
+  const panelClass =
+    variant === "spy"
+      ? "gamma-panel gamma-panel--spy"
+      : variant === "qqq"
+        ? "gamma-panel gamma-panel--qqq"
+        : "gamma-panel";
 
   return (
-    <>
-      <header className="gs-header" data-testid="gamma-header">
-        <div className="desk-driver-head">
-          <p className="desk-kicker">Structure · Gamma</p>
-          <span className="gs-scope-badge" data-testid="gamma-scope-badge">
-            BOUNDED · SINGLE EXPIRY
+    <article
+      className={`signal-gamma-card ${panelClass}`}
+      data-testid="gamma-state-ready"
+    >
+      <header className="gex-profile-header" data-testid="gamma-header">
+        <div className="gex-profile-header-left">
+          <h3
+            className="gex-profile-symbol"
+            id={`gamma-heading-${snapshot.symbol}`}
+          >
+            {snapshot.symbol}
+          </h3>
+          <p className="gex-profile-spot-large">{formatSpot(snapshot.spot)}</p>
+        </div>
+        <div className="gex-profile-header-right">
+          <p className="gex-profile-stability" data-testid="gamma-regime">
+            {gammaRegimeStabilityLabel(snapshot.gammaRegime)}
+          </p>
+          <p className="gex-profile-sign">
+            {gammaRegimeSignLabel(snapshot.gammaRegime)}
+          </p>
+          <RiskTrafficLight light={regimeLight} compact testId="gamma-regime-light" />
+        </div>
+      </header>
+
+      <KeyLevelsStrip snapshot={snapshot} flipStrike={flipStrike} />
+
+      <GexProfileChart snapshot={snapshot} />
+
+      <footer className="gex-profile-footer" data-testid="gamma-metrics">
+        <span>
+          Put Wall <strong>{wallValue(snapshot.boundedPutWall)}</strong>
+        </span>
+        <span className="gex-profile-footer-sep">|</span>
+        <span>
+          Spot <strong>{formatSpot(snapshot.spot)}</strong>
+        </span>
+        <span className="gex-profile-footer-sep">|</span>
+        <span>
+          Call Wall <strong>{wallValue(snapshot.boundedCallWall)}</strong>
+        </span>
+        <span className="gex-profile-footer-sep">|</span>
+        <span>
+          Flip <strong data-testid="gamma-flip-footer">{flipStrike !== null ? formatSpot(flipStrike) : "—"}</strong>
+        </span>
+      </footer>
+
+      <details className="desk-fold signal-gamma-details">
+        <summary>Details &amp; diagnostics</summary>
+        <span className="gs-scope-badge visually-hidden" data-testid="gamma-scope-badge">
+          BOUNDED · SINGLE EXPIRY
+        </span>
+        <p className="signal-gamma-scope-note">
+          BOUNDED · SINGLE EXPIRY · {gammaRegimeLabel(snapshot.gammaRegime)} ·{" "}
+          {dteLabel(snapshot.dte, snapshot.zeroDte.status)} · exp {snapshot.expiration}
+        </p>
+        <p
+          className="terminal-gamma-availability"
+          data-testid="gamma-availability"
+        >
+          {gammaAvailabilityLabel(snapshot.status)}
+          {suspect > 0 ? ` · suspect_vendor_greeks excluded: ${suspect}` : ""}
+        </p>
+        <p className="desk-section-note gs-method" data-testid="gamma-method-note">
+          {METHOD_NOTE}
+        </p>
+        <div className="signal-gamma-extra-stats">
+          <span>Total GEX {formatGexCompact(snapshot.totalGex)}</span>
+          <span>Coverage {formatPct(snapshot.coverage.usableGammaCoveragePct)}</span>
+          <span>
+            Bounded Call Wall{" "}
+            {snapshot.boundedCallWall.status !== "unavailable"
+              ? snapshot.boundedCallWall.strike
+              : "—"}
+          </span>
+          <span>
+            Bounded Put Wall{" "}
+            {snapshot.boundedPutWall.status !== "unavailable"
+              ? snapshot.boundedPutWall.strike
+              : "—"}
           </span>
         </div>
-        <h2 className="desk-title gs-title" id="gamma-heading">
-          {snapshot.symbol} bounded GEX
-        </h2>
-        <p className="desk-meta gs-meta">
-          <span>Source: MarketData.app</span>
-          <span>asOf {snapshot.vendorAsOf}</span>
-          <span>session {snapshot.sessionDate}</span>
-          <span>exp {snapshot.expiration}</span>
-          <span data-testid="gamma-dte">
-            {dteLabel(snapshot.dte, snapshot.zeroDte.status)}
-          </span>
-          <span>spot {formatSpot(snapshot.spot)}</span>
-          <span>
-            strikes {snapshot.strikeRequest.min}–{snapshot.strikeRequest.max}{" "}
-            step {snapshot.strikeRequest.step}
-          </span>
+        <p className="terminal-gamma-meta-full">
+          Source: MarketData.app · asOf {snapshot.vendorAsOf} · session{" "}
+          {snapshot.sessionDate}
+          <span className="terminal-gamma-meta-sep">·</span>
+          strikes {snapshot.strikeRequest.min}–{snapshot.strikeRequest.max}
+          <span className="terminal-gamma-meta-sep">·</span>
           <span
             className={
               isFixture ? "desk-source desk-source-fixture" : "desk-source desk-source-live"
             }
           >
-            {isFixture ? "fixture" : "local snapshot"}
+            {isFixture ? "fixture" : "live"}
           </span>
         </p>
-        <p className="desk-section-note gs-method" data-testid="gamma-method-note">
-          {METHOD_NOTE}
-        </p>
-      </header>
-
-      <div className="gs-metrics" data-testid="gamma-metrics">
-        <div className="gs-metric" data-testid="gamma-regime">
-          <p className="gs-metric-label">Gamma regime</p>
-          <p
-            className={`gs-metric-value gs-regime-${snapshot.gammaRegime}`}
-          >
-            {gammaRegimeLabel(snapshot.gammaRegime)}
-          </p>
-          <p className="gs-metric-sub">Amplifier / compressor — not a buy/sell signal</p>
+        <div className="terminal-gamma-chart">
+          <GexStrikeChart snapshot={snapshot} />
         </div>
-        <div className="gs-metric">
-          <p className="gs-metric-label">Total GEX</p>
-          <p className="gs-metric-value">{formatGexCompact(snapshot.totalGex)}</p>
-        </div>
-        <div className="gs-metric">
-          <p className="gs-metric-label">Gross GEX</p>
-          <p className="gs-metric-value">{formatGexCompact(snapshot.grossGex)}</p>
-        </div>
-        <WallCard title="Bounded Call Wall" wall={snapshot.boundedCallWall} />
-        <WallCard title="Bounded Put Wall" wall={snapshot.boundedPutWall} />
-        <div className="gs-metric">
-          <p className="gs-metric-label">Usable gamma coverage</p>
-          <p className="gs-metric-value">
-            {formatPct(snapshot.coverage.usableGammaCoveragePct)}
-          </p>
-          <p className="gs-metric-sub">
-            {snapshot.coverage.usableGammaCount ?? "—"} /{" "}
-            {snapshot.coverage.contractsIn} contracts
-          </p>
-        </div>
-        <div className="gs-metric">
-          <p className="gs-metric-label">Contracts</p>
-          <p className="gs-metric-value">
-            {snapshot.coverage.contractsUsed} used
-          </p>
-          <p className="gs-metric-sub">
-            {snapshot.coverage.contractsIn} received ·{" "}
-            {snapshot.coverage.contractsSkipped} skipped
-          </p>
-        </div>
-      </div>
-
-      <section
-        className={`gs-quality ${statusClass}`}
-        data-testid="gamma-quality"
-        aria-labelledby="gamma-quality-heading"
-      >
-        <h3 id="gamma-quality-heading" className="gs-quality-title">
-          Data quality
-        </h3>
-        <p className="gs-quality-status" data-testid="gamma-availability">
-          Availability: {gammaAvailabilityLabel(snapshot.status)}
-        </p>
-        <ul className="gs-quality-list">
-          <li>
-            Non-null gamma coverage:{" "}
-            {formatPct(snapshot.coverage.nonNullGammaCoveragePct)} (
-            {snapshot.coverage.nonNullGammaCount ?? "—"})
-          </li>
-          <li>
-            Usable gamma coverage:{" "}
-            {formatPct(snapshot.coverage.usableGammaCoveragePct)} (
-            {snapshot.coverage.usableGammaCount ?? "—"})
-          </li>
-          <li data-testid="gamma-suspect-count">
-            suspect_vendor_greeks excluded: {suspect}
-          </li>
-        </ul>
-        {plainLimitations.length > 0 ? (
-          <ul className="gs-limitations" data-testid="gamma-limitations">
-            {plainLimitations.slice(0, 4).map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-
-      <section className="gs-chart-section" aria-labelledby="gex-chart-heading">
-        <h3 id="gex-chart-heading" className="gs-quality-title">
-          Strike GEX (bounded sample)
-        </h3>
-        <GexStrikeChart snapshot={snapshot} />
-        <details className="desk-fold gs-table-fold">
-          <summary>Strike table</summary>
-          <div className="gs-table-scroll">
-            <table className="desk-table" data-testid="gex-strike-table">
-              <thead>
-                <tr>
-                  <th>Strike</th>
-                  <th>Call GEX</th>
-                  <th>Put GEX</th>
-                  <th>Net GEX</th>
-                  <th>Gross GEX</th>
-                  <th>Call OI</th>
-                  <th>Put OI</th>
+        <div className="gs-table-scroll">
+          <table className="terminal-table" data-testid="gex-strike-table">
+            <thead>
+              <tr>
+                <th>Strike</th>
+                <th>Net GEX</th>
+                <th>Call OI</th>
+                <th>Put OI</th>
+              </tr>
+            </thead>
+            <tbody>
+              {snapshot.byStrike.map((row) => (
+                <tr key={row.strike}>
+                  <td>{row.strike}</td>
+                  <td>{formatGexCompact(row.netGex)}</td>
+                  <td>{row.callOpenInterest}</td>
+                  <td>{row.putOpenInterest}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {snapshot.byStrike.map((row) => (
-                  <tr key={row.strike}>
-                    <td>{row.strike}</td>
-                    <td>{formatGexCompact(row.callGex)}</td>
-                    <td>{formatGexCompact(row.putGex)}</td>
-                    <td>{formatGexCompact(row.netGex)}</td>
-                    <td>
-                      {formatGexCompact(
-                        Math.abs(row.callGex) + Math.abs(row.putGex),
-                      )}
-                    </td>
-                    <td>{row.callOpenInterest}</td>
-                    <td>{row.putOpenInterest}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      </section>
-
-      <p className="desk-section-note">
-        Snapshot path label: <code>{sourceLabel}</code>
-      </p>
-    </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="desk-section-note">
+          <code>{sourceLabel}</code>
+        </p>
+      </details>
+    </article>
   );
 }
 
-export function GammaDesk({ view }: { view: BoundedGammaDeskView }) {
+function EmptyState({
+  title,
+  message,
+  testId,
+  variant,
+}: {
+  title: string;
+  message: string;
+  testId: string;
+  variant: "spy" | "qqq" | "default";
+}) {
+  const panelClass =
+    variant === "spy"
+      ? "gamma-panel gamma-panel--spy"
+      : variant === "qqq"
+        ? "gamma-panel gamma-panel--qqq"
+        : "gamma-panel";
+  return (
+    <article
+      className={`signal-gamma-card signal-gamma-card-empty ${panelClass}`}
+      data-testid={testId}
+    >
+      <h3 className="gex-profile-symbol">{title}</h3>
+      <p className="terminal-state-copy">{message}</p>
+    </article>
+  );
+}
+
+function gammaVariant(symbol: string | undefined): "spy" | "qqq" | "default" {
+  if (symbol === "SPY") return "spy";
+  if (symbol === "QQQ") return "qqq";
+  return "default";
+}
+
+export function GammaDesk({
+  view,
+  compact = false,
+}: {
+  view: BoundedGammaDeskView;
+  compact?: boolean;
+}) {
+  const variant = gammaVariant(view.snapshot?.symbol);
+
   if (view.status === "empty") {
     return (
-      <section
-        className="desk-section gs-section"
-        data-testid="gamma-state-empty"
-        aria-labelledby="gamma-heading"
-      >
-        <p className="desk-kicker">Structure · Gamma</p>
-        <h2 id="gamma-heading" className="desk-title gs-title">
-          Bounded gamma
-        </h2>
-        <p className="desk-interpretation">
-          {view.error?.message ??
-            "No bounded gamma snapshot is available for this desk."}
-        </p>
-        <p className="desk-section-note">{METHOD_NOTE}</p>
-      </section>
+      <EmptyState
+        testId="gamma-state-empty"
+        title="Bounded gamma"
+        message={
+          view.error?.message ??
+          "No bounded gamma snapshot is available for this desk."
+        }
+        variant={variant}
+      />
     );
   }
 
   if (view.status === "malformed") {
     return (
-      <section
-        className="desk-section gs-section"
-        data-testid="gamma-state-malformed"
-        aria-labelledby="gamma-heading"
-      >
-        <p className="desk-kicker">Structure · Gamma</p>
-        <h2 id="gamma-heading" className="desk-title gs-title">
-          Bounded gamma unavailable
-        </h2>
-        <p className="desk-banner desk-banner-error">
-          {view.error?.message ?? "Malformed bounded gamma snapshot."}
-        </p>
-        <p className="desk-section-note">{METHOD_NOTE}</p>
-      </section>
+      <EmptyState
+        testId="gamma-state-malformed"
+        title="Unavailable"
+        message={view.error?.message ?? "Malformed bounded gamma snapshot."}
+        variant={variant}
+      />
     );
   }
 
   if (view.status === "unavailable" || view.snapshot === null) {
     return (
-      <section
-        className="desk-section gs-section"
-        data-testid="gamma-state-unavailable"
-        aria-labelledby="gamma-heading"
-      >
-        <p className="desk-kicker">Structure · Gamma</p>
-        <h2 id="gamma-heading" className="desk-title gs-title">
-          Bounded gamma unavailable
-        </h2>
-        <p className="desk-interpretation">
-          {view.error?.message ??
-            "Bounded gamma calculation is unavailable for this snapshot."}
-        </p>
-        <p className="desk-section-note">{METHOD_NOTE}</p>
-      </section>
+      <EmptyState
+        testId="gamma-state-unavailable"
+        title="Unavailable"
+        message={
+          view.error?.message ??
+          "Bounded gamma calculation is unavailable for this snapshot."
+        }
+        variant={variant}
+      />
     );
   }
 
   return (
-    <section
-      className="desk-section gs-section"
-      data-testid="gamma-state-ready"
-      aria-labelledby="gamma-heading"
-    >
-      <ReadyBody
-        snapshot={view.snapshot}
-        sourceLabel={view.sourceLabel}
-        isFixture={view.isFixture}
-      />
-    </section>
+    <CompactBody
+      snapshot={view.snapshot}
+      sourceLabel={view.sourceLabel}
+      isFixture={view.isFixture}
+      variant={variant}
+    />
   );
 }

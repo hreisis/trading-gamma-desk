@@ -37,12 +37,13 @@ function LayerStatusStrip({ feed }: { feed: CatalystFeedDto }) {
 
 export function CatalystFeedSkeleton() {
   return (
-    <section className="desk-section cf-feed" aria-labelledby="catalyst-heading">
-      <h2 id="catalyst-heading">Catalyst feed</h2>
+    <section className="signal-section cf-feed" aria-labelledby="catalyst-heading">
+      <h2 id="catalyst-heading" className="signal-section-label">
+        Catalysts
+      </h2>
       <div className="cf-state cf-state-loading" data-testid="catalyst-loading">
         <div className="desk-skeleton desk-skeleton-title" />
         <div className="desk-skeleton desk-skeleton-line" />
-        <div className="desk-skeleton desk-skeleton-line short" />
       </div>
     </section>
   );
@@ -72,14 +73,11 @@ export function CatalystFeed({
 
   if (feed === null || uiStatus === "error") {
     return (
-      <section className="desk-section cf-feed" aria-labelledby="catalyst-heading">
-        <h2 id="catalyst-heading">Catalyst feed</h2>
+      <section className="signal-section cf-feed" aria-labelledby="catalyst-heading">
+        <h2 id="catalyst-heading" className="signal-section-label">
+          Catalysts
+        </h2>
         <div className="cf-state cf-state-error" data-testid="catalyst-error">
-          {!hideDemoChrome && feed?.banner ? (
-            <p className="desk-banner desk-banner-warn desk-banner-compact">
-              {feed.banner}
-            </p>
-          ) : null}
           <p className="desk-section-note" data-testid="catalyst-empty">
             Official calendar cache unavailable. Run{" "}
             <code>npm run catalyst:fetch</code> locally (not in public demo).
@@ -113,38 +111,17 @@ export function CatalystFeed({
         : "desk-banner desk-banner-compact";
 
   return (
-    <section className="desk-section cf-feed" aria-labelledby="catalyst-heading">
-      <h2 id="catalyst-heading">Catalyst feed</h2>
-
-      {!hideDemoChrome ? (
-        <>
-          <p className={bannerClass} data-testid="catalyst-banner">
-            {feed.banner}
-          </p>
-          <p className="desk-section-note" data-testid="catalyst-disclaimer">
-            {feed.disclaimer}
-          </p>
-        </>
-      ) : (
-        <p className="desk-section-note cf-feed-lede">
-          Events that may change the market&apos;s driver — independent of the
-          regime score above.
-        </p>
-      )}
-
-      {uiStatus === "partial" ? (
-        <p className="cf-state-banner cf-state-partial" data-testid="catalyst-partial">
-          Partial data — some layers missing or stale. Market reaction may read
-          Awaiting market data.
-        </p>
-      ) : null}
+    <section className="signal-section cf-feed" aria-labelledby="catalyst-heading">
+      <h2 id="catalyst-heading" className="signal-section-label">
+        Catalysts
+      </h2>
 
       {uiStatus === "empty" ? (
         <div className="cf-state cf-state-empty" data-testid="catalyst-empty">
           <p className="desk-section-note">No catalysts match the current view.</p>
         </div>
       ) : (
-        <div className="cf-card-list" data-testid="catalyst-list">
+        <div className="cf-signal-list" data-testid="catalyst-list">
           {feed.catalysts.map((c) => (
             <CatalystEventCard
               key={c.id}
@@ -163,6 +140,20 @@ export function CatalystFeed({
 
       <details className="desk-fold cf-feed-diagnostics" data-testid="catalyst-feed-diagnostics">
         <summary>Feed diagnostics</summary>
+        {!hideDemoChrome ? (
+          <p className={bannerClass} data-testid="catalyst-banner">
+            {feed.banner}
+          </p>
+        ) : null}
+        <p className="desk-section-note" data-testid="catalyst-disclaimer">
+          {feed.disclaimer}
+        </p>
+        {uiStatus === "partial" ? (
+          <p className="cf-state-banner cf-state-partial" data-testid="catalyst-partial">
+            Partial data — some layers missing or stale. Market reaction may read
+            Awaiting market data.
+          </p>
+        ) : null}
         <LayerStatusStrip feed={feed} />
         {feed.mode !== "live_unavailable" ? (
           <p className="desk-section-note" data-testid="catalyst-feed-source">
@@ -186,11 +177,6 @@ export function CatalystFeed({
             rows excluded).
           </p>
         ) : null}
-        {!hideDemoChrome ? null : (
-          <p className="desk-section-note" data-testid="catalyst-disclaimer">
-            {feed.disclaimer}
-          </p>
-        )}
       </details>
     </section>
   );

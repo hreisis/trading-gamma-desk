@@ -17,7 +17,14 @@ import {
 } from "@/catalyst/feed-view";
 import { deriveCatalystRiskLight } from "@/desk/risk-lights";
 import { RiskTrafficLight } from "../RiskTrafficLight";
-import { formatScheduledAtEt } from "./format";
+import {
+  catalystShortTitle,
+  catalystStatusTimeLabel,
+  riskLightScanLabel,
+  upcomingCatalystImportanceLight,
+  upcomingCatalystScanLabel,
+} from "../signal-display";
+import { formatScheduledAtEt, formatScheduledShort } from "./format";
 import { MarketReactionSection } from "./MarketReactionSection";
 import { OfficialBriefSection } from "./OfficialBriefSection";
 
@@ -52,6 +59,33 @@ function ReleaseResultPanel({
   );
 }
 
+function catalystScanSignal(
+  catalyst: Catalyst,
+  reactionLight: ReturnType<typeof deriveCatalystRiskLight>,
+): { light: typeof reactionLight; label: string } {
+  if (
+    catalyst.status === "released" ||
+    catalyst.status === "developing" ||
+    catalyst.status === "resolved"
+  ) {
+    const statusLabel = catalystStatusTimeLabel(catalyst.status);
+    if (reactionLight.kind === "gray") {
+      return { light: reactionLight, label: statusLabel || "—" };
+    }
+    return { light: reactionLight, label: riskLightScanLabel(reactionLight) };
+  }
+  return {
+    light: upcomingCatalystImportanceLight(catalyst.importance),
+    label: upcomingCatalystScanLabel(catalyst.importance),
+  };
+}
+
+function catalystTimeLabel(catalyst: Catalyst): string {
+  const status = catalystStatusTimeLabel(catalyst.status);
+  if (status) return status;
+  return formatScheduledShort(catalyst.occurredAt);
+}
+
 export function CatalystEventCard({
   catalyst,
   feed,
@@ -76,70 +110,74 @@ export function CatalystEventCard({
     reaction?.windows.find((w) => w.window === "5m") ??
     reaction?.windows[0];
 
-  const riskLight = deriveCatalystRiskLight({
+  const reactionLight = deriveCatalystRiskLight({
     status: catalyst.status,
     equityBreadth: coreWindow?.equityBreadth,
     equityLeadershipStatus: coreWindow?.equityLeadership.status,
   });
+  const scan = catalystScanSignal(catalyst, reactionLight);
+  const title = catalystShortTitle(catalyst.category, catalyst.headline);
 
   return (
     <article
-      className="cf-card"
+      className="cf-signal-card"
       data-testid="catalyst-event-card"
       data-catalyst-id={catalyst.id}
     >
-      <header className="cf-card-header">
-        <div className="cf-badges">
-          <span
-            className={`cf-badge cf-badge-status cf-status-${catalyst.status}`}
-          >
-            {formatReleaseStatusLabel(catalyst.status)}
-          </span>
-          <span
-            className={`cf-badge cf-badge-importance cf-importance-${catalyst.importance}`}
-          >
-            {formatImportanceLabel(catalyst.importance)}
-          </span>
-          {catalyst.synthetic ? (
-            <span className="cf-badge cf-badge-demo">Demo</span>
-          ) : null}
-          {(catalyst.status === "released" ||
-            catalyst.status === "developing" ||
-            catalyst.status === "resolved") && (
-            <RiskTrafficLight
-              light={riskLight}
-              compact
-              testId={`catalyst-risk-light-${catalyst.id}`}
-            />
-          )}
-        </div>
-        <time className="cf-scheduled" dateTime={catalyst.occurredAt}>
-          {formatScheduledAtEt(catalyst.occurredAt)}
+      <div className="cf-scan-row">
+        <RiskTrafficLight
+          light={scan.light}
+          compact
+          testId={`catalyst-risk-light-${catalyst.id}`}
+        />
+        <span className="cf-scan-title">{title}</span>
+        <span className="cf-scan-signal">{scan.label}</span>
+        <time className="cf-scan-time" dateTime={catalyst.occurredAt}>
+          {catalystTimeLabel(catalyst)}
         </time>
-      </header>
-
-      <h3 className="cf-card-title">{catalyst.headline}</h3>
-
-      <OfficialBriefSection
-        catalyst={catalyst}
-        briefsByDocId={briefsByDocId}
-        aiByBriefId={aiByBriefId}
-        demo={demo}
-        compact
-      />
-
-      <MarketReactionSection
-        feed={feed}
-        catalystStatus={catalyst.status}
-        context={marketContext}
-        reaction={reaction}
-        ai={aiReaction}
-        demo={demo}
-        compact
-      />
+      </div>
 
       <details className="cf-details cf-card-details" data-testid="catalyst-card-details">
         <summary>Details &amp; citations</summary>
+
+        <header className="cf-card-header">
+          <div className="cf-badges">
+            <span
+              className={`cf-badge cf-badge-status cf-status-${catalyst.status}`}
+            >
+              {formatReleaseStatusLabel(catalyst.status)}
+            </span>
+            <span
+              className={`cf-badge cf-badge-importance cf-importance-${catalyst.importance}`}
+            >
+              {formatImportanceLabel(catalyst.importance)}
+            </span>
+            {catalyst.synthetic ? (
+              <span className="cf-badge cf-badge-demo">Demo</span>
+            ) : null}
+          </div>
+          <time className="cf-scheduled" dateTime={catalyst.occurredAt}>
+            {formatScheduledAtEt(catalyst.occurredAt)}
+          </time>
+        </header>
+
+        <h3 className="cf-card-title">{catalyst.headline}</h3>
+
+        <OfficialBriefSection
+          catalyst={catalyst}
+          briefsByDocId={briefsByDocId}
+          aiByBriefId={aiByBriefId}
+          demo={demo}
+        />
+
+        <MarketReactionSection
+          feed={feed}
+          catalystStatus={catalyst.status}
+          context={marketContext}
+          reaction={reaction}
+          ai={aiReaction}
+          demo={demo}
+        />
 
         <p className="cf-card-meta">
           <span>{formatCategoryLabel(catalyst.category)}</span>
@@ -167,22 +205,6 @@ export function CatalystEventCard({
             synthetic={catalyst.synthetic}
           />
         ) : null}
-
-        <OfficialBriefSection
-          catalyst={catalyst}
-          briefsByDocId={briefsByDocId}
-          aiByBriefId={aiByBriefId}
-          demo={demo}
-        />
-
-        <MarketReactionSection
-          feed={feed}
-          catalystStatus={catalyst.status}
-          context={marketContext}
-          reaction={reaction}
-          ai={aiReaction}
-          demo={demo}
-        />
 
         {catalyst.officialDocuments && catalyst.officialDocuments.length > 0 ? (
           <p className="cf-panel-note cf-card-footer">

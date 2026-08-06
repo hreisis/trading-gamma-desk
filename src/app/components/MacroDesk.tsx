@@ -1,250 +1,137 @@
-import type { DominantDriver } from "@/contracts";
+import { Suspense } from "react";
+import type { AiStudyBriefing } from "@/contracts/ai-study-briefing";
+import type { AlpacaMarketPanel } from "@/contracts/alpaca-market";
 import type { CatalystFeed as CatalystFeedDto } from "@/contracts";
 import type { BoundedGammaDeskView, MacroDeskView } from "@/desk";
-import {
-  assetDisplayName,
-  confidenceComponentLabel,
-  formatConfidenceScore,
-  formatSignedChange,
-  formatZScore,
-  isFallbackRegime,
-  polarityLabel,
-  regimeLabel,
-  riskDirectionLabel,
-  roleLabel,
-  sessionAlignmentLabel,
-  sessionBannerText,
-  deriveAssetRiskLight,
-  deriveDriverRiskLight,
-} from "@/desk";
-import { CatalystFeed } from "./catalyst-feed/CatalystFeed";
 import { DeskChrome } from "./DeskChrome";
 import { DeskStatusBanners } from "./DeskStatusBanners";
+import { DeskWorkspace } from "./desk/DeskWorkspace";
+import type { DeskPanelId } from "./desk/desk-panel-types";
+import { buildDeskSidebarSignals } from "./desk/desk-sidebar-signals";
+import { AiStudyWorkspacePanel } from "./desk/panels/AiStudyWorkspacePanel";
+import { CatalystsWorkspacePanel } from "./desk/panels/CatalystsWorkspacePanel";
+import { CrossAssetWorkspacePanel } from "./desk/panels/CrossAssetWorkspacePanel";
+import { DataStatusWorkspacePanel } from "./desk/panels/DataStatusWorkspacePanel";
+import { MacroWorkspacePanel } from "./desk/panels/MacroWorkspacePanel";
+import { MarketWorkspacePanel } from "./desk/panels/MarketWorkspacePanel";
 import { GammaDesk } from "./gamma/GammaDesk";
-import { RiskTrafficLight } from "./RiskTrafficLight";
 
-function DriverBody({
-  driver,
-  sourceLabel,
-  isDemo,
-  isPublicDemo,
+function WorkspaceFallback() {
+  return (
+    <div className="desk-workspace desk-workspace-loading" data-testid="desk-workspace-loading">
+      <div className="desk-skeleton desk-skeleton-title" />
+      <div className="desk-skeleton desk-skeleton-line" />
+    </div>
+  );
+}
+
+function UnavailablePanel({ title }: { title: string }) {
+  return (
+    <div className="workspace-panel">
+      <h2 className="workspace-panel-title">{title}</h2>
+      <p className="desk-section-note">Unavailable for this session.</p>
+    </div>
+  );
+}
+
+function GammaRow({ panels }: { panels: readonly BoundedGammaDeskView[] }) {
+  if (panels.length === 0) {
+    return (
+      <p className="desk-section-note" data-testid="gamma-missing">
+        No bounded gamma snapshots loaded.
+      </p>
+    );
+  }
+  return (
+    <div className="desk-gamma-grid" data-testid="desk-gamma-grid">
+      {panels.map((panel) => (
+        <GammaDesk
+          key={panel.snapshot?.symbol ?? panel.sourceLabel}
+          view={panel}
+          compact
+        />
+      ))}
+    </div>
+  );
+}
+
+function MacroDeskWorkspace({
+  view,
+  catalystFeed,
+  gammaPanels,
+  marketPanel,
+  aiBriefing,
+  initialPanel,
+  demoMode,
 }: {
-  driver: DominantDriver;
-  sourceLabel: string;
-  isDemo: boolean;
-  isPublicDemo: boolean;
+  view: MacroDeskView;
+  catalystFeed?: CatalystFeedDto | null;
+  gammaPanels: readonly BoundedGammaDeskView[];
+  marketPanel?: AlpacaMarketPanel | null;
+  aiBriefing?: AiStudyBriefing | null;
+  initialPanel?: DeskPanelId | null;
+  demoMode?: boolean;
 }) {
-  const contradictionSet = new Set(driver.contradictions);
-  const evidenceById = new Map(driver.evidence.map((e) => [e.id, e]));
-  const showAsFixture = isDemo || isPublicDemo;
-  const driverLight = deriveDriverRiskLight({
-    primaryRegime: driver.primaryRegime,
-    riskDirection: driver.riskDirection,
-    confidenceScore: driver.confidence.score,
-    zeroedBy: driver.confidence.zeroedBy,
-  });
-
-  const sortedAssets = [...driver.assets].sort((a, b) => {
-    const rank = (role: typeof a.role) =>
-      role === "confirming"
-        ? 0
-        : role === "contradicting"
-          ? 1
-          : role === "neutral"
-            ? 2
-            : 3;
-    return rank(a.role) - rank(b.role);
+  const driver = view.driver;
+  const signals = buildDeskSidebarSignals({
+    view,
+    driver,
+    catalystFeed,
+    gammaPanels,
+    marketPanel,
+    briefing: aiBriefing,
   });
 
   return (
-    <>
-      {!isPublicDemo ? (
-        <p className="desk-banner desk-banner-compact" data-testid="banner-session">
-          {sessionBannerText(driver)}
-          <span className="desk-banner-meta">
-            · {sessionAlignmentLabel(driver.sessionAlignment)}
-            {driver.isCompleteSession ? "" : " · incomplete"}
-            {" · "}
-            <span
-              className={
-                showAsFixture
-                  ? "desk-source desk-source-fixture"
-                  : "desk-source desk-source-live"
-              }
-              data-desk-source={showAsFixture ? "fixture" : "local_driver"}
-            >
-              {sourceLabel}
-            </span>
-          </span>
-        </p>
-      ) : null}
-
-      <section className="desk-driver" aria-labelledby="driver-heading">
-        <div className="desk-driver-head">
-          <p className="desk-kicker">
-            {isFallbackRegime(driver.primaryRegime)
-              ? "No single driver"
-              : "Dominant driver"}
-          </p>
-          <RiskTrafficLight light={driverLight} testId="driver-risk-light" />
-        </div>
-        <h1 id="driver-heading" className="desk-title">
-          {driver.label}
-        </h1>
-        <p className="desk-meta">
-          <span>{regimeLabel(driver.primaryRegime)}</span>
-          {driver.polarity ? <span>{polarityLabel(driver.polarity)}</span> : null}
-          {driver.riskDirection ? (
-            <span>{riskDirectionLabel(driver.riskDirection)}</span>
-          ) : null}
-        </p>
-        <p className="desk-confidence">
-          {formatConfidenceScore(driver.confidence)}
-        </p>
-        <p className="desk-interpretation">{driver.interpretation.text}</p>
-      </section>
-
-      <section className="desk-section desk-section-tight" aria-labelledby="assets-heading">
-        <h2 id="assets-heading">Cross-asset moves</h2>
-        <p className="desk-section-note">
-          Normalized change and z-score from the compute snapshot. Risk lights
-          reflect high-beta implication — not bare up/down.
-        </p>
-        <table className="desk-table">
-          <thead>
-            <tr>
-              <th scope="col">Asset</th>
-              <th scope="col">Risk</th>
-              <th scope="col">Change</th>
-              <th scope="col">z</th>
-              <th scope="col">Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedAssets.map((asset) => {
-              const assetLight = deriveAssetRiskLight({
-                symbol: asset.symbol,
-                zScore: asset.zScore,
-                role: asset.role,
-                staleDays: asset.staleDays,
-              });
-              return (
-                <tr key={asset.symbol} data-role={asset.role}>
-                  <td>
-                    <span className="desk-asset-name">
-                      {assetDisplayName(asset)}
-                    </span>
-                    {asset.staleDays !== null && asset.staleDays > 0 ? (
-                      <span className="desk-stale">
-                        {" "}
-                        stale {asset.staleDays}d
-                      </span>
-                    ) : null}
-                  </td>
-                  <td>
-                    <RiskTrafficLight
-                      light={assetLight}
-                      compact
-                      testId={`asset-risk-light-${asset.symbol}`}
-                    />
-                  </td>
-                  <td>{formatSignedChange(asset.value, asset.unit)}</td>
-                  <td>{formatZScore(asset.zScore)}</td>
-                  <td>{roleLabel(asset.role)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
-
-      <details className="desk-fold" data-testid="fold-evidence">
-        <summary>Evidence</summary>
-        <ul className="desk-evidence">
-          {driver.evidence.map((ev) => (
-            <li
-              key={ev.id}
-              className={
-                contradictionSet.has(ev.id) ? "desk-evidence-contra" : undefined
-              }
-            >
-              <span className="desk-evidence-mark">
-                {contradictionSet.has(ev.id) ? "Contra" : "For"}
-              </span>
-              {ev.statement}
-              {ev.isProxy ? (
-                <span className="desk-proxy"> · via {ev.instrument}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {driver.interpretation.evidenceIds.length > 0 ? (
-          <p className="desk-section-note">
-            Cited:{" "}
-            {driver.interpretation.evidenceIds
-              .map((id) => evidenceById.get(id)?.symbol ?? id)
-              .join(", ")}
-          </p>
-        ) : null}
-      </details>
-
-      <details className="desk-fold" data-testid="fold-confidence">
-        <summary>Confidence components</summary>
-        <p className="desk-section-note">
-          Score copied from the interpretation payload
-          {driver.confidence.calibrated
-            ? "."
-            : "; band labels withheld while uncalibrated."}
-        </p>
-        <ul className="desk-components">
-          {driver.confidence.components.map((c) => (
-            <li key={c.name}>
-              <span>{confidenceComponentLabel(c.name)}</span>
-              <span>
-                {(c.value * 100).toFixed(0)}% · w={c.weight.toFixed(2)}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {driver.confidence.hardCapsApplied.length > 0 ? (
-          <ul className="desk-caps">
-            {driver.confidence.hardCapsApplied.map((cap) => (
-              <li key={`${cap.rule}-${cap.cappedAt}`}>
-                Cap {cap.rule} ≤ {cap.cappedAt} — {cap.basis}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </details>
-
-      <details className="desk-fold" data-testid="fold-diagnostics">
-        <summary>Diagnostics</summary>
-        <p className="desk-section-note" data-testid="diagnostics-session">
-          Session {driver.marketSessionDate} ·{" "}
-          {sessionAlignmentLabel(driver.sessionAlignment)}
-          {driver.isCompleteSession ? "" : " · incomplete"}
-          {isPublicDemo ? " · synthetic" : ` · ${sourceLabel}`}
-        </p>
-        {driver.confidence.detail.runnerUpRegime ? (
-          <p className="desk-section-note">
-            Runner-up: {regimeLabel(driver.confidence.detail.runnerUpRegime)} ·
-            effective confirmations{" "}
-            {driver.confidence.detail.effectiveConfirmations}
-          </p>
-        ) : null}
-        {driver.confidence.hardCapsApplied.length > 0 ? (
-          <ul className="desk-caps">
-            {driver.confidence.hardCapsApplied.map((cap) => (
-              <li key={`diag-${cap.rule}-${cap.cappedAt}`}>
-                Cap {cap.rule} ≤ {cap.cappedAt} — {cap.basis}
-              </li>
-            ))}
-          </ul>
+    <DeskWorkspace
+      demoMode={demoMode}
+      signals={signals}
+      initialPanel={initialPanel}
+      gamma={<GammaRow panels={gammaPanels} />}
+      panels={{
+        market: marketPanel ? (
+          <MarketWorkspacePanel panel={marketPanel} />
         ) : (
-          <p className="desk-section-note">No hard caps applied.</p>
-        )}
-      </details>
-    </>
+          <UnavailablePanel title="Market" />
+        ),
+        macro: driver ? (
+          <MacroWorkspacePanel
+            driver={driver}
+            sourceLabel={view.sourceLabel ?? "unknown"}
+            isPublicDemo={view.isPublicDemo}
+          />
+        ) : (
+          <UnavailablePanel title="Macro" />
+        ),
+        catalysts: catalystFeed ? (
+          <CatalystsWorkspacePanel
+            feed={catalystFeed}
+            suppressDemoChrome={view.isPublicDemo}
+          />
+        ) : (
+          <UnavailablePanel title="Catalysts" />
+        ),
+        "cross-asset": driver ? (
+          <CrossAssetWorkspacePanel driver={driver} />
+        ) : (
+          <UnavailablePanel title="Cross Asset" />
+        ),
+        "ai-study": aiBriefing ? (
+          <AiStudyWorkspacePanel briefing={aiBriefing} />
+        ) : (
+          <UnavailablePanel title="AI Study" />
+        ),
+        "data-status": (
+          <DataStatusWorkspacePanel
+            view={view}
+            gammaPanels={gammaPanels}
+            catalystFeed={catalystFeed}
+            marketPanel={marketPanel}
+            briefing={aiBriefing}
+          />
+        ),
+      }}
+    />
   );
 }
 
@@ -254,42 +141,44 @@ export function MacroDesk({
   gammaView,
   gammaViews,
   demoMode,
+  marketPanel,
+  aiBriefing,
+  initialPanel,
 }: {
   view: MacroDeskView;
   catalystFeed?: CatalystFeedDto | null;
   gammaView?: BoundedGammaDeskView | null;
   gammaViews?: readonly BoundedGammaDeskView[];
   demoMode?: boolean;
+  marketPanel?: AlpacaMarketPanel | null;
+  aiBriefing?: AiStudyBriefing | null;
+  initialPanel?: DeskPanelId | null;
 }) {
-  const gammaPanels =
-    gammaViews ?? (gammaView ? [gammaView] : []);
+  const gammaPanels = gammaViews ?? (gammaView ? [gammaView] : []);
 
-  function GammaSection() {
-    return (
-      <>
-        {gammaPanels.map((panel) => (
-          <GammaDesk
-            key={panel.snapshot?.symbol ?? panel.sourceLabel}
-            view={panel}
-          />
-        ))}
-      </>
-    );
-  }
+  const workspace = (
+    <Suspense fallback={<WorkspaceFallback />}>
+      <MacroDeskWorkspace
+        view={view}
+        catalystFeed={catalystFeed}
+        gammaPanels={gammaPanels}
+        marketPanel={marketPanel}
+        aiBriefing={aiBriefing}
+        initialPanel={initialPanel}
+        demoMode={demoMode}
+      />
+    </Suspense>
+  );
+
   if (view.status === "live_unavailable") {
     return (
-      <DeskChrome activeNav="macro" demoMode={demoMode}>
+      <DeskChrome demoMode={demoMode}>
         <DeskStatusBanners view={view} />
-        <section className="desk-state" data-testid="state-live-unavailable">
-          <h1 className="desk-title">Live data unavailable</h1>
-          <p className="desk-interpretation">
+        <section className="terminal-state" data-testid="state-live-unavailable">
+          <h1 className="terminal-page-title">Live data unavailable</h1>
+          <p className="terminal-state-copy">
             {view.error?.message ??
               "This deployment does not serve live drivers for this request."}
-          </p>
-          <p className="desk-section-note">
-            Open <a href="/demo">the synthetic demo</a> for the illustrative
-            scenario fixture, or configure live credentials and local{" "}
-            <code>data/drivers</code> for current mode.
           </p>
         </section>
       </DeskChrome>
@@ -298,14 +187,13 @@ export function MacroDesk({
 
   if (view.status === "empty" || (view.driver === null && !view.error)) {
     return (
-      <DeskChrome activeNav="macro" demoMode={demoMode}>
+      <DeskChrome demoMode={demoMode}>
         <DeskStatusBanners view={view} />
-        {gammaPanels.length > 0 ? <GammaSection /> : null}
-        <section className="desk-state" data-testid="state-empty">
-          <h1 className="desk-title">No macro driver</h1>
-          <p className="desk-interpretation">
+        {workspace}
+        <section className="terminal-state" data-testid="state-empty">
+          <p className="terminal-state-copy">
             {view.error?.message ??
-              "No live driver and fixture fallback is disabled. Run npm run daily after configuring .env."}
+              "No live driver and fixture fallback is disabled."}
           </p>
         </section>
       </DeskChrome>
@@ -314,25 +202,12 @@ export function MacroDesk({
 
   if (view.driver === null) {
     return (
-      <DeskChrome activeNav="macro" demoMode={demoMode}>
+      <DeskChrome demoMode={demoMode}>
         <DeskStatusBanners view={view} />
-        {gammaPanels.length > 0 ? <GammaSection /> : null}
-        <section
-          className="desk-state"
-          data-testid={`state-${view.status}`}
-        >
-          <h1 className="desk-title">
-            {view.status === "malformed"
-              ? "Malformed live driver"
-              : "Pipeline error"}
-          </h1>
-          <p className="desk-interpretation">
-            {view.error?.message ??
-              "The desk cannot render a DominantDriver payload."}
-          </p>
-          <p className="desk-section-note">
-            UI does not classify or recompute confidence. Fix the pipeline or
-            restore a valid driver under data/drivers/.
+        {workspace}
+        <section className="terminal-state" data-testid={`state-${view.status}`}>
+          <p className="terminal-state-copy">
+            {view.error?.message ?? "The desk cannot render a DominantDriver payload."}
           </p>
         </section>
       </DeskChrome>
@@ -340,35 +215,20 @@ export function MacroDesk({
   }
 
   return (
-    <DeskChrome activeNav="macro" demoMode={demoMode}>
+    <DeskChrome demoMode={demoMode}>
       <DeskStatusBanners view={view} />
-      {gammaPanels.length > 0 ? <GammaSection /> : null}
-      <div data-testid={`state-${view.status}`}>
-        <DriverBody
-          driver={view.driver}
-          sourceLabel={view.sourceLabel ?? "unknown"}
-          isDemo={view.isDemo}
-          isPublicDemo={view.isPublicDemo}
-        />
-      </div>
-      {catalystFeed ? (
-        <CatalystFeed feed={catalystFeed} suppressDemoChrome={view.isPublicDemo} />
-      ) : null}
+      <div data-testid={`state-${view.status}`}>{workspace}</div>
     </DeskChrome>
   );
 }
 
 export function DeskLoading() {
   return (
-    <DeskChrome activeNav="macro">
-      <p className="desk-banner" data-testid="state-loading">
+    <DeskChrome>
+      <p className="terminal-session-strip" data-testid="state-loading">
         Loading macro desk…
       </p>
-      <section className="desk-state">
-        <div className="desk-skeleton desk-skeleton-title" />
-        <div className="desk-skeleton desk-skeleton-line" />
-        <div className="desk-skeleton desk-skeleton-line short" />
-      </section>
+      <WorkspaceFallback />
     </DeskChrome>
   );
 }
