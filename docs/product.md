@@ -1,5 +1,19 @@
 # Product
 
+## V2 product reset (2026-08-06)
+
+The current product focus is a three-to-five-minute pre-market / post-market
+command center. The first viewport prioritizes Daily Stance, Portfolio Risk,
+recommended 0-150% gross exposure, honest SPY/QQQ gamma corridors, and a
+High-Beta / Defense / Metals / Hedge allocation map. Detailed Macro, rotation,
+gamma and study evidence remain available as drill-down research.
+
+Risk and tactical dip opportunity are separate outputs. The Shock/Event Gate
+may override a dip signal, while Gamma remains structure context rather than a
+directional predictor. Live stance, exposure and allocation are withheld until
+breadth, volatility, credit, leadership and event inputs are aligned. See
+`docs/v2-mvp.md` for the bounded first implementation.
+
 ## North Star
 
 **GammaDesk** is a **read-only macro structure copilot** for a discretionary desk.
