@@ -31,14 +31,6 @@
       "freshness": "fixture"
     },
     {
-      "id": "market_temperature",
-      "status": "unavailable",
-      "sourceLabel": "not_implemented",
-      "note": "Market Temperature is backlog — not computed in this MVP",
-      "provider": "not_implemented",
-      "freshness": "unavailable"
-    },
-    {
       "id": "catalysts",
       "status": "fixture",
       "sourceLabel": "synthetic_fixtures",
@@ -61,15 +53,6 @@
       "sourceLabel": "synthetic_demo",
       "note": "Synthetic demo market quotes",
       "provider": "synthetic_demo",
-      "freshness": "fixture"
-    },
-    {
-      "id": "historical_study",
-      "status": "fixture",
-      "sourceLabel": "fixtures/studies/evidence-bundle.m62.json",
-      "note": "Synthetic demo historical study fixture",
-      "provider": "synthetic_demo",
-      "sessionDate": "2026-07-29",
       "freshness": "fixture"
     }
   ],
@@ -98,10 +81,6 @@
       {
         "text": "Synthetic catalyst headlines in the demo feed — not observed releases.",
         "evidenceIds": ["catalyst.demo-1.headline"]
-      },
-      {
-        "text": "Market Temperature is not available in this MVP.",
-        "evidenceIds": ["macro.label"]
       }
     ],
     "scenarios": {

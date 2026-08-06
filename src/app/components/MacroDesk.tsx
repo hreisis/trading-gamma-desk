@@ -17,7 +17,7 @@ import {
   deriveAssetRiskLight,
   deriveDriverRiskLight,
 } from "@/desk";
-import { CatalystFeed } from "./CatalystFeed";
+import { CatalystFeed } from "./catalyst-feed/CatalystFeed";
 import { DeskChrome } from "./DeskChrome";
 import { DeskStatusBanners } from "./DeskStatusBanners";
 import { GammaDesk } from "./gamma/GammaDesk";

@@ -1,5 +1,4 @@
-import { GITHUB_REPO_URL, PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
-import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
+import { GITHUB_REPO_URL } from "@/desk/public-demo";
 
 function navHref(path: string, demoMode?: boolean): string {
   if (!demoMode) return path;
@@ -13,13 +12,9 @@ export function DeskChrome({
   demoMode,
 }: {
   children: React.ReactNode;
-  activeNav?: "macro" | "decide" | "market" | "ai-study";
+  activeNav?: "macro" | "market" | "ai-study";
   demoMode?: boolean;
 }) {
-  const decideDate = demoMode
-    ? PUBLIC_DEMO_SESSION
-    : resolveCurrentMarketSessionDate();
-
   return (
     <main className="desk">
       <header className="desk-brand">
@@ -32,13 +27,6 @@ export function DeskChrome({
               aria-current={activeNav === "macro" ? "page" : undefined}
             >
               Macro Desk
-            </a>
-            <a
-              className={activeNav === "decide" ? "desk-nav-link is-active" : "desk-nav-link"}
-              href={`/decide?date=${decideDate}`}
-              aria-current={activeNav === "decide" ? "page" : undefined}
-            >
-              Decide
             </a>
             <a
               className={activeNav === "market" ? "desk-nav-link is-active" : "desk-nav-link"}

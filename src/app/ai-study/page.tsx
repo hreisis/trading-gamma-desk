@@ -31,9 +31,8 @@ export default async function AiStudyPage({
           ) : (
             <>
               Current session briefing anchored to today&apos;s US market date
-              (America/New_York) with live Alpaca quotes. Cached macro, gamma,
-              and historical study inputs show their own session/as-of when they
-              lag today.
+              (America/New_York) with live Alpaca quotes. Cached macro and gamma
+              inputs show their own session/as-of when they lag today.
             </>
           )}
         </p>

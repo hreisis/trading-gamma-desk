@@ -204,34 +204,6 @@ export function buildAiStudyEvidenceCorpus(
     );
   });
 
-  if (facts.historicalStudy) {
-    const h = facts.historicalStudy;
-    push(
-      entries,
-      "historical.evidenceStatus",
-      "Historical evidence status",
-      h.evidenceStatus,
-      "historical_study",
-    );
-    push(
-      entries,
-      "historical.primaryHorizon",
-      "Historical primary horizon",
-      h.primaryHorizon,
-      "historical_study",
-    );
-    const matched = h.matchedStudyIds as unknown;
-    if (Array.isArray(matched)) {
-      push(
-        entries,
-        "historical.matchedStudyIds",
-        "Matched study IDs",
-        matched.join(", "),
-        "historical_study",
-      );
-    }
-  }
-
   return entries;
 }
 

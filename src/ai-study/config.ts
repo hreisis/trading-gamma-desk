@@ -4,7 +4,6 @@ import {
   AI_BRIEF_TIMEOUT_MS,
   AI_BRIEF_MAX_RETRIES,
 } from "@/catalyst/briefs/ai/config";
-import { resolveStudyMemoLlmModel } from "@/study-agent/config";
 
 export {
   OPENAI_RESPONSES_URL,
@@ -13,12 +12,13 @@ export {
 
 export const AI_STUDY_MAX_OUTPUT_TOKENS = 1400;
 export const AI_STUDY_PARSE_RETRIES = 2;
+export const AI_STUDY_DEFAULT_LLM_MODEL = "gpt-4.1-mini";
 
 export function resolveAiStudyLlmModel(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   const fromEnv = (env.AI_STUDY_LLM_MODEL ?? "").trim();
-  return fromEnv || resolveStudyMemoLlmModel(env);
+  return fromEnv || AI_STUDY_DEFAULT_LLM_MODEL;
 }
 
 export interface AiStudyLlmRuntimeConfig {

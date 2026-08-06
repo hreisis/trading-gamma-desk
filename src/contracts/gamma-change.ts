@@ -1,13 +1,11 @@
 import { z } from "zod";
 import { IsoDate, IsoDateTime } from "./common";
 import {
-  EstimatedGammaStructure,
   GEX_METHODOLOGY_ID,
   GEX_METHODOLOGY_VERSION,
   GammaRegime,
 } from "./estimated-gamma";
 
-export const GAMMA_SNAPSHOT_SCHEMA_VERSION = "0.1.0";
 export const GAMMA_CHANGE_SET_SCHEMA_VERSION = "0.1.1";
 
 export const GammaPctChange = z.discriminatedUnion("status", [
@@ -30,88 +28,6 @@ export const GammaSnapshotCaptureKind = z.enum([
   "intraday",
   "close",
 ]);
-
-/**
- * Immutable as-of gamma snapshot (M4-2).
- * Embeds the full M4-1 EstimatedGammaStructure; identity is stable and
- * append-only in storage.
- */
-export const GammaHistoricalSnapshot = z
-  .object({
-    kind: z.literal("GammaHistoricalSnapshot"),
-    schemaVersion: z.literal(GAMMA_SNAPSHOT_SCHEMA_VERSION),
-    /** Stable identity: underlying|sessionDate|captureKind|asOf */
-    snapshotId: z.string().min(1),
-    captureKind: GammaSnapshotCaptureKind,
-    capturedAt: IsoDateTime,
-    underlying: z.string().min(1),
-    sessionDate: IsoDate,
-    asOf: IsoDateTime,
-    structureSchemaVersion: z.string().min(1),
-    methodologyId: z.literal(GEX_METHODOLOGY_ID),
-    methodologyVersion: z.literal(GEX_METHODOLOGY_VERSION),
-    structure: EstimatedGammaStructure,
-  })
-  .superRefine((snap, ctx) => {
-    const expectedId = [
-      snap.underlying,
-      snap.sessionDate,
-      snap.captureKind,
-      snap.asOf,
-    ].join("|");
-    if (snap.snapshotId !== expectedId) {
-      ctx.addIssue({
-        code: "custom",
-        message: `snapshotId must match underlying|sessionDate|captureKind|asOf (expected ${expectedId})`,
-        path: ["snapshotId"],
-      });
-    }
-    const s = snap.structure;
-    if (snap.underlying !== s.underlying) {
-      ctx.addIssue({
-        code: "custom",
-        message: "underlying must match structure.underlying",
-        path: ["underlying"],
-      });
-    }
-    if (snap.sessionDate !== s.sessionDate) {
-      ctx.addIssue({
-        code: "custom",
-        message: "sessionDate must match structure.sessionDate",
-        path: ["sessionDate"],
-      });
-    }
-    if (snap.asOf !== s.asOf) {
-      ctx.addIssue({
-        code: "custom",
-        message: "asOf must match structure.asOf",
-        path: ["asOf"],
-      });
-    }
-    if (snap.structureSchemaVersion !== s.schemaVersion) {
-      ctx.addIssue({
-        code: "custom",
-        message: "structureSchemaVersion must match structure.schemaVersion",
-        path: ["structureSchemaVersion"],
-      });
-    }
-    if (snap.methodologyId !== s.methodology.id) {
-      ctx.addIssue({
-        code: "custom",
-        message: "methodologyId must match structure.methodology.id",
-        path: ["methodologyId"],
-      });
-    }
-    if (snap.methodologyVersion !== s.methodology.version) {
-      ctx.addIssue({
-        code: "custom",
-        message: "methodologyVersion must match structure.methodology.version",
-        path: ["methodologyVersion"],
-      });
-    }
-  });
-
-export const GammaBaselineAvailability = z.enum(["available", "unavailable"]);
 
 export const GammaBaselineRef = z.discriminatedUnion("status", [
   z.object({
@@ -210,7 +126,6 @@ export const GammaChangeSet = z.object({
 
 export type GammaSnapshotCaptureKind = z.infer<typeof GammaSnapshotCaptureKind>;
 export type GammaPctChange = z.infer<typeof GammaPctChange>;
-export type GammaHistoricalSnapshot = z.infer<typeof GammaHistoricalSnapshot>;
 export type GammaBaselineRef = z.infer<typeof GammaBaselineRef>;
 export type GammaNumericChange = z.infer<typeof GammaNumericChange>;
 export type GammaRegimeChange = z.infer<typeof GammaRegimeChange>;

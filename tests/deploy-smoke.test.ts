@@ -12,7 +12,6 @@ import {
   SITE_TITLE,
   SITE_TITLE_DEMO,
   formatConfidenceScore,
-  loadDecisionSurface,
   loadPublicDemoDeskView,
   resolveDeskRequest,
 } from "@/desk";
@@ -84,16 +83,5 @@ describe("deploy smoke (public synthetic demo)", () => {
     expect(process.env.TIINGO_TOKEN ?? "").toEqual(expect.any(String));
     const view = resolveDeskRequest({ publicDemo: true });
     expect(view.driver).not.toBeNull();
-  });
-
-  it("loads public demo decision surface without data/", () => {
-    const view = loadDecisionSurface({
-      sessionDate: PUBLIC_DEMO_SESSION,
-      publicDemo: true,
-    });
-    expect(view.status).toBe("ready");
-    expect(view.isPublicDemo).toBe(true);
-    expect(view.research?.evidenceDrillDown).toBeDefined();
-    expect(view.stance?.nonTrade).toBe(true);
   });
 });

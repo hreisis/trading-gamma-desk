@@ -23,11 +23,9 @@ export const AiStudyInputFreshness = z.enum([
 export const AiStudyInputProvenance = z.object({
   id: z.enum([
     "macro",
-    "market_temperature",
     "catalysts",
     "gamma_structure",
     "market_quotes",
-    "historical_study",
   ]),
   status: AiStudyInputStatus,
   sourceLabel: z.string().min(1),

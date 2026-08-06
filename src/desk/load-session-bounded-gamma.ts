@@ -8,7 +8,7 @@ import {
   boundedGammaLatestPath,
   DEFAULT_BOUNDED_GAMMA_DATA_ROOT,
 } from "@/gamma/marketdata-app/paths";
-import type { ArtifactIntegrityIssue } from "@/contracts/decision-surface";
+import type { ArtifactIntegrityIssue } from "@/contracts/artifact-integrity";
 
 export interface SessionBoundedGammaLoadResult {
   readonly snapshot: BoundedGammaProviderSnapshotDto | null;

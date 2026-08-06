@@ -1,7 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadAlpacaMarketPanel } from "@/alpaca";
-import { StudyEvidenceBundle } from "@/contracts";
 import type {
   AiStudyInputProvenance,
   AiStudySessionAlignment,
@@ -17,8 +15,6 @@ import {
 } from "@/desk/production-runtime";
 import { PUBLIC_DEMO_SESSION } from "@/desk/public-demo";
 import { buildMarketStructureStateV2 } from "@/gamma/structure-state-v2";
-import { studyEvidenceBundlePath } from "@/studies/pipeline-store";
-import evidenceFixture from "../../fixtures/studies/evidence-bundle.m62.json";
 import { buildAiStudyEvidenceCorpus } from "./evidence-corpus";
 import {
   isHistoricalAiStudySession,
@@ -29,11 +25,9 @@ import { buildSessionAlignment } from "./validate";
 export interface AiStudyFacts {
   readonly sessionDate: string | null;
   readonly macro: Record<string, unknown> | null;
-  readonly marketTemperature: null;
   readonly catalysts: readonly Record<string, unknown>[];
   readonly gammaStructure: Record<string, unknown> | null;
   readonly marketQuotes: readonly Record<string, unknown>[];
-  readonly historicalStudy: Record<string, unknown> | null;
 }
 
 export interface AiStudyInputPacket {
@@ -412,107 +406,6 @@ async function summarizeMarketQuotes(
   };
 }
 
-function summarizeHistoricalStudy(
-  sessionDate: string | null,
-  publicDemo: boolean,
-  dataRoot: string,
-): {
-  provenance: AiStudyInputProvenance;
-  facts: Record<string, unknown> | null;
-} {
-  if (publicDemo) {
-    const bundle = StudyEvidenceBundle.parse(evidenceFixture);
-    return {
-      provenance: input({
-        id: "historical_study",
-        status: "fixture",
-        sourceLabel: "fixtures/studies/evidence-bundle.m62.json",
-        note: "Synthetic demo historical study fixture",
-        provider: "synthetic_demo",
-        sessionDate: PUBLIC_DEMO_SESSION,
-        fetchedAt: null,
-        freshness: "fixture",
-      }),
-      facts: {
-        sessionDate: PUBLIC_DEMO_SESSION,
-        evidenceStatus: bundle.evidenceStatus,
-        primaryHorizon: bundle.primaryHorizon,
-        cohortQuality: bundle.cohortQuality,
-        matchedStudyIds: bundle.cohortQuality.matchedStudyIds,
-        horizonSummary: {
-          d1: bundle.horizonEvidence.d1?.aggregate?.status,
-          d5: bundle.horizonEvidence.d5?.aggregate?.status,
-          d20: bundle.horizonEvidence.d20?.aggregate?.status,
-        },
-      },
-    };
-  }
-
-  const date = sessionDate ?? "";
-  const path = date
-    ? studyEvidenceBundlePath(dataRoot, date, "SPY")
-    : null;
-  if (!path || !existsSync(path)) {
-    return {
-      provenance: input({
-        id: "historical_study",
-        status: "unavailable",
-        sourceLabel: "local_store",
-        note: sessionDate
-          ? `No evidence bundle at data/studies/evidence/${sessionDate}/SPY/`
-          : "Session date unknown — cannot resolve historical study",
-        provider: "local_store",
-        sessionDate: sessionDate,
-        fetchedAt: null,
-        freshness: "unavailable",
-      }),
-      facts: null,
-    };
-  }
-  try {
-    const bundle = StudyEvidenceBundle.parse(
-      JSON.parse(readFileSync(path, "utf8")),
-    );
-    return {
-      provenance: input({
-        id: "historical_study",
-        status: "available",
-        sourceLabel: path,
-        provider: "local_store",
-        sessionDate: date,
-        fetchedAt: bundle.computedAt,
-        freshness: "cached",
-      }),
-      facts: {
-        sessionDate: date,
-        evidenceStatus: bundle.evidenceStatus,
-        primaryHorizon: bundle.primaryHorizon,
-        cohortQuality: bundle.cohortQuality,
-        matchedStudyIds: bundle.cohortQuality.matchedStudyIds,
-        horizonSummary: {
-          d1: bundle.horizonEvidence.d1?.aggregate?.status,
-          d5: bundle.horizonEvidence.d5?.aggregate?.status,
-          d20: bundle.horizonEvidence.d20?.aggregate?.status,
-        },
-      },
-    };
-  } catch {
-    return {
-      provenance: input({
-        id: "historical_study",
-        status: "unavailable",
-        sourceLabel: path,
-        note: "Evidence bundle present but invalid",
-        provider: "local_store",
-        sessionDate: date,
-        fetchedAt: null,
-        freshness: "unavailable",
-      }),
-      facts: null,
-    };
-  }
-}
-
 export interface CollectAiStudyInputsOptions {
   readonly env?: NodeJS.ProcessEnv;
   readonly now?: Date;
@@ -554,34 +447,20 @@ export async function collectAiStudyInputs(
   const gamma = summarizeGamma(publicDemo, targetSession, dataRoot);
   const quotes = await summarizeMarketQuotes(publicDemo, now);
   const sessionDate = targetSession;
-  const historical = summarizeHistoricalStudy(sessionDate, publicDemo, dataRoot);
 
   const inputs: AiStudyInputProvenance[] = [
     macro.provenance,
-    input({
-      id: "market_temperature",
-      status: "unavailable",
-      sourceLabel: "not_implemented",
-      note: "Market Temperature is backlog — not computed in this MVP",
-      provider: "not_implemented",
-      sessionDate: null,
-      fetchedAt: null,
-      freshness: "unavailable",
-    }),
     catalysts.provenance,
     gamma.provenance,
     quotes.provenance,
-    historical.provenance,
   ];
 
   const facts: AiStudyFacts = {
     sessionDate,
     macro: macro.facts,
-    marketTemperature: null,
     catalysts: catalysts.facts,
     gammaStructure: gamma.facts,
     marketQuotes: quotes.facts,
-    historicalStudy: historical.facts,
   };
 
   const sessionAlignment = buildSessionAlignment({

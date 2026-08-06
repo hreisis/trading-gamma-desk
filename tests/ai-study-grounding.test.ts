@@ -20,11 +20,9 @@ describe("validateAiStudyReport", () => {
         interpretation: "Macro interpretation from packet.",
         assets: [],
       },
-      marketTemperature: null,
       catalysts: [],
       gammaStructure: null,
       marketQuotes: [],
-      historicalStudy: null,
     },
     [],
   );
@@ -116,11 +114,9 @@ describe("validateAiStudyReport", () => {
             },
           ],
         },
-        marketTemperature: null,
         catalysts: [],
         gammaStructure: null,
         marketQuotes: [],
-        historicalStudy: null,
       },
       [],
     );

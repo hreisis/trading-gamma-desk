@@ -1,20 +1,14 @@
 # GammaDesk
 
-**Study-backed market decision agent.**
+**Read-only macro structure copilot.**
 
-Decision loop: **Observe → Research → Evaluate → Decide → Review**
+Module chain: **Driver → Catalyst → Structure → Confirmation → Updated View**
 
-Module chain (deterministic compute → interpreted outputs): **Driver → Catalyst → Structure → Confirmation → Updated View**
+**Shipped surfaces:** Macro Desk (regime + SPY/QQQ bounded gamma + tier-1 catalysts), Market (live Alpaca quotes), AI Study (daily briefing from current real inputs).
 
-**Shipped (M1–M8):** read-only Macro Desk (`DominantDriver`), Catalyst evidence chain (fixtures in public demo; locally, official US macro **release schedules** from BLS + BEA + Federal Reserve FOMC), Structure·Gamma desk section, deterministic strategy research + constrained study memo pipeline (`studies:build`, `studies:pipeline`, `studies:memo`), and the **Decision surface** at `/decide?date=` (Observe → Research → Evaluate → Decide). UI renders precomputed payloads — it does not classify markets or recompute scores.
-
-**Next public milestone (M9):** shadow mode / review loop — decision logs and outcome compare in the **private repository**. **M7** private portfolio policy remains a **separate private-repo** track.
-
-**Public vs private:** this repo ships **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio data, allocation policy, and decision logs live in a **separate private repository** (`.gitignore` here is secondary local protection, not the primary boundary).
+**Public vs private:** this repo ships **contracts, methodology, interfaces, and synthetic examples only**. Private thresholds, portfolio data, allocation policy, and decision logs live in a **separate private repository**.
 
 **Public portfolio demo:** **Synthetic Demo Data — illustrative, not market data.** All demo research uses bundled fixtures only; never reads `data/`. Repository: [hreisis/trading-gamma-desk](https://github.com/hreisis/trading-gamma-desk).
-
-**Study validation status:** M8 ships the decision UI and pipeline wiring. Local acceptance on 2026-07-29 confirms non-demo `/decide` loads `data/` artifacts, but the default non-demo pipeline manifest still uses fixture-backed Study archive and peer corpus. **M8-5a** adds real Tiingo SPY bars + exact-date `StudyPriceSeries` (`studies:ingest-prices`). **M8-5b** adds offline builders for a real PIT multi-session archive and peer corpus from local `data/` — **not wired into default pipeline**; real historical Study validation is **not claimed as passed** (M8-5c required).
 
 ### Regime vs catalyst vs confidence
 
@@ -83,7 +77,7 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 
 **Portfolio market panel:** open [`/market`](http://localhost:3000/market) for SPY, QQQ, BTC/USD, and optional `ALPACA_WATCHLIST` symbols via Alpaca snapshots. Missing `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY` shows **Alpaca not configured** — no Tiingo or desk fixture fallback on this surface. Public demo serves labelled synthetic quotes only. Free/paper accounts should set `CATALYST_MARKET_FEED=iex` in local `.env` (SIP requires paid entitlement).
 
-**Market news:** open [`/news`](http://localhost:3000/news) for recent headlines via the Alpaca News API (`/v1beta1/news`) when `APCA_*` is configured. Sections cover macro (general feed), SPY/QQQ, crypto (`BTC/USD`), and optional watchlist symbols. No AI summarization — headline, source, timestamp, symbols, and link only. Missing credentials show explicit unavailable states; stale headlines are labelled, not hidden. Public demo serves `fixtures/news/public-demo.news.json` only — never calls Alpaca or exposes keys.
+**AI Study:** open [`/ai-study`](http://localhost:3000/ai-study) for a daily briefing from current macro, catalyst, bounded gamma, and market quotes when `OPENAI_API_KEY` is configured locally. Public demo serves `fixtures/ai-study/public-demo.briefing.json` only — never calls OpenAI or live providers.
 
 | Command | Purpose |
 | --- | --- |
@@ -103,10 +97,10 @@ Leave `GAMMADESK_PUBLIC_DEMO` **unset** locally so `npm run daily`, `catalyst:fe
 | `npm run smoke:demo` | Public-demo + deploy smoke tests |
 | `npm run smoke:demo:prod` | Public-demo `next build` + `next start` HTTP smoke |
 | `/market` | Portfolio watchlist — Alpaca when `APCA_*` configured; synthetic fixtures in public demo |
-| `/news` | Market headlines — Alpaca News when `APCA_*` configured; synthetic fixtures in public demo |
+| `/ai-study` | AI market briefing — OpenAI when `OPENAI_API_KEY` configured locally; synthetic fixture in public demo |
 | `GET /api/alpaca/health` | Alpaca credential + connectivity status |
 | `GET /api/alpaca/market` | Watchlist quotes JSON for the Market panel |
-| `GET /api/news` | Market headlines JSON for the News panel |
+| `GET /api/ai-study` | AI Study briefing JSON |
 | `npm test` / `npm run typecheck` / `npm run build` | Verify |
 
 ### Official US macro calendar (M2-2A)
@@ -181,16 +175,13 @@ npm run catalyst:update -- --max-events 2
 | `/?source=live` | Live only — empty if no drivers (no silent fixture). **Public demo:** macro page shows **Live data unavailable**; Catalyst UI is hidden on that page. `/api/catalysts` still returns `synthetic_demo` (API has no `?source=` gate) — intentional until a later M3 split. |
 | `/api/macro/latest` | Same view model as JSON |
 | `/api/catalysts` | Public `CatalystFeed` DTO (`?category=&status=&importance=&asset=&start=&end=`) — no cache paths, raw provider errors, or AI token usage |
-| `/decide?date=2026-07-29` | **M8 decision surface** — Observe + deterministic study evidence + auditable drill-down + AI memo + policy slot + non-trade stance; public demo uses fixtures only; **exact date required** (no latest) |
 | `/market` | Portfolio watchlist — Alpaca when `APCA_*` configured; synthetic fixtures in public demo |
-| `/news` | Market headlines — Alpaca News when `APCA_*` configured; synthetic fixtures in public demo |
 | `/ai-study` | AI market briefing — OpenAI when `OPENAI_API_KEY` configured locally; synthetic fixture in public demo |
 | `/api/alpaca/health` | Alpaca credential + connectivity status (synthetic unavailable in public demo) |
 | `/api/alpaca/market` | Watchlist quotes JSON for the Market panel |
-| `/api/news` | Market headlines JSON for the News panel |
 | `/api/ai-study` | AI Study briefing JSON |
 
-Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md). Decision surface demo: `/decide?date=2026-07-29`.
+Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md).
 
 ---
 
@@ -281,30 +272,9 @@ Do not commit tokens, Tiingo bars, or generated `data/`. Do not put `TIINGO_TOKE
 | **M1** Macro (M1-11) | ✅ |
 | **M2** Catalyst / events (M2-5B; Alpaca live smoke deferred) | ✅ |
 | **M3** Catalyst UI + risk lights (M3-1.5) | ✅ |
-| **M4** Gamma snapshots / features (M4-1…M4-4) | ✅ |
-| **M5** Strategy research / replay / regime (M5-1A…M5-4) | ✅ |
-| **M6** Constrained LLM study agent (M6-1…M6-4) | ✅ |
+| **M4** Gamma bounded provider + Structure·Gamma UI | ✅ |
+| **AI Study** | ✅ Shipped — `/ai-study` briefing from live inputs when configured |
 | **M7** Private portfolio policy | Planned (private repo) |
-| **M8** Minimal decision interface (M8-1…M8-4) | ✅ |
-| **M9** Shadow mode / review loop | **Next** (private repo) |
+| **M9** Shadow mode / review loop | Planned (private repo) |
 
-Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope for the catalyst chain. Market Temperature stays in the backlog. See [product](docs/product.md) and [tasks](docs/tasks.md) for the full M4–M9 plan.
-
-### Strategy research & study memos (M5–M6)
-
-Deterministic PIT research and constrained LLM memos — **offline/fixture path**; no scheduler; no trade advice.
-
-```bash
-npm run studies:build -- --date 2026-07-29 --manifest fixtures/studies/sources.m51b.json
-npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
-npm run studies:ingest-prices -- --date 2026-08-29   # real SPY price series (requires ingest + TIINGO_TOKEN)
-npm run studies:inventory-archive -- --through 2026-08-03   # inventory local PIT archive candidates (offline)
-npm run studies:build-archive -- --through 2026-08-03       # build real archive + peer corpus (offline; gitignored data/)
-npm run studies:memo -- --date 2026-07-29 --bundle fixtures/studies/evidence-bundle.m62.json
-```
-
-- **Exact date required** — no latest-fallback on any studies CLI.
-- **Real archive (M8-5b):** `studies:inventory-archive` and `studies:build-archive` require `--through YYYY-MM-DD`; write `data/studies/archive/{sessionDate}/daily-research.json` (eligible sessions only) and `data/studies/profiles/{throughDate}/peer-corpus.json`. Demo/CI and `pipeline.m64.json` remain fixture-backed until **M8-5c**.
-- **Pipeline (M6-4):** archive → definition → outcomes → similar regime → evidence bundle → validated memo (rule-based by default; OpenAI optional on memo-only path when key set).
-- **Outputs:** gitignored `data/studies/` (archive, definitions, outcomes, evidence, memos, pipeline run record).
-- **Tests:** fake narrator / rule-based fallback — CI never calls OpenAI. Integration smoke (`studies:memo:smoke`) is manual opt-in.
+Consensus/surprise, BEA results series, free-form LLM over full documents, hawkish/dovish inference, and schedulers remain out of scope for the catalyst chain. See [product](docs/product.md) and [tasks](docs/tasks.md).

@@ -231,9 +231,7 @@ export function buildSessionAlignment(input: {
   const conflicts: string[] = [];
   const target = input.targetSessionDate;
 
-  const sources = input.inputs
-    .filter((i) => i.id !== "market_temperature")
-    .map((i) => ({
+  const sources = input.inputs.map((i) => ({
       id: i.id,
       sessionDate: i.sessionDate ?? null,
       fetchedAt: i.fetchedAt ?? null,
@@ -263,16 +261,6 @@ export function buildSessionAlignment(input: {
     ) {
       conflicts.push(
         `macro ${macro.sessionDate} != gamma ${gamma.sessionDate}`,
-      );
-    }
-    const historical = sources.find((s) => s.id === "historical_study");
-    if (
-      historical?.sessionDate &&
-      historical.sessionDate !== target &&
-      historical.freshness === "cached"
-    ) {
-      conflicts.push(
-        `historical_study sessionDate ${historical.sessionDate} != target ${target}`,
       );
     }
   }

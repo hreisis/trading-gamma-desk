@@ -1,7 +1,7 @@
 import { AiStudyNarratorRawOutput } from "@/contracts/ai-study-briefing";
 import type { AiStudyLlmUsage } from "@/contracts/ai-study-briefing";
 import type { FetchLike } from "@/ingest/http";
-import { extractOutputText, parseUsage } from "@/study-agent/openai-narrator";
+import { extractOutputText, parseUsage } from "./openai-utils";
 import type { AiStudyLlmRuntimeConfig } from "./config";
 import { OPENAI_RESPONSES_URL } from "./config";
 import type { AiStudyInputPacket } from "./collect-inputs";

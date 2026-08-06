@@ -90,16 +90,19 @@ function mockOpenAiSuccess(
 }
 
 describe("collectAiStudyInputs", () => {
-  it("labels market temperature unavailable and public demo fixtures", async () => {
+  it("loads public demo fixtures for macro, catalysts, gamma, and quotes", async () => {
     const packet = await collectAiStudyInputs({
       publicDemo: true,
     });
 
-    expect(
-      packet.inputs.find((i) => i.id === "market_temperature")?.status,
-    ).toBe("unavailable");
     expect(packet.inputs.find((i) => i.id === "macro")?.status).toBe("fixture");
-    expect(packet.inputs.find((i) => i.id === "historical_study")?.status).toBe(
+    expect(packet.inputs.find((i) => i.id === "catalysts")?.status).toBe(
+      "fixture",
+    );
+    expect(packet.inputs.find((i) => i.id === "gamma_structure")?.status).toBe(
+      "fixture",
+    );
+    expect(packet.inputs.find((i) => i.id === "market_quotes")?.status).toBe(
       "fixture",
     );
     expect(JSON.stringify(packet.facts)).not.toContain("invented");

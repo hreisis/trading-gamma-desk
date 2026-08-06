@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DominantDriver, type DominantDriver as DominantDriverType } from "@/contracts";
 import { isSessionStale } from "./load-macro-desk";
-import type { ArtifactIntegrityIssue } from "@/contracts/decision-surface";
+import type { ArtifactIntegrityIssue } from "@/contracts/artifact-integrity";
 
 export interface SessionDriverLoadResult {
   readonly driver: DominantDriverType | null;

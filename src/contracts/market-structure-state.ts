@@ -1,27 +1,13 @@
 import { z } from "zod";
-import { IsoDate, IsoDateTime } from "./common";
 import {
-  ESTIMATED_GAMMA_SCHEMA_VERSION,
-  GammaAvailability,
-  GammaDataDelay,
-  GammaRegime,
-  GEX_METHODOLOGY_ID,
-  GEX_METHODOLOGY_VERSION,
-} from "./estimated-gamma";
-import {
-  GAMMA_CHANGE_SET_SCHEMA_VERSION,
-  GAMMA_SNAPSHOT_SCHEMA_VERSION,
   GammaBaselineRef,
   GammaChangeMetrics,
   GammaPctChange,
   GammaRegimeChange,
-  GammaSnapshotCaptureKind,
-} from "./gamma-snapshot";
+} from "./gamma-change";
 
-export const MARKET_STRUCTURE_STATE_SCHEMA_VERSION = "0.1.0";
 export const MARKET_STRUCTURE_FEATURE_METHODOLOGY_ID =
   "gamma_feature_layer_v1" as const;
-export const MARKET_STRUCTURE_FEATURE_METHODOLOGY_VERSION = "0.1.0";
 
 /**
  * Spot position relative to available put/call walls.
@@ -128,7 +114,7 @@ export const DirectedChange = z.discriminatedUnion("status", [
 
 /**
  * Change features for one baseline (prior-close or session-open).
- * Preserves M4-2 numeric metrics + unavailable reasons; adds directions.
+ * Preserves numeric metrics + unavailable reasons; adds directions.
  */
 export const StructureBaselineFeatures = z.object({
   baseline: GammaBaselineRef,
@@ -137,48 +123,7 @@ export const StructureBaselineFeatures = z.object({
   callWallShiftDirection: DirectedChange,
   putWallShiftDirection: DirectedChange,
   zeroDteShareOfGrossGexDirection: DirectedChange,
-  /** Exact M4-2 metrics (including nested pct unavailable). */
   metrics: GammaChangeMetrics,
-});
-
-export const MarketStructureCurrentFeatures = z.object({
-  gammaRegime: GammaRegime,
-  spotWallCorridor: SpotWallCorridor,
-  distanceToCallWall: WallDistance,
-  distanceToPutWall: WallDistance,
-  zeroDteShareOfGrossGex: ZeroDteShareFeature,
-  coverageRatio: CoverageRatio,
-  structureStatus: GammaAvailability,
-  dataDelay: GammaDataDelay,
-  synthetic: z.boolean(),
-  limitations: z.array(z.string()),
-});
-
-/**
- * Deterministic desk-ready gamma features (M4-3).
- * Derived from one GammaHistoricalSnapshot + matching GammaChangeSet.
- * Not a directional forecast; no compression/amplification claims; no scores.
- */
-export const MarketStructureState = z.object({
-  kind: z.literal("MarketStructureState"),
-  schemaVersion: z.literal(MARKET_STRUCTURE_STATE_SCHEMA_VERSION),
-  snapshotId: z.string().min(1),
-  underlying: z.string().min(1),
-  sessionDate: IsoDate,
-  asOf: IsoDateTime,
-  captureKind: GammaSnapshotCaptureKind,
-  methodologyId: z.literal(GEX_METHODOLOGY_ID),
-  methodologyVersion: z.literal(GEX_METHODOLOGY_VERSION),
-  featureMethodologyId: z.literal(MARKET_STRUCTURE_FEATURE_METHODOLOGY_ID),
-  featureMethodologyVersion: z.literal(
-    MARKET_STRUCTURE_FEATURE_METHODOLOGY_VERSION,
-  ),
-  sourceSnapshotSchemaVersion: z.literal(GAMMA_SNAPSHOT_SCHEMA_VERSION),
-  sourceChangeSetSchemaVersion: z.literal(GAMMA_CHANGE_SET_SCHEMA_VERSION),
-  sourceStructureSchemaVersion: z.literal(ESTIMATED_GAMMA_SCHEMA_VERSION),
-  current: MarketStructureCurrentFeatures,
-  versusPriorClose: StructureBaselineFeatures,
-  versusSessionOpen: StructureBaselineFeatures,
 });
 
 export type SpotWallCorridorPosition = z.infer<typeof SpotWallCorridorPosition>;
@@ -191,7 +136,3 @@ export type DirectedChange = z.infer<typeof DirectedChange>;
 export type StructureBaselineFeatures = z.infer<
   typeof StructureBaselineFeatures
 >;
-export type MarketStructureCurrentFeatures = z.infer<
-  typeof MarketStructureCurrentFeatures
->;
-export type MarketStructureState = z.infer<typeof MarketStructureState>;

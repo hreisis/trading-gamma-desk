@@ -4,16 +4,11 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 ## Current focus
 
-**Milestone 6 — Constrained LLM study agent (✅ complete through M6-4).** M5-3/M5-4 and M6-1…M6-4 shipped: deterministic similar-regime evidence, constrained memo agent, integration smoke, and end-to-end `studies:pipeline`. **M6 exit criteria satisfied** (see below).
+**Simplified MVP — three surfaces only:** Macro Desk · Market · AI Study.
 
-**Next public milestone:** **M9 — Shadow mode / review loop** (private repo). **M8 — Minimal decision interface** is ✅ complete (M8-1…M8-4). **M7** private policy remains a separate private-repo track.
+Removed from this repo: Historical Study pipeline, Decide surface, Alpaca News panel, and related study fixtures/tests.
 
-### Queued (not started)
-
-| Item | Notes |
-| --- | --- |
-| **Market Temperature (experimental)** | Deterministic 0–100 risk-on/risk-off summary derived from the canonical snapshot, displayed separately from Signal Confidence, with a five-session trend. Spec only — do not implement until scheduled. |
-| **Catalyst → regime linkage** | Later milestone — do not mix catalyst direction into DominantDriver confidence in M2-1. |
+**Queued (not started):** Market risk indicator — simple 0–100 score + green/yellow/red from current Macro + Gamma + market signals (spec only; do not implement until scheduled).
 
 ### M1-6b calibration status (split)
 
@@ -46,23 +41,7 @@ Living build plan. Update status as work lands. Definition of done for each phas
 | 0.2.2 | Flags split into `insufficientHistory`, `missingAdjacentSession`, `repeatedPrints`, `invalidPrice`; `gapSkipped` removed | These fail for different reasons and need different fixes; `gapSkipped` also implied bridging a gap was acceptable |
 | 0.2.2 | `window.validCount` may be shorter than `length`, with `sessionDates` matching `validCount` | An insufficient-history feature was literally unrepresentable under 0.2.1, which surfaced while implementing M1-3 |
 | 0.1.1 | `EstimatedGammaStructure` + `oi_gex_proxy_v1` methodology | Renamed `zeroDte.shareOfAbsStrikeGex` → `shareOfGrossGex` (gross 0DTE / gross total); Zod validates [0, 1]; fixture provider returns null for missing files, throws on malformed parse |
-| 0.1.0 | `GammaHistoricalSnapshot` + `GammaChangeSet` (M4-2) | Immutable as-of snapshots with explicit `captureKind`; append-only store; prior-close / session-open change metrics with explicit unavailable |
-| 0.1.1 | `GammaChangeSet` (M4-2A) | Snapshot envelope/structure invariants; instant-ordered baselines; O_EXCL append; `pctChange` explicit unavailable when baseline is zero |
-| 0.1.0 | `GammaHistoricalSnapshot` store (M4-2B) | Same-dir temp + fsync + hard-link publication; final visible only when complete; temp cleanup on success/failure |
-| 0.1.0 | `GammaHistoricalSnapshot` store (M4-2C) | Collision-safe temp names; temp cleanup on write/fsync failure; async subprocess concurrency tests |
-| 0.1.0 | `MarketStructureState` (M4-3) | Desk-ready features from matched snapshot + change set; wall corridor; directed changes; no scores/signals |
 | 0.2.0 | `MarketStructureState` (M4-3C) | Bounded-aware interpretation layer from `BoundedGammaProviderSnapshot` + optional `GammaChangeSet`; condition taxonomy; evidence + plain-English interpretation; flip never fabricated |
-| 0.1.0 | `ReplayCorpus` + `ReplayRun` (M5-1A) | Point-in-time frames from stored macro/structure/catalyst artifacts; instant-ordered eligibility; no lookahead |
-| 0.1.0 | `DailyResearchArchive` (M5-1B) | Exact-date PIT archive with component provenance, conservative eligibility, embedded corpus+replayRun; atomic gitignored store |
-| 0.1.0 | `StudyDefinition` + `StudyForwardOutcome` (M5-2) | PIT study anchor + separate forward 1D/5D/20D returns, MFE/MAE, maturity; never merged into replay inputs |
-| 0.1.0 | `StudyMatchProfile` + `SimilarRegimeStudy` (M5-3) | Explicit PIT macro/catalyst/gamma match fields; deterministic similar-regime aggregates; outcomes never affect matching |
-| 0.1.0 | `StudyEvidenceBundle` (M5-4) | Deterministic evidence rollup from similar-regime study; explicit status rules; cohort quality + source refs; not a trade signal |
-| 0.1.0 | `StudyMemo` (M6-1) | Constrained LLM memo from evidence bundle only; separated evidence/inference/limitations/unknowns; citation + guardrail validation |
-| 0.1.0 | Study memo workflow & CLI (M6-2) | `runStudyMemoWorkflow`; exact `--date` + `--bundle`; OpenAI or rule-based fallback; atomic memo store |
-| 0.1.0 | Study memo integration smoke (M6-3) | `StudyMemoIntegrationSmokeReport`; live dry-run + offline fake narrator; `sectionCounts` from validated memo |
-| 0.1.0 | End-to-end study pipeline (M6-4) | `StudyPipelineManifest` + `runStudyPipeline`; archive → memo; atomic writes under `data/studies/` |
-| 0.2.0 | `DecisionSurfaceView` (M8-2) | Exact-date study artifact loading; `DecisionEvidenceSummary`, `ArtifactIntegrityIssue`, display-only strength; stance suppression on integrity failure |
-
 ---
 
 ## Phase 0 — Foundation
@@ -138,146 +117,17 @@ Assets: Gold, Copper, BTC, Oil, US 2Y, US 10Y, USD proxy, VIX. No Gamma, no Clos
 | M4-1 | Estimated Gamma Structure Engine | Provider-neutral options chain port + fixture provider; OI-based Call/Put/Total GEX; Positive/Negative/near_zero regime; Call/Put walls; expiry + 0DTE breakdown; Flip contract-only unavailable (no strike interpolation); methodology/asOf/dataDelay/source/status on every output; pure functions + boundary tests; no UI / no live API / no Macro-Catalyst changes — ✅ |
 | M4-1A | GEX correctness hardening | OI=0/gamma=0 valid; gross GEX near-zero + 0DTE share; strict fixture parse; partial if wall missing; no fabricated all-zero walls; documented wall tie-break — ✅ |
 | M4-1B | Contract cleanup | Bump `EstimatedGammaStructure` / methodology to 0.1.1; `shareOfGrossGex` [0,1] + float tolerance; fixture missing→null / malformed→throw with path — ✅ |
-| M4-2 | Historical Snapshot & Change Engine | Immutable as-of gamma snapshots; prior-close and since-open comparisons; explicit `unavailable` when baseline missing; no overwrite of prior snapshots, no hindsight fill; fixture path + tests; no UI / no live options API — ✅ |
-| M4-2A | Snapshot integrity hardening | Envelope/structure invariants; instant-ordered baselines; zero-baseline pct unavailable; safe ID/path encoding; focused tests — ✅ |
-| M4-2B | Atomic snapshot publication | Same-dir temp + fsync + hard-link; no partial visibility; temp cleanup on link/idempotency/conflict — ✅ |
-| M4-2C | Atomic-publication test/failure cleanup | Async subprocess writers; concurrent reader poll; either-wins conflict; injectable write failure cleanup — ✅ |
-| M4-3 | Gamma Feature Layer | Deterministic desk-ready features + `MarketStructureState` 0.1.0 from matched snapshot + change set; wall corridor; directed changes; fixture + tests; no UI / scores / signals — ✅ |
 | M4-3B | Bounded MarketData.app Gamma provider | Credit-capped CLI `npm run gamma:fetch` (one symbol / one expiry / explicit strikes); normalize + Greek quality + engine → `BoundedGammaProviderSnapshot`; mocked tests only; no UI / no daily integration — ✅ |
 | M4-3C | Gamma Feature Layer (bounded interpretation) | Deterministic `MarketStructureState` 0.2.0 from bounded provider snapshot + optional compatible `GammaChangeSet`; condition taxonomy; evidence + interpretation; preserve bounded wall scope; no flip fabrication; no live API / no UI redesign — ✅ |
 | M4-4 | Gamma Desk UI v1 | Read-only Structure·Gamma section from bounded snapshot; empty/malformed states; bounded wall labeling; strike GEX chart; fixture + SSR tests; no live API / no daily integration — ✅ |
 
-**Exit criteria (M4):** Fixture path produces immutable gamma snapshots, honest change comparisons, and a desk-ready structure state; compute remains deterministic and separate from LLM.
+**Exit criteria (M4):** Bounded gamma provider + desk-ready `MarketStructureState` v0.2.0; compute remains deterministic and separate from LLM.
 
 ---
 
-## Milestone 5 — Strategy research / replay / regime
+## Removed milestones (M5–M8)
 
-| ID | Task | Done when |
-| --- | --- | --- |
-| M5-1A | Point-in-time replay foundation | Versioned `ReplayCorpus` / `ReplayFrame` / `ReplayRun`; latest compatible eligible artifact per source; catalyst only after publishedAt; instant ordering; no lookahead; fixture + tests — ✅ |
-| M5-1B | PIT research archive + exact-date offline replay | `DailyResearchArchive` + `StudySourcesManifest`; component provenance; conservative eligibility; atomic write to `data/studies/archive/{date}/daily-research.json`; `studies:build` / `studies:replay` CLIs; reuses M5-1A `ReplayCorpus`/`ReplayRun`; fixture + tests; no network / no latest-fallback — ✅ |
-| M5-2 | Study definitions + forward outcomes | `StudyDefinition` + `StudyForwardOutcome`; trading-session 1D/5D/20D adjClose returns, MFE/MAE, maturity; PIT/outcome separation; fixture + tests; no network / no latest-fallback — ✅ |
-| M5-3 | Deterministic similar-regime study | `StudyMatchProfile` + `SimilarRegimeStudy`; exact PIT field matching (macro/catalyst/gamma); mature 1D/5D/20D aggregates; outcomes never affect matching; fixture + tests; no network / no ML — ✅ |
-| M5-4 | Deterministic evidence bundle | `StudyEvidenceBundle` from M5-3; query context, cohort quality, horizon evidence, explicit status rules (`supported`/`mixed`/`not_supported`/`insufficient_evidence`); source refs + preserved warnings; fixture + tests; no LLM / no trade signals — ✅ |
-
-**Exit criteria (M5):** Operator can run deterministic regime/replay studies from fixtures without LLM or live vendors. **✅ Satisfied** (M5-1A…M5-4).
-
----
-
-## Milestone 6 — Constrained LLM study agent
-
-| ID | Task | Done when |
-| --- | --- | --- |
-| M6-1 | Study memo contract + guardrails | `StudyMemo` from `StudyEvidenceBundle` only; prompt builder, provider interface, citation validation, abstain on insufficient evidence; mocked offline tests — ✅ |
-| M6-2 | End-to-end study memo workflow | `runStudyMemoWorkflow` + `studies:memo` CLI; exact `--date` + `--bundle`; OpenAI when configured else rule-based fallback; atomic write to `data/studies/memos/{date}/study-memo.json`; offline tests — ✅ |
-| M6-3 | Integration smoke | `studies:memo:smoke` live dry-run + offline fake narrator; `StudyMemoIntegrationSmokeReport` with `sectionCounts` from validated memo; gitignored `data/studies/memo-integration-smoke-latest.json` — ✅ |
-| M6-4 | End-to-end study pipeline | `studies:pipeline` chains archive → definition → outcomes → similar regime → evidence bundle → validated memo; explicit `--date` + `--manifest`; atomic writes under `data/studies/`; offline tests — ✅ |
-
-**Exit criteria (M6):** LLM produces study briefs/decision memos from cited deterministic inputs only; validation failures never silently pass. **✅ Satisfied** — evidence bundle is the sole LLM input; local validation rejects bad citations/numbers/prohibited language; `rejected`/`unavailable` fall back to rule-based memo or abstain; integration smoke + offline tests cover the path; no trade advice in contracts or guardrails.
-
-**Post-M6 (deferred):** M6-5+ optional enhancements (e.g. full-chain live smoke UI wiring) — not required for M6 exit.
-
----
-
-## Milestone 7 — Private portfolio policy
-
-**Status:** Planned — **separate private repository**; does not block public **M8** work.
-
-| ID | Task | Done when |
-| --- | --- | --- |
-| M7-1 | Policy contract (private repo) | Thresholds, sizing, allocation rules, instrument universe — separate private repository, not this repo |
-| M7-2 | Policy evaluator | Pure function: evidence + policy → allowed stance/constraints; no LLM |
-| M7-3 | Public boundary tests | Public repo/build contains only contracts, methodology, interfaces, synthetic examples; never bundles or reads private policy |
-
-**Exit criteria (M7):** Decide stage runs against policy in the private repo; public repo remains portfolio-safe.
-
----
-
-## Milestone 8 — Minimal decision interface
-
-**Status:** ✅ **Complete** (M8-1…M8-4).
-
-| ID | Task | Done when |
-| --- | --- | --- |
-| M8-1 | Decision surface | `/decide?date=` SSR viewport: Observe (driver/catalyst/structure) + StudyMemo research w/ citations + public policy-unavailable slot + deterministic non-trade stance; fixture-only; exact date — ✅ |
-| M8-2 | Uncertainty + study artifacts | Non-demo `/decide` loads exact-date driver, structure, `StudyEvidenceBundle`, and `StudyMemo` from `data/`; deterministic evidence panel (status, cohort, horizons, MFE/MAE, limitations); display-only strength; memo provenance labels; artifact integrity errors; stance suppressed on study integrity failure; demo stays fixture-only — ✅ |
-| M8-3 | Evidence path | Expandable auditable drill-down on `/decide`: full horizons + MFE/MAE, matched sessions, match/similarity fields, limitations/unknowns, memo citation resolution — ✅ |
-| M8-4 | UI polish + smoke | Portfolio-ready hierarchy, ribbons/badges, responsive layout, nav to `/decide`, keyboard/semantic expandables, representative state smoke tests, deploy smoke — ✅ |
-
-**Exit criteria (M8):** Operator can Evaluate → Decide from one minimal UI without dashboard clutter. **Satisfied.**
-
-### M8 local acceptance (2026-07-29) — pipeline wiring only
-
-**Does not validate real historical Study research.** Documents non-demo `/decide` loading genuine `data/` pipeline outputs when present.
-
-| Layer | Result |
-| --- | --- |
-| Macro driver | ✅ Real — `data/drivers/2026-07-29.json` (Tiingo daily ingest) |
-| Catalysts | ✅ Real cached schedules/results in `data/catalyst/` |
-| Bounded structure | ❌ Unavailable for exact date — gamma snapshot `sessionDate` 2026-07-30 ≠ query 2026-07-29 → `/decide` status `partial` |
-| Study archive | ❌ Fixture — `fixtures/studies/archive/2026-07-29/daily-research.json` |
-| Peer corpus | ❌ Fixture — single peer from `fixtures/studies/profiles/peer-m64.json` |
-| SPY outcomes (1D/5D/20D) | Real prices available via M8-5a (`studies:ingest-prices`); acceptance manifest still uses fixture `spy.m52.json` |
-| Cohort | n=1 matched peer (`2026-07-22`); 1 mature sample per horizon |
-| Memo | Rule-based fallback (`complete`); evidence cites fixture-backed bundle |
-| Non-demo missing artifacts | Shows unavailable — never falls back to bundled fixtures |
-
-Automated (opt-in, requires local `data/` pipeline artifacts — **not run in CI**):
-
-```bash
-npm run studies:pipeline -- --date 2026-07-29 --manifest fixtures/studies/pipeline.m64.json
-GAMMADESK_REAL_ACCEPTANCE=1 npm test -- tests/decision-surface-real-acceptance.test.ts
-```
-
-Default `npm test` skips this suite unless `GAMMADESK_REAL_ACCEPTANCE=1`. **Real historical Study validation deferred to M8-5c** (pipeline wiring after M8-5b data foundation).
-
-### M8-5a (shipped) — real SPY price ingestion
-
-Real Tiingo daily SPY bars + exact-date `StudyPriceSeries` artifacts for non-demo Study outcomes. **Does not** replace archive or peer corpus.
-
-| Deliverable | Status |
-| --- | --- |
-| SPY Tiingo ingest → `data/bars/SPY.json` | ✅ via `npm run ingest` |
-| Exact-date price series CLI | ✅ `npm run studies:ingest-prices -- --date YYYY-MM-DD` |
-| Artifact | ✅ `data/studies/prices/SPY/{asOf}/price-series.json` with `local_store` provenance |
-| Pipeline integration | ✅ Non-demo manifests may reference real price-series; fixture demo/CI preserved |
-| Tests | ✅ `tests/studies-m85a.test.ts` (offline fixtures — not real-data acceptance) |
-
-```bash
-npm run ingest   # requires TIINGO_TOKEN — writes data/bars/SPY.json
-npm run studies:ingest-prices -- --date 2026-08-29
-```
-
-Real SPY prices alone do **not** make the Study cohort real. Default pipeline archive + peer corpus remain fixture-backed until M8-5c.
-
-### M8-5b (shipped) — real PIT archive + peer corpus (data foundation)
-
-Offline builders discover eligible historical sessions from local `data/` artifacts and write non-synthetic `DailyResearchArchive` entries plus a derived peer corpus. **Does not** switch default non-demo pipeline or claim real Study acceptance.
-
-| Deliverable | Status |
-| --- | --- |
-| Contracts (`RealArchiveSessionSourcesManifest`, inventory report, peer corpus) | ✅ `src/contracts/real-archive.ts` |
-| Candidate discovery + validation | ✅ `src/studies/real-archive/` — parse/validate artifacts; exact session-date alignment; no nearest/latest fallback |
-| Inventory CLI | ✅ `npm run studies:inventory-archive -- --through YYYY-MM-DD` |
-| Archive + corpus builder CLI | ✅ `npm run studies:build-archive -- --through YYYY-MM-DD` |
-| Archive output | ✅ `data/studies/archive/{sessionDate}/daily-research.json` (eligible only; atomic; idempotent) |
-| Peer corpus output | ✅ `data/studies/profiles/{throughDate}/peer-corpus.json` |
-| Catalyst PIT | ✅ Rejects `syn-*`, synthetic, and post-session releases when cache cannot prove availability |
-| Structure PIT | ✅ Exact `sessionDate` only — historical snapshot or bounded gamma; bounded loaded independently |
-| Demo/CI isolation | ✅ `pipeline.m64.json` unchanged; default tests offline fixtures only |
-| Tests | ✅ `tests/studies-m85b.test.ts` (fixture inputs — not real-data acceptance) |
-
-```bash
-npm run studies:inventory-archive -- --through 2026-08-03
-npm run studies:build-archive -- --through 2026-08-03
-```
-
-**Blockers for real acceptance:** sparse local coverage (often 0 eligible sessions until exact-date structure artifacts exist per session). **M8-5c (queued)** wires real archive/corpus into non-demo pipeline manifests and enforces end-to-end non-synthetic provenance.
-
-### M8-5c (queued — not started)
-
-Wire real archive + peer corpus into non-demo pipeline manifests; enforce end-to-end non-synthetic provenance; re-run acceptance with honest cohort reporting. Do not start until M8-5b local coverage is understood.
+Historical Study pipeline, Decide surface, and Alpaca News were removed in the simplified MVP. Shipped surfaces are Macro Desk, Market, and AI Study only. Private policy (M7) and shadow review (M9) remain planned in a separate repository.
 
 ---
 
