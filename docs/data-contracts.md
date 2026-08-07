@@ -871,6 +871,24 @@ Official SPY holdings parse. Zod: `src/contracts/etf-universe-artifact.ts`.
 
 **Persistence:** `data/universes/SPY/` and `data/bars/spy-universe/` are **local-ready filesystem adapters only**. Vercel serverless has no durable writable `data/` path; deployment requires external object storage or build-time artifacts (no DB/Blob wired in this phase).
 
+#### Breadth snapshot store (V2-3B4A)
+
+Durable SPY breadth uses the existing `BreadthInternalsSnapshot` schema — no separate metrics artifact. Zod: `src/contracts/breadth-snapshot-pointer.ts`. Store: `src/desk/breadth/store/`.
+
+| Artifact | Role |
+| --- | --- |
+| **Versioned snapshot** | Immutable JSON at `{universeId}/snapshots/{snapshotIdentity}.json` under the store root (`data/breadth/` locally; Blob prefix `breadth/` in production) |
+| **Latest pointer** | `BreadthSnapshotPointer` at `{universeId}/latest.json` — `schemaVersion`, `universeId`, `fundSymbol`, `marketSessionDate`, `snapshotPath`, `snapshotIdentity`, `generatedAt` (`asOf`), `publishedAt` |
+
+**Publish-last order:** `writeVersioned(snapshot)` → `readSnapshot` read-back validation → `publishLatest(pointer)`. A failed snapshot write never updates latest; a failed latest publish leaves the prior pointer intact (atomic filesystem rename; Blob `put` failure does not delete the old object).
+
+**Last-known-good:** malformed JSON, schema errors, `status: unavailable`, and path traversal are rejected. Immutable identity conflicts (same path, different payload) fail without overwriting. Blob adapter returns `unavailable` when no client/token is configured — it does not fall back to local `data/`.
+
+| Adapter | Responsibility |
+| --- | --- |
+| **Filesystem** | Local dev and hermetic tests under `data/breadth/` (gitignored) |
+| **Vercel Blob** | Production persistence via injected minimal `BlobStoreClient` (`BLOB_READ_WRITE_TOKEN` or `VERCEL_BLOB_READ_WRITE_TOKEN`) |
+
 ### EventGate (V2-3C)
 
 Deterministic shock gate from the official catalyst calendar only. Zod: `src/contracts/event-gate.ts`. Builder: `buildEventGate` in `src/desk/event-gate/`.
