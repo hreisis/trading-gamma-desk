@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
+import {
+  copyFileSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { normalizeCatalystEvent, loadCatalystFeed } from "@/catalyst";
+import { calendarLatestPath } from "@/catalyst/fetch-calendar";
 import type { CatalystRawEvent } from "@/catalyst";
 import type { CatalystFeedResponse } from "@/catalyst/types";
 import { easternWallToUtc } from "@/catalyst/market-context/session";
@@ -11,6 +20,24 @@ import {
   eventGatePhaseAt,
   loadBoundedGammaDeskView,
 } from "@/desk";
+
+const OFFICIAL_CALENDAR_FIXTURE = join(
+  process.cwd(),
+  "fixtures/catalyst/event-gate-official-calendar.json",
+);
+
+function withTrackedOfficialCalendarFixture<T>(
+  run: (ctx: { dataRoot: string }) => T,
+): T {
+  const dataRoot = mkdtempSync(join(tmpdir(), "gammadesk-event-gate-"));
+  mkdirSync(join(dataRoot, "catalyst"), { recursive: true });
+  copyFileSync(OFFICIAL_CALENDAR_FIXTURE, calendarLatestPath(dataRoot));
+  try {
+    return run({ dataRoot });
+  } finally {
+    rmSync(dataRoot, { recursive: true, force: true });
+  }
+}
 
 const rawBase: CatalystRawEvent = {
   synthetic: false,
@@ -323,42 +350,48 @@ describe("buildEventGate", () => {
   });
 });
 
-describe("real calendar-latest.json", () => {
+describe("tracked official calendar fixture", () => {
   it("recognizes CPI, payrolls, FOMC decision, and press conference rows", () => {
-    const now = new Date("2026-07-29T13:00:00-04:00");
-    const feed = loadCatalystFeed({}, { publicDemo: false, now });
-    expect(feed?.mode).toBe("official_calendar");
+    withTrackedOfficialCalendarFixture(({ dataRoot }) => {
+      const now = new Date("2026-07-29T13:00:00-04:00");
+      const feed = loadCatalystFeed({}, { publicDemo: false, now, dataRoot });
+      expect(feed.mode).toBe("official_calendar");
 
-    const classified = (feed?.catalysts ?? [])
-      .map((c) => ({ c, kind: classifyHighImpactEvent(c) }))
-      .filter((row) => row.kind);
+      const classified = (feed.catalysts ?? [])
+        .map((c) => ({ c, kind: classifyHighImpactEvent(c) }))
+        .filter((row) => row.kind);
 
-    const kinds = new Set(classified.map((row) => row.kind));
-    expect(kinds.has("fomc_decision")).toBe(true);
-    expect(kinds.has("fomc_press_conference")).toBe(true);
-    expect(kinds.has("cpi")).toBe(true);
-    expect(kinds.has("payrolls")).toBe(true);
+      const kinds = new Set(classified.map((row) => row.kind));
+      expect(kinds.has("fomc_decision")).toBe(true);
+      expect(kinds.has("fomc_press_conference")).toBe(true);
+      expect(kinds.has("cpi")).toBe(true);
+      expect(kinds.has("payrolls")).toBe(true);
 
-    const decision = classified.find((row) => row.kind === "fomc_decision")?.c;
-    const press = classified.find((row) => row.kind === "fomc_press_conference")?.c;
-    expect(decision?.occurredAt).toBe("2026-07-29T18:00:00.000Z");
-    expect(press?.occurredAt).toBe("2026-07-29T18:30:00.000Z");
-    expect(decision?.id).not.toBe(press?.id);
+      const decision = classified.find((row) => row.kind === "fomc_decision")?.c;
+      const press = classified.find(
+        (row) => row.kind === "fomc_press_conference",
+      )?.c;
+      expect(decision?.occurredAt).toBe("2026-07-29T18:00:00.000Z");
+      expect(press?.occurredAt).toBe("2026-07-29T18:30:00.000Z");
+      expect(decision?.id).not.toBe(press?.id);
+    });
   });
 
   it("builds a non-unavailable gate when cache is within freshness TTL", () => {
-    const now = new Date("2026-07-30T12:00:00-04:00");
-    const feed = loadCatalystFeed({}, { publicDemo: false, now });
-    expect(feed?.source.stale).toBe(false);
+    withTrackedOfficialCalendarFixture(({ dataRoot }) => {
+      const now = new Date("2026-07-30T12:00:00-04:00");
+      const feed = loadCatalystFeed({}, { publicDemo: false, now, dataRoot });
+      expect(feed.source.stale).toBe(false);
 
-    const gate = buildEventGate({
-      feed,
-      targetMarketSessionDate: "2026-07-30",
-      generatedAt: now.toISOString(),
-      publicDemo: false,
+      const gate = buildEventGate({
+        feed,
+        targetMarketSessionDate: "2026-07-30",
+        generatedAt: now.toISOString(),
+        publicDemo: false,
+      });
+      expect(gate.state).not.toBe("unavailable");
+      expect(gate.missingReason).toBeNull();
     });
-    expect(gate.state).not.toBe("unavailable");
-    expect(gate.missingReason).toBeNull();
   });
 });
 

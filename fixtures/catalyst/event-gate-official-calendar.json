@@ -1,0 +1,183 @@
+{
+  "kind": "CatalystCalendarCache",
+  "schemaVersion": "0.1.0",
+  "fetchedAt": "2026-07-29T16:00:00.000Z",
+  "requestedWindow": {
+    "now": "2026-07-29T16:00:00.000Z",
+    "start": "2026-06-29T16:00:00.000Z",
+    "end": "2026-08-28T16:00:00.000Z"
+  },
+  "sources": [
+    {
+      "id": "bls",
+      "name": "BLS News Release Schedule",
+      "url": "https://www.bls.gov/schedule/news_release/bls.ics",
+      "status": "ok",
+      "mappedEventCount": 2
+    },
+    {
+      "id": "bea",
+      "name": "BEA Release Dates",
+      "url": "https://apps.bea.gov/API/signup/release_dates.json",
+      "status": "skipped"
+    },
+    {
+      "id": "federal_reserve",
+      "name": "Federal Reserve FOMC Calendars",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "status": "ok",
+      "mappedEventCount": 2
+    }
+  ],
+  "catalysts": [
+    {
+      "schemaVersion": "0.1.0",
+      "id": "cat_def10e2d350fd958",
+      "occurredAt": "2026-07-29T18:00:00.000Z",
+      "observedAt": "2026-07-29T16:00:00.000Z",
+      "sourceType": "calendar",
+      "sourceName": "Federal Reserve FOMC Calendars",
+      "sourceUrl": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "headline": "FOMC policy decision (scheduled)",
+      "summary": "Scheduled FOMC policy decision.",
+      "category": "monetary-policy",
+      "importance": "high",
+      "status": "upcoming",
+      "affectedAssets": [
+        "US2Y",
+        "US10Y"
+      ],
+      "macroChannels": [
+        "fed_rates"
+      ],
+      "direction": "unclear",
+      "confidence": {
+        "score": 85,
+        "calibrated": false,
+        "note": "classification clarity only — not a market direction probability"
+      },
+      "evidence": [
+        {
+          "id": "cat_def10e2d350fd958_ev1",
+          "statement": "Official schedule only",
+          "basis": "official_fomc_schedule"
+        }
+      ],
+      "dedupeKey": "ext:fomc-decision-2026-07-29",
+      "synthetic": false
+    },
+    {
+      "schemaVersion": "0.1.0",
+      "id": "cat_b2e093e62147ae0a",
+      "occurredAt": "2026-07-29T18:30:00.000Z",
+      "observedAt": "2026-07-29T16:00:00.000Z",
+      "sourceType": "calendar",
+      "sourceName": "Federal Reserve FOMC Calendars",
+      "sourceUrl": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "headline": "Federal Reserve Chair press conference (scheduled)",
+      "summary": "Scheduled FOMC press conference.",
+      "category": "monetary-policy",
+      "importance": "high",
+      "status": "upcoming",
+      "affectedAssets": [
+        "US2Y",
+        "US10Y"
+      ],
+      "macroChannels": [
+        "fed_rates"
+      ],
+      "direction": "unclear",
+      "confidence": {
+        "score": 85,
+        "calibrated": false,
+        "note": "classification clarity only — not a market direction probability"
+      },
+      "evidence": [
+        {
+          "id": "cat_b2e093e62147ae0a_ev1",
+          "statement": "Official schedule only",
+          "basis": "official_fomc_schedule"
+        }
+      ],
+      "dedupeKey": "ext:fomc-press-2026-07-29",
+      "synthetic": false
+    },
+    {
+      "schemaVersion": "0.1.0",
+      "id": "cat_9e70c08cb79ad87f",
+      "occurredAt": "2026-08-12T12:30:00.000Z",
+      "observedAt": "2026-07-29T16:00:00.000Z",
+      "sourceType": "calendar",
+      "sourceName": "BLS News Release Schedule",
+      "sourceUrl": "https://www.bls.gov/schedule/news_release/bls.ics",
+      "headline": "Consumer Price Index scheduled release",
+      "summary": "Scheduled CPI release.",
+      "category": "inflation",
+      "importance": "high",
+      "status": "upcoming",
+      "affectedAssets": [
+        "US2Y",
+        "US10Y"
+      ],
+      "macroChannels": [
+        "inflation"
+      ],
+      "direction": "unclear",
+      "confidence": {
+        "score": 85,
+        "calibrated": false,
+        "note": "classification clarity only — not a market direction probability"
+      },
+      "evidence": [
+        {
+          "id": "cat_9e70c08cb79ad87f_ev1",
+          "statement": "Official schedule only",
+          "basis": "official_release_schedule"
+        }
+      ],
+      "dedupeKey": "ext:bls-cpi-2026-08-12",
+      "synthetic": false,
+      "releaseFamily": "cpi"
+    },
+    {
+      "schemaVersion": "0.1.0",
+      "id": "cat_4937cb571d043649",
+      "occurredAt": "2026-08-01T12:30:00.000Z",
+      "observedAt": "2026-07-29T16:00:00.000Z",
+      "sourceType": "calendar",
+      "sourceName": "BLS News Release Schedule",
+      "sourceUrl": "https://www.bls.gov/schedule/news_release/bls.ics",
+      "headline": "Employment Situation scheduled release",
+      "summary": "Scheduled payrolls release.",
+      "category": "labor",
+      "importance": "high",
+      "status": "upcoming",
+      "affectedAssets": [
+        "US2Y",
+        "SPX"
+      ],
+      "macroChannels": [
+        "growth",
+        "fed_rates"
+      ],
+      "direction": "unclear",
+      "confidence": {
+        "score": 85,
+        "calibrated": false,
+        "note": "classification clarity only — not a market direction probability"
+      },
+      "evidence": [
+        {
+          "id": "cat_4937cb571d043649_ev1",
+          "statement": "Official schedule only",
+          "basis": "official_release_schedule"
+        }
+      ],
+      "dedupeKey": "ext:bls-empsit-2026-08-01",
+      "synthetic": false,
+      "releaseFamily": "employment_situation"
+    }
+  ],
+  "validationErrors": [],
+  "partialFailure": false
+}
