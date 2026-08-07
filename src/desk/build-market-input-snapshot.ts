@@ -38,7 +38,7 @@ const NO_CREDIT_REASON =
   "Credit stress ingest is not implemented (no HYG/LQD or spread series in ASSET_REGISTRY).";
 
 import { buildEventGate } from "./event-gate/build-event-gate";
-import { loadSpyBreadthInternals } from "./breadth/load-spy-breadth";
+import { loadDurableSpyBreadthForMarketInput } from "./breadth/read-durable-breadth";
 
 const LEADERSHIP_ROTATION_MISSING_REASON =
   "Leadership rotation ingest is not implemented (V2-3B3 scope: SPY breadth only).";
@@ -53,6 +53,10 @@ export interface BuildMarketInputSnapshotInput {
   readonly qqqGamma: BoundedGammaDeskView;
   readonly publicDemo: boolean;
   readonly breadthInternals?: BreadthInternalsSnapshot | null;
+  readonly breadthDurableMeta?: {
+    readonly sourceArtifact?: string | null;
+    readonly unavailableReason?: string | null;
+  };
 }
 
 function missingField(
@@ -90,6 +94,10 @@ function deriveBreadthInternalsField(
   breadth: BreadthInternalsSnapshot | null | undefined,
   targetSession: string,
   publicDemo: boolean,
+  durableMeta?: {
+    readonly sourceArtifact?: string | null;
+    readonly unavailableReason?: string | null;
+  },
 ): MarketInputField {
   if (publicDemo) {
     return {
@@ -117,14 +125,16 @@ function deriveBreadthInternalsField(
       asOf: null,
       marketSessionDate: null,
       source: {
-        provider: "official_etf_holdings+alpaca",
-        artifact: "src/desk/breadth/load-spy-breadth.ts",
+        provider: "durable_breadth_snapshot",
+        artifact:
+          durableMeta?.sourceArtifact ?? "breadth/spy_etf_holdings/latest.json",
         fetchedAt: null,
       },
       status: "unavailable",
       stale: false,
       missingReason:
-        "SPY breadth could not be loaded (holdings or Alpaca bar panel unavailable).",
+        durableMeta?.unavailableReason ??
+        "SPY breadth could not be loaded from durable snapshot store.",
       isProxy: false,
     };
   }
@@ -139,10 +149,12 @@ function deriveBreadthInternalsField(
     label: MARKET_INPUT_LABELS.breadth_internals,
     value: breadth,
     asOf: breadth.asOf,
-    marketSessionDate: targetSession,
+    marketSessionDate: breadth.marketSessionDate,
     source: {
-      provider: "official_etf_holdings+alpaca",
-      artifact: `data/universes/SPY/${breadth.universe.asOf}.json`,
+      provider: "durable_breadth_snapshot",
+      artifact:
+        durableMeta?.sourceArtifact ??
+        `breadth/spy_etf_holdings/snapshots/${breadth.marketSessionDate}.json`,
       fetchedAt: breadth.bars.fetchedAt,
     },
     status: fieldStatus,
@@ -510,6 +522,7 @@ export function buildMarketInputSnapshot(
       input.breadthInternals,
       input.targetMarketSessionDate,
       input.publicDemo,
+      input.breadthDurableMeta,
     ),
     missingField("leadership_rotation", LEADERSHIP_ROTATION_MISSING_REASON),
     deriveMacroAssetField("vix_spot", "VIX", input.macro, input.targetMarketSessionDate),
@@ -564,7 +577,7 @@ export async function loadMarketInputSnapshot(
   const targetMarketSessionDate = resolveLastCompletedMarketSessionDate(now);
   const publicDemo = options.publicDemo === true;
 
-  const [macro, alpacaPanel, catalystFeed, spyGamma, qqqGamma, breadthInternals] =
+  const [macro, alpacaPanel, catalystFeed, spyGamma, qqqGamma, breadthLoad] =
     await Promise.all([
       publicDemo
         ? Promise.resolve(
@@ -597,9 +610,8 @@ export async function loadMarketInputSnapshot(
             forceFixture: options.forceFixture,
             env,
           }),
-      loadSpyBreadthInternals({
+      loadDurableSpyBreadthForMarketInput({
         targetMarketSessionDate,
-        generatedAt,
         env,
         publicDemo,
       }),
@@ -614,6 +626,10 @@ export async function loadMarketInputSnapshot(
     spyGamma,
     qqqGamma,
     publicDemo,
-    breadthInternals,
+    breadthInternals: breadthLoad.snapshot,
+    breadthDurableMeta: {
+      sourceArtifact: breadthLoad.sourceArtifact,
+      unavailableReason: breadthLoad.missingReason,
+    },
   });
 }

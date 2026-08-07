@@ -895,6 +895,10 @@ Durable SPY breadth uses the existing `BreadthInternalsSnapshot` schema — no s
 
 Vercel Cron: `GET /api/cron/breadth-daily` (`vercel.json` schedule `0 22 * * *` UTC = **18:00 ET** during daylight saving, **17:00 ET** during standard time — ~1h after US regular close at 16:00 ET). Requires `Authorization: Bearer $CRON_SECRET`; missing or mismatched secret returns **401** (fail-closed). Missing blob token on Vercel returns **503** `storage_unavailable` — cron does not report success after non-persistent writes. Cron does not duplicate producer logic.
 
+#### Durable breadth reader (V2-3B4C)
+
+`loadDurableSpyBreadthForMarketInput()` reads `latest.json` → versioned `BreadthInternalsSnapshot` only. Production page loads **never** fetch SPY holdings or ~503 constituent Alpaca bars. Missing blob token on Vercel, absent latest pointer, or malformed artifacts → `breadth_internals` **unavailable** (no `data/` fallback). Freshness compares snapshot `marketSessionDate` to `targetMarketSessionDate` via trading-session lag (weekends/holidays use last completed session, not calendar day). Stale snapshots retain true `asOf`, source artifact, and session date on the field.
+
 ### EventGate (V2-3C)
 
 Deterministic shock gate from the official catalyst calendar only. Zod: `src/contracts/event-gate.ts`. Builder: `buildEventGate` in `src/desk/event-gate/`.
