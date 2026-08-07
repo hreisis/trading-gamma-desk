@@ -1,26 +1,8 @@
 :root {
-  --bg: #0a0f18;
-  --bg-wash: #0d1420;
-  --bg-panel: #111b2a;
-  --bg-panel-alt: #131f30;
-  --bg-sidebar: #0d1522;
-  --line: #1a2840;
-  --line-bright: #2a3d5c;
-  --text: #e8eef5;
-  --muted: #8fa3bc;
-  --accent: #4ec9e8;
-  --warn: #e0b050;
-  --contra: #e87060;
-  --confirm: #4ecf7a;
-  --risk-green: #4ecf7a;
-  --risk-yellow: #e0b050;
-  --risk-red: #e87060;
-  --risk-gray: #5c6d82;
-  --terminal-glow: rgba(78, 201, 232, 0.08);
-  --gamma-spy-bg: #0e1726;
-  --gamma-qqq-bg: #101c2e;
-  --gamma-spy-border: #1a3050;
-  --gamma-qqq-border: #1e3860;
+  --v2-ink: #17191d;
+  --v2-muted: #6f747c;
+  --v2-line: #e4e6e9;
+  --v2-surface: #f6f7f8;
 }
 
 * {
@@ -32,8 +14,8 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
+  background: #fff;
+  color: var(--v2-ink);
   font-family: var(--font-sans), "Segoe UI", sans-serif;
   font-size: 14px;
   line-height: 1.45;
@@ -42,7 +24,7 @@ body {
 code {
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.9em;
-  color: var(--accent);
+  color: #3267d6;
 }
 
 .desk {
@@ -442,6 +424,57 @@ code {
   color: var(--v2-ink);
   font-family: var(--font-sans), "Segoe UI", sans-serif;
 }
+
+@keyframes v2-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.v2-loading-line,
+.v2-loading-nav,
+.v2-loading-command .v2-panel {
+  background: linear-gradient(90deg, #eef0f2 0%, #f6f7f8 50%, #eef0f2 100%);
+  background-size: 200% 100%;
+  animation: v2-loading-pulse 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.v2-loading-line {
+  display: block;
+  height: 12px;
+}
+
+.v2-loading-line-title {
+  width: 140px;
+  margin-bottom: 8px;
+}
+
+.v2-loading-line-sub {
+  width: 220px;
+  height: 10px;
+  opacity: 0.75;
+}
+
+.v2-loading-nav {
+  display: block;
+  height: 34px;
+  margin-bottom: 4px;
+}
+
+.v2-loading-command {
+  margin-top: 22px;
+  min-height: 420px;
+}
+
+.v2-loading-command .v2-panel {
+  min-height: 360px;
+}
+
 
 .v2-sidebar {
   position: sticky;
@@ -1850,10 +1883,33 @@ code {
 
 /* —— Terminal dashboard (UI redesign) —— */
 .terminal-shell {
+  --bg: #0a0f18;
+  --bg-wash: #0d1420;
+  --bg-panel: #111b2a;
+  --bg-panel-alt: #131f30;
+  --bg-sidebar: #0d1522;
+  --line: #1a2840;
+  --line-bright: #2a3d5c;
+  --text: #e8eef5;
+  --muted: #8fa3bc;
+  --accent: #4ec9e8;
+  --warn: #e0b050;
+  --contra: #e87060;
+  --confirm: #4ecf7a;
+  --risk-green: #4ecf7a;
+  --risk-yellow: #e0b050;
+  --risk-red: #e87060;
+  --risk-gray: #5c6d82;
+  --terminal-glow: rgba(78, 201, 232, 0.08);
+  --gamma-spy-bg: #0e1726;
+  --gamma-qqq-bg: #101c2e;
+  --gamma-spy-border: #1a3050;
+  --gamma-qqq-border: #1e3860;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  color: var(--text);
 }
 
 .terminal-header {

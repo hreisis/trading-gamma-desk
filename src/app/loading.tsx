@@ -1,5 +1,5 @@
-import { DeskLoading } from "@/app/components/MacroDesk";
+import { V2AppLoading } from "@/app/components/v2/V2AppLoading";
 
 export default function Loading() {
-  return <DeskLoading />;
+  return <V2AppLoading />;
 }

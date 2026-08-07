@@ -31,8 +31,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable}`}
+      style={{ background: "#fff" }}
+    >
+      <body style={{ background: "#fff" }}>{children}</body>
     </html>
   );
 }
