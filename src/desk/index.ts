@@ -6,6 +6,8 @@ export * from "./pipeline-status";
 export * from "./public-demo";
 export * from "./load-macro-desk";
 export * from "./load-bounded-gamma";
+export * from "./v2-command-center";
+export * from "./load-v2-home";
 export * from "./format-gamma";
 export * from "./resolve-desk-request";
 export * from "./production-runtime";

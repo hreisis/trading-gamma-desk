@@ -56,7 +56,7 @@ export function AlpacaMarketPanel({
 
   return (
     <section
-      className="desk-section"
+      className="terminal-panel"
       aria-labelledby="alpaca-market-heading"
       data-testid="alpaca-market-panel"
     >

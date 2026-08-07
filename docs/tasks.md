@@ -1,5 +1,19 @@
 # Tasks
 
+## GammaDesk V2 reset (current focus)
+
+| ID | Task | Status |
+| --- | --- | --- |
+| V2-0 | Freeze the simplified MVP, trust rules and missing-input inventory | ✅ documented in `docs/v2-mvp.md` |
+| V2-1 | White bilingual command-center preview at isolated `/v2` route | ✅ implemented; typecheck, 737-test suite and production build pass |
+| V2-2 | Reconcile local branch with live/demo routing fixes; promote V2 to home | Pending |
+| V2-3 | Wire timestamp-aligned breadth, volatility, credit, leadership and event-gate inputs | Pending |
+| V2-4 | Deterministic Risk + Opportunity + Exposure + Allocation policy with daily review log | Pending |
+| V2-5 | Multi-expiry SPY/QQQ gamma summary and tested range/pin model | Pending |
+
+V2-1 may show explicitly labelled illustrative decision values only when
+`preview=1`. Live mode withholds the decision rather than fabricating inputs.
+
 Living build plan. Update status as work lands. Definition of done for each phase is explicit.
 
 ## Current focus

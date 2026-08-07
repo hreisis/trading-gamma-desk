@@ -6,6 +6,14 @@ import type {
 } from "@/contracts/ai-study-briefing";
 import { claimEvidenceIds, claimText } from "@/ai-study/claim-utils";
 import { formatAiStudyMarketStatus } from "@/ai-study/session";
+import { RiskTrafficLight } from "../RiskTrafficLight";
+import {
+  briefHeadline,
+  deriveBriefingStance,
+  deriveInputDisplayLight,
+  inputScanLabel,
+  riskLightScanLabel,
+} from "../signal-display";
 
 function statusLabel(status: AiStudyInputProvenance["status"]): string {
   switch (status) {
@@ -85,6 +93,89 @@ function ClaimLine({ claim }: { claim: AiStudyClaim | string }) {
   );
 }
 
+function BriefUnavailable({
+  briefing,
+  historicalDate,
+  testId,
+  title,
+}: {
+  briefing: AiStudyBriefing;
+  historicalDate?: string | null;
+  testId: string;
+  title: string;
+}) {
+  const stance = deriveBriefingStance(briefing);
+  return (
+    <div className="signal-brief" data-testid={testId}>
+      <BriefHero briefing={briefing} stance={stance} headline={briefing.message} />
+      <details className="desk-fold signal-brief-system" data-testid="ai-study-system-details">
+        <summary>Details / System Status</summary>
+        <BriefingMeta briefing={briefing} historicalDate={historicalDate} />
+        <SessionAlignmentBlock alignment={briefing.sessionAlignment} />
+        <InputProvenanceList inputs={briefing.inputs} />
+      </details>
+      <p className="visually-hidden">{title}</p>
+    </div>
+  );
+}
+
+function BriefHero({
+  briefing,
+  stance,
+  headline,
+  signalInputs,
+  summaryLines,
+}: {
+  briefing: AiStudyBriefing;
+  stance: ReturnType<typeof deriveBriefingStance>;
+  headline: string;
+  signalInputs?: readonly AiStudyInputProvenance[];
+  summaryLines?: readonly string[];
+}) {
+  return (
+    <header className="signal-brief-hero">
+      <div className="signal-brief-top">
+        <p className="signal-brief-kicker">AI Daily Brief</p>
+        <div className="signal-brief-stance">
+          <RiskTrafficLight light={stance.light} compact testId="ai-study-stance-light" />
+          <span className={`signal-stance-label signal-stance-${stance.light.kind}`}>
+            {stance.label}
+          </span>
+        </div>
+      </div>
+      <h1 className="signal-brief-headline">{briefHeadline(headline)}</h1>
+      {signalInputs && signalInputs.length > 0 ? (
+        <ul className="signal-brief-cards" data-testid="ai-study-signal-cards">
+          {signalInputs.map((input) => {
+            const light = deriveInputDisplayLight(input);
+            return (
+              <li key={input.id} className="signal-brief-card">
+                <RiskTrafficLight
+                  light={light}
+                  compact
+                  testId={`ai-study-signal-${input.id}`}
+                />
+                <span className="signal-brief-card-label">{inputScanLabel(input.id)}</span>
+                <span className="signal-brief-card-value">{riskLightScanLabel(light)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {summaryLines && summaryLines.length > 0 ? (
+        <div className="signal-brief-summary" data-testid="ai-study-summary">
+          {summaryLines.map((line) => (
+            <p key={line}>{briefHeadline(line, 220)}</p>
+          ))}
+        </div>
+      ) : null}
+      <p className="visually-hidden" data-testid="ai-study-briefing-status">
+        {briefingStatusLabel(briefing.status)}
+      </p>
+    </header>
+  );
+}
+
 export function AiStudyPanel({
   briefing,
   historicalDate,
@@ -92,149 +183,137 @@ export function AiStudyPanel({
   briefing: AiStudyBriefing;
   historicalDate?: string | null;
 }) {
-  const bannerClass =
-    briefing.status === "synthetic_demo" || briefing.status === "partial"
-      ? "desk-banner desk-banner-warn"
-      : briefing.status === "error" || briefing.status === "session_conflict"
-        ? "desk-banner desk-banner-warn"
-        : briefing.status === "unavailable"
-          ? "desk-banner desk-banner-compact"
-          : "desk-banner desk-banner-compact";
-
   if (
     (briefing.status === "unavailable" || briefing.status === "session_conflict") &&
     !briefing.report
   ) {
     return (
-      <section className="desk-state" data-testid="ai-study-unavailable">
-        <BriefingMeta briefing={briefing} historicalDate={historicalDate} />
-        <h2 className="desk-title">AI Study unavailable</h2>
-        <p className="desk-interpretation">{briefing.message}</p>
-        <SessionAlignmentBlock alignment={briefing.sessionAlignment} />
-        <InputProvenanceList inputs={briefing.inputs} />
-      </section>
+      <BriefUnavailable
+        briefing={briefing}
+        historicalDate={historicalDate}
+        testId="ai-study-unavailable"
+        title="AI Study unavailable"
+      />
     );
   }
 
   if (briefing.status === "error" && !briefing.report) {
     return (
-      <section className="desk-state" data-testid="ai-study-error">
-        <BriefingMeta briefing={briefing} historicalDate={historicalDate} />
-        <h2 className="desk-title">AI Study error</h2>
-        <p className="desk-interpretation">{briefing.message}</p>
-        <SessionAlignmentBlock alignment={briefing.sessionAlignment} />
-        <InputProvenanceList inputs={briefing.inputs} />
-      </section>
+      <BriefUnavailable
+        briefing={briefing}
+        historicalDate={historicalDate}
+        testId="ai-study-error"
+        title="AI Study error"
+      />
     );
   }
 
   const report = briefing.report;
   if (!report) {
     return (
-      <section className="desk-state" data-testid="ai-study-empty">
-        <BriefingMeta briefing={briefing} historicalDate={historicalDate} />
-        <p className="desk-interpretation">No AI Study report payload.</p>
-      </section>
+      <div className="signal-brief" data-testid="ai-study-empty">
+        <BriefHero
+          briefing={briefing}
+          stance={deriveBriefingStance(briefing)}
+          headline="No AI Study report payload."
+        />
+      </div>
     );
   }
 
+  const stance = deriveBriefingStance(briefing);
+  const summaryLines = report.mainDrivers
+    .slice(0, 3)
+    .map((item) => claimText(item));
+
   return (
-    <div data-testid="ai-study-panel">
-      <BriefingMeta briefing={briefing} historicalDate={historicalDate} />
+    <div className="signal-brief" data-testid="ai-study-panel">
+      <BriefHero
+        briefing={briefing}
+        stance={stance}
+        headline={claimText(report.marketRegime)}
+        signalInputs={briefing.inputs}
+        summaryLines={summaryLines}
+      />
 
-      <p className={bannerClass} data-testid="ai-study-status-banner">
-        {briefing.message}
-        {briefing.model ? (
-          <span className="desk-inline-meta">
-            {" "}
-            · model {briefing.model} · {briefing.provider}
-          </span>
-        ) : null}
-        {briefing.usage ? (
-          <span className="desk-inline-meta">
-            {" "}
-            · tokens {briefing.usage.totalTokens} · est $
-            {briefing.usage.estimatedCostUsd.toFixed(4)}
-          </span>
-        ) : null}
-      </p>
+      <details className="desk-fold signal-brief-expand">
+        <summary>Full report</summary>
+        <section className="ai-study-section">
+          <h2>Key levels / structure</h2>
+          <ul className="desk-list">
+            {report.keyLevelsStructure.map((item) => (
+              <li key={claimText(item)}>
+                <ClaimLine claim={item} />
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="ai-study-section">
+          <h2>Upcoming risks</h2>
+          <ul className="desk-list">
+            {report.upcomingRisks.map((item) => (
+              <li key={claimText(item)}>
+                <ClaimLine claim={item} />
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="ai-study-section">
+          <h2>Scenarios</h2>
+          <div className="ai-study-scenarios">
+            <article className="ai-study-scenario">
+              <h3>Bull</h3>
+              <p>
+                <ClaimLine claim={report.scenarios.bull} />
+              </p>
+            </article>
+            <article className="ai-study-scenario">
+              <h3>Base</h3>
+              <p>
+                <ClaimLine claim={report.scenarios.base} />
+              </p>
+            </article>
+            <article className="ai-study-scenario">
+              <h3>Bear</h3>
+              <p>
+                <ClaimLine claim={report.scenarios.bear} />
+              </p>
+            </article>
+          </div>
+        </section>
+      </details>
 
-      <SessionAlignmentBlock alignment={briefing.sessionAlignment} />
-      <InputProvenanceList inputs={briefing.inputs} />
-
-      {briefing.grounding &&
-      (!briefing.grounding.citationsValid ||
-        !briefing.grounding.numbersValid ||
-        briefing.grounding.prohibitedLanguageDetected) ? (
-        <p className="desk-banner desk-banner-warn">
-          Grounding validation flagged citation, numeric, or language issues —
-          review before relying on this briefing.
+      <details className="desk-fold signal-brief-system" data-testid="ai-study-system-details">
+        <summary>Details / System Status</summary>
+        <p className="desk-banner desk-banner-compact" data-testid="ai-study-status-banner">
+          {briefing.message}
+          {briefing.model ? (
+            <span className="desk-inline-meta">
+              {" "}
+              · model {briefing.model} · {briefing.provider}
+            </span>
+          ) : null}
+          {briefing.usage ? (
+            <span className="desk-inline-meta">
+              {" "}
+              · tokens {briefing.usage.totalTokens} · est $
+              {briefing.usage.estimatedCostUsd.toFixed(4)}
+            </span>
+          ) : null}
         </p>
-      ) : null}
-
-      <section className="desk-section ai-study-section">
-        <h2>1. Market regime</h2>
-        <p className="desk-interpretation">
-          <ClaimLine claim={report.marketRegime} />
-        </p>
-      </section>
-
-      <section className="desk-section ai-study-section">
-        <h2>2. Main drivers</h2>
-        <ul className="desk-list">
-          {report.mainDrivers.map((item) => (
-            <li key={claimText(item)}>
-              <ClaimLine claim={item} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="desk-section ai-study-section">
-        <h2>3. Key levels / structure</h2>
-        <ul className="desk-list">
-          {report.keyLevelsStructure.map((item) => (
-            <li key={claimText(item)}>
-              <ClaimLine claim={item} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="desk-section ai-study-section">
-        <h2>4. Upcoming risks</h2>
-        <ul className="desk-list">
-          {report.upcomingRisks.map((item) => (
-            <li key={claimText(item)}>
-              <ClaimLine claim={item} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="desk-section ai-study-section">
-        <h2>5. Scenarios</h2>
-        <div className="ai-study-scenarios">
-          <article className="ai-study-scenario">
-            <h3>Bull</h3>
-            <p>
-              <ClaimLine claim={report.scenarios.bull} />
-            </p>
-          </article>
-          <article className="ai-study-scenario">
-            <h3>Base</h3>
-            <p>
-              <ClaimLine claim={report.scenarios.base} />
-            </p>
-          </article>
-          <article className="ai-study-scenario">
-            <h3>Bear</h3>
-            <p>
-              <ClaimLine claim={report.scenarios.bear} />
-            </p>
-          </article>
-        </div>
-      </section>
+        {briefing.grounding &&
+        (!briefing.grounding.citationsValid ||
+          !briefing.grounding.numbersValid ||
+          briefing.grounding.prohibitedLanguageDetected) ? (
+          <p className="desk-banner desk-banner-warn">
+            Grounding validation flagged citation, numeric, or language issues —
+            review before relying on this briefing.
+          </p>
+        ) : null}
+        <BriefingMeta briefing={briefing} historicalDate={historicalDate} />
+        <SessionAlignmentBlock alignment={briefing.sessionAlignment} />
+        <InputProvenanceList inputs={briefing.inputs} />
+      </details>
     </div>
   );
 }

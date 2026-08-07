@@ -1,44 +1,21 @@
-import { MacroDesk } from "@/app/components/MacroDesk";
-import { toPublicCatalystFeed } from "@/catalyst";
-import {
-  loadBoundedGammaDeskViewAsync,
-  loadCatalystFeedAsync,
-  resolveDeskRequestAsync,
-} from "@/desk";
+import { CommandCenter } from "@/app/components/v2/CommandCenter";
+import { loadV2HomePage } from "@/desk/load-v2-home";
 
-/** Always resolve at request time (env + query). */
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; gamma?: string; demo?: string }>;
+  searchParams: Promise<{ source?: string; gamma?: string; lang?: string }>;
 }) {
   const params = await searchParams;
-  const view = await resolveDeskRequestAsync({
+  const { view, lang, demoMode } = await loadV2HomePage({
+    demo: false,
     source: params.source,
-    demoQuery: params.demo,
-    publicDemo: false,
+    forceFixture: params.gamma === "fixture",
+    lang: params.lang,
   });
-  const catalystFeed =
-    view.status === "live_unavailable"
-      ? null
-      : toPublicCatalystFeed(
-          await loadCatalystFeedAsync({}, { publicDemo: view.isPublicDemo }),
-        );
 
-  const gammaViews = await Promise.all(
-    (["SPY", "QQQ"] as const).map((symbol) =>
-      loadBoundedGammaDeskViewAsync({
-        symbol,
-        forceFixture: params.gamma === "fixture",
-        publicDemo: view.isPublicDemo,
-      }),
-    ),
-  );
-
-  return (
-    <MacroDesk view={view} catalystFeed={catalystFeed} gammaViews={gammaViews} />
-  );
+  return <CommandCenter view={view} lang={lang} demoMode={demoMode} />;
 }

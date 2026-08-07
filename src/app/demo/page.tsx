@@ -1,37 +1,19 @@
-import { MacroDesk } from "@/app/components/MacroDesk";
-import { loadCatalystFeed, toPublicCatalystFeed } from "@/catalyst";
-import { loadBoundedGammaDeskView, resolveDeskRequest } from "@/desk";
+import { CommandCenter } from "@/app/components/v2/CommandCenter";
+import { loadV2HomePage } from "@/desk/load-v2-home";
 
 export const dynamic = "force-dynamic";
 
 export default async function DemoHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; gamma?: string }>;
+  searchParams: Promise<{ gamma?: string; lang?: string }>;
 }) {
   const params = await searchParams;
-  const view = resolveDeskRequest({
-    source: params.source,
-    demoPath: true,
-    publicDemo: true,
-  });
-  const catalystFeed =
-    view.status === "live_unavailable"
-      ? null
-      : toPublicCatalystFeed(loadCatalystFeed({}, { publicDemo: true }));
-
-  const gammaView = loadBoundedGammaDeskView({
-    symbol: "SPY",
+  const { view, lang, demoMode } = await loadV2HomePage({
+    demo: true,
     forceFixture: params.gamma === "fixture",
-    publicDemo: true,
+    lang: params.lang,
   });
 
-  return (
-    <MacroDesk
-      view={view}
-      catalystFeed={catalystFeed}
-      gammaView={gammaView}
-      demoMode
-    />
-  );
+  return <CommandCenter view={view} lang={lang} demoMode={demoMode} />;
 }
