@@ -4,7 +4,6 @@ import { createServer } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CATALYST_DEMO_BANNER,
-  CATALYST_DEMO_DISCLAIMER,
 } from "@/catalyst";
 import {
   PUBLIC_DEMO_DRIVER,
@@ -19,8 +18,6 @@ import {
 const START_TIMEOUT_MS = 60_000;
 const FETCH_TIMEOUT_MS = 15_000;
 
-const FIXTURE_FALLBACK_BANNER =
-  "Demo · fixture fallback — not a live market session.";
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -103,7 +100,7 @@ describe("public demo production build", () => {
     });
   });
 
-  it("serves / in current/live mode with an honest empty state", async () => {
+  it("serves / in live V2 mode with an honest empty state", async () => {
     const desk = await fetch(baseUrl + "/api/macro/latest", {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     }).then((r) => r.json());
@@ -118,11 +115,13 @@ describe("public demo production build", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
+    expect(html).toContain('class="v2-app"');
     expect(html).not.toContain('data-testid="banner-illustrative-demo"');
     expect(html).not.toContain('data-testid="demo-route-banner"');
+    expect(html).toContain("Live decision withheld");
 
     if (desk.status === "empty") {
-      expect(html).toContain("No macro driver");
+      expect(html).toContain("No aligned macro snapshot");
       expect(desk.driver).toBeNull();
     } else {
       expect(desk.isLiveDriver).toBe(true);
@@ -130,7 +129,7 @@ describe("public demo production build", () => {
     }
   });
 
-  it("serves /demo in explicit synthetic mode with fixture provenance", async () => {
+  it("serves /demo in explicit synthetic V2 mode with fixture provenance", async () => {
     const desk = await fetch(baseUrl + "/api/macro/latest?demo=1", {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     }).then((r) => r.json());
@@ -146,23 +145,32 @@ describe("public demo production build", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
+    expect(html).toContain('class="v2-app"');
     expect(html).toContain('data-testid="demo-route-banner"');
     expect(html).toContain("Synthetic fixtures only via");
     expect(html).toContain('data-testid="banner-illustrative-demo"');
+    expect(html).toContain("Illustrative methodology preview");
     expect(html).toContain(PUBLIC_DEMO_DRIVER.label);
-    expect(html).toContain(
-      `${PUBLIC_DEMO_DRIVER.confidence.score}/100 (uncalibrated)`,
-    );
-    expect(html).toContain("Catalyst feed");
-    expect(html).toContain('data-testid="driver-risk-light"');
-    expect(html).toContain(CATALYST_DEMO_DISCLAIMER);
+    expect(html).toContain('data-testid="v2-gamma-SPY"');
+    expect(html).toContain('data-testid="v2-gamma-QQQ"');
     expect(html).not.toContain("fixture missing or invalid");
     expect(html).not.toContain("ENOENT");
+  });
 
-    const fixtureHtml = await fetch(baseUrl + "/?source=fixture", {
+  it("redirects legacy /v2 routes to / and /demo while preserving lang", async () => {
+    const live = await fetch(baseUrl + "/v2?lang=zh", {
+      redirect: "manual",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    }).then((r) => r.text());
-    expect(fixtureHtml).toContain(FIXTURE_FALLBACK_BANNER);
+    });
+    expect(live.status).toBe(307);
+    expect(live.headers.get("location")).toBe("/?lang=zh");
+
+    const demo = await fetch(baseUrl + "/v2?preview=1&lang=en", {
+      redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    expect(demo.status).toBe(307);
+    expect(demo.headers.get("location")).toBe("/demo?lang=en");
   });
 
   it("distinguishes default desk API from explicit demo flag", async () => {

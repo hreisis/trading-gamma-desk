@@ -50,6 +50,13 @@ describe("GammaDesk V2 command center", () => {
     });
   });
 
+  it("keeps demo QQQ distinct from the SPY fixture", () => {
+    const qqq = loadBoundedGammaDeskView({ symbol: "QQQ", publicDemo: true });
+    expect(qqq.status).toBe("empty");
+    expect(qqq.snapshot).toBeNull();
+    expect(qqq.isFixture).toBe(false);
+  });
+
   it("summarizes SPY fixture but keeps an unavailable QQQ distinct", () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
     const view = buildV2CommandCenterView({

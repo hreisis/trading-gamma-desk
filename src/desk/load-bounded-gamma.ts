@@ -88,6 +88,19 @@ export function loadBoundedGammaDeskView(
     options.publicDemo ?? isPublicDemoMode(options.env ?? process.env);
 
   if (options.forceFixture || publicDemo) {
+    if (symbol !== "SPY") {
+      return {
+        status: "empty",
+        snapshot: null,
+        sourceLabel: `${symbol} demo fixture not configured`,
+        isFixture: false,
+        error: {
+          code: "empty",
+          message:
+            `${symbol} is unavailable because the demo must not reuse the SPY fixture.`,
+        },
+      };
+    }
     return parseSnapshot(
       spyBoundedUiFixture,
       BOUNDED_GAMMA_UI_FIXTURE_PATH,

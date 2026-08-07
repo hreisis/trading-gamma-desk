@@ -202,25 +202,28 @@ function AllocationMap({
 export function CommandCenter({
   view,
   lang,
+  demoMode = false,
 }: {
   view: V2CommandCenterView;
   lang: V2Language;
+  demoMode?: boolean;
 }) {
   const t = copy[lang];
   const preview = view.decisionStatus === "methodology_preview";
-  const previewQuery = preview ? "&preview=1" : "";
+  const homePath = demoMode ? "/demo" : "/";
+  const langQuery = `?lang=${lang}`;
 
   return (
     <div className="v2-app">
       <aside className="v2-sidebar">
-        <a className="v2-mark" href={`/v2?lang=${lang}`} aria-label="GammaDesk home">G</a>
+        <a className="v2-mark" href={`${homePath}${langQuery}`} aria-label="GammaDesk home">G</a>
         <nav aria-label="V2 navigation">
           <a className="is-active" href="#overview"><span>01</span>{t.overview}</a>
           <a href="#gamma"><span>02</span>{t.structure}</a>
-          <a href="/"><span>03</span>{t.macro}</a>
+          <a href="#overview"><span>03</span>{t.macro}</a>
           <a href="#allocation-heading"><span>04</span>{t.rotation}</a>
-          <a href="/ai-study"><span>05</span>{t.study}</a>
-          <a href="/decide"><span>06</span>{t.review}</a>
+          <a href="#overview"><span>05</span>{t.study}</a>
+          <a href="#overview"><span>06</span>{t.review}</a>
         </nav>
       </aside>
 
@@ -233,13 +236,16 @@ export function CommandCenter({
           <div className="v2-top-actions">
             <span>{view.sessionDate ?? "—"}</span>
             <div className="v2-lang" aria-label="Language">
-              <a className={lang === "zh" ? "is-active" : ""} href={`/v2?lang=zh${previewQuery}`}>中文</a>
-              <a className={lang === "en" ? "is-active" : ""} href={`/v2?lang=en${previewQuery}`}>EN</a>
+              <a className={lang === "zh" ? "is-active" : ""} href={`${homePath}?lang=zh`}>中文</a>
+              <a className={lang === "en" ? "is-active" : ""} href={`${homePath}?lang=en`}>EN</a>
             </div>
           </div>
         </header>
 
-        <div className={`v2-trust-banner ${preview ? "is-preview" : "is-blocked"}`}>
+        <div
+          className={`v2-trust-banner ${preview ? "is-preview" : "is-blocked"}`}
+          data-testid={preview ? "banner-illustrative-demo" : undefined}
+        >
           {preview ? t.preview : t.liveBlocked}
         </div>
 
