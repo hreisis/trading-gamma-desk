@@ -823,6 +823,41 @@ Inputs are explicit provenance rows (`macro`, `catalysts`, `gamma_structure`, `m
 
 ---
 
+## 5. MarketInputSnapshot (V2-3A readiness)
+
+Timestamp-aligned **input readiness** envelope for V2 decision engines. Zod: `src/contracts/market-input-snapshot.ts`. Builder: `buildMarketInputSnapshot` / `loadMarketInputSnapshot` in `src/desk/build-market-input-snapshot.ts`.
+
+Does **not** compute Risk, Exposure, Allocation, or stance. Each `inputs[]` row carries:
+
+| Field | Rule |
+| --- | --- |
+| `value` | Typed payload or `null` — never silently forward-filled |
+| `asOf` | Vendor/compute instant for the observation |
+| `marketSessionDate` | Session the observation describes (`YYYY-MM-DD`) |
+| `source` | `{ provider, artifact, fetchedAt }` |
+| `status` | `available` \| `partial` \| `incomplete` \| `unavailable` \| `missing` |
+| `stale` | `true` when cross-session, vendor-stale, or macro `staleDays > 0` |
+| `missingReason` | Human-auditable gap when not `available` |
+| `isProxy` | From `ASSET_REGISTRY` for macro assets; `false` for quotes/gamma |
+
+`missing` means **no wired repository source** (session breadth, credit, VIX term structure, event gate). Event-scoped catalyst breadth must not substitute for session breadth.
+
+`targetMarketSessionDate` is the desk cross-section anchor (America/New_York). `sessionAlignment` and `isCompleteCrossSection` summarize whether all required inputs align to that session without staleness.
+
+### EventGate (V2-3C)
+
+Deterministic shock gate from the official catalyst calendar only. Zod: `src/contracts/event-gate.ts`. Builder: `buildEventGate` in `src/desk/event-gate/`.
+
+| Field | Rule |
+| --- | --- |
+| `state` | `clear` \| `scheduled_risk` \| `active_shock` \| `unavailable` — never directional |
+| `activeEvents` | High-impact rows inside configured pre/post windows |
+| `nextEvent` | Earliest future high-impact scheduled row (informational) |
+| Windows | CPI/Payrolls 24h pre / 2h post; FOMC decision 12h/4h; press conf 2h/2h |
+| Stale | `stale_calendar` mode or `source.stale` (age &gt; 36h TTL) → `unavailable` |
+
+---
+
 ## Contract rules
 
 1. Do not emit `kind: "reported_flow"` unless backed by real ETF/fund/options flow sources.
