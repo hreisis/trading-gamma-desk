@@ -29,11 +29,10 @@ import { resolveDeskRequest } from "./resolve-desk-request";
 const GAMMA_FLIP_UNAVAILABLE_REASON =
   "Gamma Flip is not estimated; requires recomputing gamma from spot, IV, rates, and time-to-expiry rather than interpolating strike GEX";
 
-const NO_SESSION_BREADTH_REASON =
-  "No session-level breadth loader exists in the repository; event-scoped catalyst breadth is not substituted.";
-
-const NO_SESSION_LEADERSHIP_REASON =
-  "No session-level leadership / rotation loader exists in the repository.";
+import {
+  BREADTH_INTERNALS_MISSING_REASON,
+  LEADERSHIP_ROTATION_MISSING_REASON,
+} from "./breadth-leadership/capability-audit";
 
 const NO_VIX_TERM_STRUCTURE_REASON =
   "VIX term structure and positioning ingest is not implemented (no VIX9D/VIX3M/VVIX source).";
@@ -409,8 +408,8 @@ export function buildMarketInputSnapshot(
   const inputs: MarketInputField[] = [
     deriveQuoteField("spy_quote", "SPY", input.alpacaPanel, input.targetMarketSessionDate),
     deriveQuoteField("qqq_quote", "QQQ", input.alpacaPanel, input.targetMarketSessionDate),
-    missingField("breadth_internals", NO_SESSION_BREADTH_REASON),
-    missingField("leadership_rotation", NO_SESSION_LEADERSHIP_REASON),
+    missingField("breadth_internals", BREADTH_INTERNALS_MISSING_REASON),
+    missingField("leadership_rotation", LEADERSHIP_ROTATION_MISSING_REASON),
     deriveMacroAssetField("vix_spot", "VIX", input.macro, input.targetMarketSessionDate),
     missingField("vix_term_structure", NO_VIX_TERM_STRUCTURE_REASON),
     deriveMacroAssetField("us2y", "US2Y", input.macro, input.targetMarketSessionDate),
