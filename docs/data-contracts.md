@@ -889,6 +889,12 @@ Durable SPY breadth uses the existing `BreadthInternalsSnapshot` schema — no s
 | **Filesystem** | Local dev and hermetic tests under `data/breadth/` (gitignored) |
 | **Vercel Blob** | Production persistence via injected minimal `BlobStoreClient` (`BLOB_READ_WRITE_TOKEN` or `VERCEL_BLOB_READ_WRITE_TOKEN`) |
 
+#### Daily breadth producer (V2-3B4B)
+
+`produceDailySpyBreadth()` in `src/desk/breadth/produce-daily-spy-breadth.ts` orchestrates: official SPY universe → Alpaca constituent daily bars → existing `computeSpyBreadthInternals` → Zod validate → `publishBreadthSnapshot()`. Upstream failure, `status: unavailable`, or publish errors leave the latest pointer unchanged (last-known-good).
+
+Vercel Cron: `GET /api/cron/breadth-daily` (`vercel.json` schedule `0 22 * * *` UTC — ~1h after US regular close). Requires `Authorization: Bearer $CRON_SECRET`; missing or mismatched secret returns **401** (fail-closed). Cron does not duplicate producer logic.
+
 ### EventGate (V2-3C)
 
 Deterministic shock gate from the official catalyst calendar only. Zod: `src/contracts/event-gate.ts`. Builder: `buildEventGate` in `src/desk/event-gate/`.
