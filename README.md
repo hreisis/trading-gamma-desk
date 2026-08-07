@@ -59,7 +59,7 @@ Public deploy (GAMMADESK_PUBLIC_DEMO=1):
 | `src/desk` | Filesystem load + public-demo / status model for UI/API |
 | `src/app` | Macro Desk + Catalyst Feed (read-only) |
 
-Docs: [product](docs/product.md) · [architecture](docs/architecture.md) · [contracts](docs/data-contracts.md) · [tasks](docs/tasks.md) · [AGENTS](AGENTS.md)
+Docs: [V2 roadmap](docs/v2-roadmap.md) · [product](docs/product.md) · [architecture](docs/architecture.md) · [contracts](docs/data-contracts.md) · [tasks](docs/tasks.md) · [AGENTS](AGENTS.md)
 
 ---
 

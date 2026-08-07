@@ -1,5 +1,7 @@
 # Tasks
 
+> **V2 status:** For current phase, active milestone, and definition of done, see [`docs/v2-roadmap.md`](v2-roadmap.md). This file remains a historical living build log (M1–M9 and early V2 rows); it may lag the roadmap.
+
 ## GammaDesk V2 reset (current focus)
 
 | ID | Task | Status |
