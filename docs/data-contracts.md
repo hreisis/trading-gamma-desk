@@ -882,18 +882,18 @@ Durable SPY breadth uses the existing `BreadthInternalsSnapshot` schema — no s
 
 **Publish-last order:** `writeVersioned(snapshot)` → `readSnapshot` read-back validation → `publishLatest(pointer)`. A failed snapshot write never updates latest; a failed latest publish leaves the prior pointer intact (atomic filesystem rename; Blob `put` failure does not delete the old object).
 
-**Last-known-good:** malformed JSON, schema errors, `status: unavailable`, and path traversal are rejected. Immutable identity conflicts (same path, different payload) fail without overwriting. Blob adapter returns `unavailable` when no client/token is configured — it does not fall back to local `data/`.
+**Last-known-good:** malformed JSON, schema errors, `status: unavailable`, and path traversal are rejected. Immutable identity conflicts (same path, different payload) fail without overwriting. On Vercel/production hosts, missing `BLOB_READ_WRITE_TOKEN` / `VERCEL_BLOB_READ_WRITE_TOKEN` is **fail-closed** — the cron route returns **503** and does not fall back to ephemeral `data/breadth/`.
 
 | Adapter | Responsibility |
 | --- | --- |
-| **Filesystem** | Local dev and hermetic tests under `data/breadth/` (gitignored) |
+| **Filesystem** | Local development and hermetic tests under `data/breadth/` (gitignored) |
 | **Vercel Blob** | Production persistence via injected minimal `BlobStoreClient` (`BLOB_READ_WRITE_TOKEN` or `VERCEL_BLOB_READ_WRITE_TOKEN`) |
 
 #### Daily breadth producer (V2-3B4B)
 
 `produceDailySpyBreadth()` in `src/desk/breadth/produce-daily-spy-breadth.ts` orchestrates: official SPY universe → Alpaca constituent daily bars → existing `computeSpyBreadthInternals` → Zod validate → `publishBreadthSnapshot()`. Upstream failure, `status: unavailable`, or publish errors leave the latest pointer unchanged (last-known-good).
 
-Vercel Cron: `GET /api/cron/breadth-daily` (`vercel.json` schedule `0 22 * * *` UTC — ~1h after US regular close). Requires `Authorization: Bearer $CRON_SECRET`; missing or mismatched secret returns **401** (fail-closed). Cron does not duplicate producer logic.
+Vercel Cron: `GET /api/cron/breadth-daily` (`vercel.json` schedule `0 22 * * *` UTC = **18:00 ET** during daylight saving, **17:00 ET** during standard time — ~1h after US regular close at 16:00 ET). Requires `Authorization: Bearer $CRON_SECRET`; missing or mismatched secret returns **401** (fail-closed). Missing blob token on Vercel returns **503** `storage_unavailable` — cron does not report success after non-persistent writes. Cron does not duplicate producer logic.
 
 ### EventGate (V2-3C)
 

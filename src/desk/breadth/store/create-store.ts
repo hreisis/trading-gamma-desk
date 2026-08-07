@@ -1,3 +1,4 @@
+import { isServerlessHost } from "@/desk/production-runtime";
 import {
   createBlobBreadthSnapshotStore,
   createFilesystemBreadthSnapshotStore,
@@ -6,6 +7,54 @@ import {
   type BreadthSnapshotStore,
 } from "./index";
 
+export type BreadthStoreResolution =
+  | { readonly ok: true; readonly store: BreadthSnapshotStore }
+  | {
+      readonly ok: false;
+      readonly reason: "blob_unconfigured";
+      readonly message: string;
+    };
+
+export function resolveBreadthSnapshotStoreFromEnv(
+  env: Record<string, string | undefined> = process.env,
+  options?: {
+    readonly fetchImpl?: typeof fetch;
+    readonly dataRoot?: string;
+    readonly blobPrefix?: string;
+  },
+): BreadthStoreResolution {
+  const token = readBreadthBlobToken(env);
+  if (token) {
+    return {
+      ok: true,
+      store: createBlobBreadthSnapshotStore({
+        client: createFetchVercelBlobStoreClient({
+          token,
+          fetchImpl: options?.fetchImpl,
+        }),
+        prefix: options?.blobPrefix ?? "breadth",
+      }),
+    };
+  }
+
+  if (isServerlessHost(env as NodeJS.ProcessEnv)) {
+    return {
+      ok: false,
+      reason: "blob_unconfigured",
+      message:
+        "Breadth durable storage requires BLOB_READ_WRITE_TOKEN on Vercel — filesystem fallback is disabled in production",
+    };
+  }
+
+  return {
+    ok: true,
+    store: createFilesystemBreadthSnapshotStore({
+      dataRoot: options?.dataRoot ?? "data",
+    }),
+  };
+}
+
+/** Local-dev convenience; throws when production host has no blob token configured. */
 export function createBreadthSnapshotStoreFromEnv(
   env: Record<string, string | undefined> = process.env,
   options?: {
@@ -14,18 +63,9 @@ export function createBreadthSnapshotStoreFromEnv(
     readonly blobPrefix?: string;
   },
 ): BreadthSnapshotStore {
-  const token = readBreadthBlobToken(env);
-  if (token) {
-    return createBlobBreadthSnapshotStore({
-      client: createFetchVercelBlobStoreClient({
-        token,
-        fetchImpl: options?.fetchImpl,
-      }),
-      prefix: options?.blobPrefix ?? "breadth",
-    });
+  const resolution = resolveBreadthSnapshotStoreFromEnv(env, options);
+  if (!resolution.ok) {
+    throw new Error(resolution.message);
   }
-
-  return createFilesystemBreadthSnapshotStore({
-    dataRoot: options?.dataRoot ?? "data",
-  });
+  return resolution.store;
 }

@@ -1,33 +1,57 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { verifyCronSecret } from "@/desk/cron/verify-cron-secret";
+import type { BreadthStoreResolution } from "@/desk/breadth/store/create-store";
+
+const { mockStore, resolveBreadthSnapshotStoreFromEnv, produceDailySpyBreadth } =
+  vi.hoisted(() => {
+    const mockStore = {
+      mode: "filesystem" as const,
+      writeVersioned: vi.fn(),
+      publishLatest: vi.fn(),
+      readLatestPointer: vi.fn(),
+      readSnapshot: vi.fn(),
+    };
+
+    const resolveBreadthSnapshotStoreFromEnv = vi.fn(
+      (): BreadthStoreResolution => ({
+        ok: true,
+        store: mockStore,
+      }),
+    );
+
+    const produceDailySpyBreadth = vi.fn(async () => ({
+      status: "published",
+      marketSessionDate: "2026-08-06",
+      snapshotIdentity: "2026-08-06_20260806T220000000Z",
+      publishedAt: "2026-08-06T22:00:00.000Z",
+    }));
+
+    return {
+      mockStore,
+      resolveBreadthSnapshotStoreFromEnv,
+      produceDailySpyBreadth,
+    };
+  });
 
 vi.mock("@/desk/breadth/produce-daily-spy-breadth", () => ({
-  produceDailySpyBreadth: vi.fn(async () => ({
-    status: "published",
-    marketSessionDate: "2026-08-06",
-    snapshotIdentity: "2026-08-06_20260806T220000000Z",
-    publishedAt: "2026-08-06T22:00:00.000Z",
-  })),
+  produceDailySpyBreadth,
 }));
 
 vi.mock("@/desk/breadth/store/create-store", () => ({
-  createBreadthSnapshotStoreFromEnv: vi.fn(() => ({
-    mode: "filesystem",
-    writeVersioned: vi.fn(),
-    publishLatest: vi.fn(),
-    readLatestPointer: vi.fn(),
-    readSnapshot: vi.fn(),
-  })),
+  resolveBreadthSnapshotStoreFromEnv,
 }));
 
 import { GET } from "@/app/api/cron/breadth-daily/route";
-import { produceDailySpyBreadth } from "@/desk/breadth/produce-daily-spy-breadth";
 
 const ORIGINAL_ENV = { ...process.env };
 
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
   vi.clearAllMocks();
+  resolveBreadthSnapshotStoreFromEnv.mockImplementation(() => ({
+    ok: true,
+    store: mockStore,
+  }));
 });
 
 describe("verifyCronSecret", () => {
@@ -76,7 +100,36 @@ describe("GET /api/cron/breadth-daily", () => {
     expect(produceDailySpyBreadth).not.toHaveBeenCalled();
   });
 
-  it("runs producer when authorized", async () => {
+  it("returns 503 when production storage is not configured", async () => {
+    process.env.CRON_SECRET = "expected-secret";
+    resolveBreadthSnapshotStoreFromEnv.mockReturnValueOnce({
+      ok: false,
+      reason: "blob_unconfigured",
+      message:
+        "Breadth durable storage requires BLOB_READ_WRITE_TOKEN on Vercel — filesystem fallback is disabled in production",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cron/breadth-daily", {
+        headers: { authorization: "Bearer expected-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(produceDailySpyBreadth).not.toHaveBeenCalled();
+    const body = (await response.json()) as {
+      status: string;
+      reason: string;
+      detail: string;
+    };
+    expect(body).toMatchObject({
+      status: "failed",
+      reason: "storage_unavailable",
+    });
+    expect(JSON.stringify(body)).not.toMatch(/Bearer\s+/i);
+  });
+
+  it("runs producer when authorized and storage is configured", async () => {
     process.env.CRON_SECRET = "expected-secret";
     const response = await GET(
       new Request("http://localhost/api/cron/breadth-daily", {
@@ -95,6 +148,6 @@ describe("GET /api/cron/breadth-daily", () => {
       marketSessionDate: "2026-08-06",
       snapshotIdentity: "2026-08-06_20260806T220000000Z",
     });
-    expect(JSON.stringify(body)).not.toMatch(/secret|token|api_key/i);
+    expect(JSON.stringify(body)).not.toMatch(/Bearer\s+/i);
   });
 });

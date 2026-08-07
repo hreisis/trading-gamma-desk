@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyCronSecret } from "@/desk/cron/verify-cron-secret";
 import { produceDailySpyBreadth } from "@/desk/breadth/produce-daily-spy-breadth";
-import { createBreadthSnapshotStoreFromEnv } from "@/desk/breadth/store/create-store";
+import { resolveBreadthSnapshotStoreFromEnv } from "@/desk/breadth/store/create-store";
 
 /** SPY breadth daily producer — Vercel Cron only; not for browser or public polling. */
 export const dynamic = "force-dynamic";
@@ -13,8 +13,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const storeResolution = resolveBreadthSnapshotStoreFromEnv(process.env);
+  if (!storeResolution.ok) {
+    return NextResponse.json(
+      {
+        status: "failed",
+        reason: "storage_unavailable",
+        detail: storeResolution.message,
+      },
+      { status: 503 },
+    );
+  }
+
   const result = await produceDailySpyBreadth({
-    store: createBreadthSnapshotStoreFromEnv(process.env),
+    store: storeResolution.store,
     env: process.env,
   });
 
