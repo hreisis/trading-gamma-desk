@@ -842,7 +842,34 @@ Does **not** compute Risk, Exposure, Allocation, or stance. Each `inputs[]` row 
 
 `missing` means **no wired repository source** (session breadth, credit, VIX term structure, event gate). Event-scoped catalyst breadth must not substitute for session breadth.
 
-`targetMarketSessionDate` is the desk cross-section anchor (America/New_York). `sessionAlignment` and `isCompleteCrossSection` summarize whether all required inputs align to that session without staleness.
+`targetMarketSessionDate` is the desk cross-section anchor: the **last completed** US equity session in `America/New_York` (after regular close on a trading day; prior session before close or on non-session days). `sessionAlignment` and `isCompleteCrossSection` summarize whether all required inputs align to that session without staleness.
+
+### BreadthInternals (V2-3B3)
+
+Session-level SPY ETF-holdings breadth. Zod: `src/contracts/breadth-internals.ts`. Builder: `loadSpyBreadthInternals` → `computeSpyBreadthInternals`.
+
+| Field | Rule |
+| --- | --- |
+| `advance` / `decline` / `unchanged` | Counts from prior-session close vs target-session close |
+| `metrics.advanceDecline` | `{ advance, decline, unchanged, eligibleCount, denominator, coverage, status }` — **no `numerator`**; invariant `advance + decline + unchanged === eligibleCount` |
+| `metrics.percentAboveMA*` / `new20Day*` | `BreadthMetricResult` with explicit numerator/denominator |
+| `status` | Gated by universe freshness and per-metric coverage thresholds |
+
+Target session must be completed — intraday runs before US regular close must not treat the in-progress calendar day as the daily bar session.
+
+### EtfUniverseArtifact (V2-3B3)
+
+Official SPY holdings parse. Zod: `src/contracts/etf-universe-artifact.ts`.
+
+| `rowCounts` field | Meaning |
+| --- | --- |
+| `sheetDataRowCount` | All rows after the holdings header |
+| `holdingCandidateCount` | Rows representing positions (equity, cash, CVR, duplicate) |
+| `constituentCount` | Included equity symbols |
+| `excludedHoldingCount` | `cash_row` / `non_equity_ticker` / `duplicate_ticker` only |
+| `ignoredMetadataRowCount` | Disclaimers/footnotes — **not** in `excludedRows` |
+
+**Persistence:** `data/universes/SPY/` and `data/bars/spy-universe/` are **local-ready filesystem adapters only**. Vercel serverless has no durable writable `data/` path; deployment requires external object storage or build-time artifacts (no DB/Blob wired in this phase).
 
 ### EventGate (V2-3C)
 

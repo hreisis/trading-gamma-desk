@@ -206,8 +206,8 @@ describe("MarketInputSnapshot invariants", () => {
       availableCount: 0,
       partialCount: 4,
       incompleteCount: 1,
-      unavailableCount: 5,
-      missingCount: 4,
+      unavailableCount: 6,
+      missingCount: 3,
       staleCount: expect.any(Number),
       crossSessionCount: expect.any(Number),
     });
@@ -228,7 +228,7 @@ describe("buildMarketInputSnapshot", () => {
     });
 
     expect(field(snapshot, "breadth_internals")).toMatchObject({
-      status: "missing",
+      status: "unavailable",
       value: null,
       isProxy: false,
     });
@@ -237,7 +237,7 @@ describe("buildMarketInputSnapshot", () => {
     expect(field(snapshot, "credit_stress").status).toBe("missing");
     expect(field(snapshot, "event_gate").status).toBe("unavailable");
     expect(snapshot.isCompleteCrossSection).toBe(false);
-    expect(snapshot.summary.missingCount).toBeGreaterThanOrEqual(4);
+    expect(snapshot.summary.missingCount).toBeGreaterThanOrEqual(3);
   });
 
   it("keeps QQQ gamma unavailable instead of reusing SPY", () => {

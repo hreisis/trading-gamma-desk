@@ -9,6 +9,7 @@ export * from "./load-bounded-gamma";
 export * from "./v2-command-center";
 export * from "./load-v2-home";
 export * from "./build-market-input-snapshot";
+export * from "./breadth";
 export * from "./event-gate";
 export * from "./event-gate/build-event-gate";
 export * from "./event-gate/classify";

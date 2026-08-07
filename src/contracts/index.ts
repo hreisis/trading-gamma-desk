@@ -21,3 +21,5 @@ export * from "./artifact-integrity";
 export * from "./alpaca-market";
 export * from "./market-input-snapshot";
 export * from "./event-gate";
+export * from "./etf-universe-artifact";
+export * from "./breadth-internals";

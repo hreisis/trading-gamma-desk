@@ -30,6 +30,7 @@
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "next": "16.2.12",
     "node-html-parser": "^9.0.1",
     "react": "19.2.8",
