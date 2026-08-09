@@ -8,4 +8,4 @@ export * from "./filesystem";
 export * from "./blob-client";
 export * from "./blob";
 export * from "./create-store";
-export * from "./vercel-blob-fetch";
+export * from "./vercel-blob-sdk";

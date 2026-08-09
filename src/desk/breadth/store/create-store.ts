@@ -2,7 +2,7 @@ import { isServerlessHost } from "@/desk/production-runtime";
 import {
   createBlobBreadthSnapshotStore,
   createFilesystemBreadthSnapshotStore,
-  createFetchVercelBlobStoreClient,
+  createVercelBlobStoreClient,
   readBreadthBlobToken,
   type BreadthSnapshotStore,
 } from "./index";
@@ -28,9 +28,8 @@ export function resolveBreadthSnapshotStoreFromEnv(
     return {
       ok: true,
       store: createBlobBreadthSnapshotStore({
-        client: createFetchVercelBlobStoreClient({
+        client: createVercelBlobStoreClient({
           token,
-          fetchImpl: options?.fetchImpl,
         }),
         prefix: options?.blobPrefix ?? "breadth",
       }),

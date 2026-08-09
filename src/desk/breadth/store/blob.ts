@@ -119,7 +119,7 @@ export function createBlobBreadthSnapshotStore(
       const body = JSON.stringify(pointer, null, 2) + "\n";
 
       try {
-        await client.put(key, body);
+        await client.put(key, body, { allowOverwrite: true });
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         throw new BreadthStoreError(
@@ -203,7 +203,10 @@ export function createInMemoryBlobStoreClient(
   const entries = new Map(Object.entries(initial ?? {}));
   return {
     entries,
-    async put(path, body) {
+    async put(path, body, options) {
+      if (entries.has(path) && !options?.allowOverwrite) {
+        throw new Error(`blob already exists at pathname: ${path}`);
+      }
       entries.set(path, body);
     },
     async get(path) {

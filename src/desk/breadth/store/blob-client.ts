@@ -1,9 +1,14 @@
 /**
  * Minimal Blob client surface injected into the breadth store adapter.
- * Production wiring can wrap `@vercel/blob` or the REST API; tests use in-memory fakes.
+ * Production wiring uses `@vercel/blob` SDK; tests use in-memory fakes.
  */
+export interface BlobStorePutOptions {
+  /** When false (default), put rejects overwriting an existing pathname. */
+  readonly allowOverwrite?: boolean;
+}
+
 export interface BlobStoreClient {
-  put(path: string, body: string): Promise<void>;
+  put(path: string, body: string, options?: BlobStorePutOptions): Promise<void>;
   get(path: string): Promise<string | null>;
 }
 
