@@ -29,6 +29,8 @@ describe("GammaDesk V2 command center", () => {
     expect(view.exposure).toBeNull();
     expect(view.allocation).toBeNull();
     expect(view.missingInputs).toContain("Credit stress");
+    expect(view.missingInputs).toContain("Breadth: Nasdaq / high-beta / semis");
+    expect(view.spyBreadth.status).toBe("unavailable");
   });
 
   it("labels illustrative decision values as methodology preview", () => {

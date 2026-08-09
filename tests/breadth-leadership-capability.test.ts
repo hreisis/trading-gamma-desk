@@ -60,7 +60,7 @@ describe("V2-3B breadth/leadership capability audit", () => {
       value: null,
       isProxy: false,
     });
-    expect(breadth?.missingReason).toMatch(/SPY breadth/i);
+    expect(breadth?.missingReason).toMatch(/durable snapshot store/i);
     expect(leadership).toMatchObject({
       status: "missing",
       value: null,

@@ -1,5 +1,8 @@
 import type { V2CommandCenterView, V2Language } from "./v2-command-center";
-import { buildV2CommandCenterView } from "./v2-command-center";
+import {
+  buildV2CommandCenterView,
+  summarizeSpyBreadthFromDurable,
+} from "./v2-command-center";
 import {
   loadBoundedGammaDeskView,
   type LoadBoundedGammaOptions,
@@ -12,6 +15,8 @@ import {
   loadBoundedGammaDeskViewAsync,
   resolveDeskRequestAsync,
 } from "./production-runtime";
+import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
+import { loadDurableSpyBreadthForMarketInput } from "./breadth/read-durable-breadth";
 
 export interface LoadV2HomePageInput {
   readonly demo: boolean;
@@ -62,9 +67,30 @@ export async function loadV2HomePage(
       });
 
   const gammaOptions = { forceFixture, publicDemo: input.demo } as const;
-  const [spyGamma, qqqGamma] = await Promise.all([
+  const now = new Date();
+  const targetMarketSessionDate = resolveLastCompletedMarketSessionDate(now);
+
+  const [spyGamma, qqqGamma, breadthLoad] = await Promise.all([
     loadGamma("SPY", gammaOptions, input.demo),
     loadGamma("QQQ", gammaOptions, input.demo),
+    input.demo
+      ? Promise.resolve({
+          snapshot: null,
+          sourceArtifact: null,
+          missingReason: "SPY breadth is not computed on the public demo path.",
+        })
+      : loadDurableSpyBreadthForMarketInput({
+          targetMarketSessionDate,
+          publicDemo: false,
+        }).catch((error: unknown) => {
+          const detail =
+            error instanceof Error ? error.message : String(error);
+          return {
+            snapshot: null,
+            sourceArtifact: null,
+            missingReason: `Durable breadth read failed: ${detail}`,
+          };
+        }),
   ]);
 
   const view = buildV2CommandCenterView({
@@ -72,6 +98,7 @@ export async function loadV2HomePage(
     spyGamma,
     qqqGamma,
     methodologyPreview: input.demo,
+    spyBreadth: summarizeSpyBreadthFromDurable(breadthLoad, input.demo),
   });
 
   return { view, lang, demoMode: input.demo };

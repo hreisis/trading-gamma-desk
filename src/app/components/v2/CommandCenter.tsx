@@ -2,6 +2,7 @@ import type {
   V2CommandCenterView,
   V2GammaSummary,
   V2Language,
+  V2SpyBreadthSummary,
 } from "@/desk";
 
 const copy = {
@@ -28,6 +29,18 @@ const copy = {
     exposureScale: "0–150% gross exposure",
     gamma: "SPY / QQQ gamma",
     gammaNote: "Structure context, not a directional forecast",
+    breadth: "SPY breadth internals",
+    breadthNote: "Official SPY holdings universe · durable daily snapshot",
+    session: "Session",
+    asOf: "As-of",
+    advance: "Advance",
+    decline: "Decline",
+    unchanged: "Unchanged",
+    aboveMa20: "> MA20",
+    aboveMa50: "> MA50",
+    new20dHighs: "20D highs",
+    new20dLows: "20D lows",
+    stale: "Stale",
     spot: "Spot",
     putWall: "Put wall",
     callWall: "Call wall",
@@ -72,6 +85,18 @@ const copy = {
     exposureScale: "0–150% 总敞口",
     gamma: "SPY / QQQ Gamma",
     gammaNote: "描述市场结构，不是方向预测",
+    breadth: "SPY 广度内部指标",
+    breadthNote: "官方 SPY 持仓 universe · 持久化每日快照",
+    session: "交易日",
+    asOf: "截至",
+    advance: "上涨",
+    decline: "下跌",
+    unchanged: "持平",
+    aboveMa20: "> MA20",
+    aboveMa50: "> MA50",
+    new20dHighs: "20 日新高",
+    new20dLows: "20 日新低",
+    stale: "滞后",
     spot: "现货",
     putWall: "Put Wall",
     callWall: "Call Wall",
@@ -100,6 +125,120 @@ function formatLevel(value: number | null): string {
   return value >= 1000
     ? value.toLocaleString("en-US", { maximumFractionDigits: 1 })
     : value.toFixed(value % 1 === 0 ? 0 : 1);
+}
+
+function formatMetric(value: number | null): string {
+  if (value === null) return "—";
+  return `${value}%`;
+}
+
+function SpyBreadthPanel({
+  breadth,
+  lang,
+}: {
+  breadth: V2SpyBreadthSummary;
+  lang: V2Language;
+}) {
+  const t = copy[lang];
+  const ready = breadth.status === "available" || breadth.status === "partial";
+
+  return (
+    <section
+      className="v2-breadth-panel"
+      id="breadth"
+      data-testid="v2-spy-breadth"
+      aria-labelledby="breadth-heading"
+    >
+      <div className="v2-breadth-head">
+        <div>
+          <p className="v2-eyebrow">05 / BREADTH</p>
+          <h2 id="breadth-heading">{t.breadth}</h2>
+          <p className="v2-panel-note">{t.breadthNote}</p>
+        </div>
+        <div className="v2-breadth-badges">
+          <span
+            className={`v2-breadth-status is-${breadth.status}`}
+            data-testid="v2-spy-breadth-status"
+          >
+            {breadth.status}
+          </span>
+          {breadth.stale ? (
+            <span className="v2-breadth-stale" data-testid="v2-spy-breadth-stale">
+              {t.stale}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {ready ? (
+        <>
+          <div className="v2-breadth-meta">
+            <span>{t.session}</span>
+            <strong data-testid="v2-spy-breadth-session">
+              {breadth.marketSessionDate ?? "—"}
+            </strong>
+            <span>{t.asOf}</span>
+            <strong data-testid="v2-spy-breadth-asof">{breadth.asOf ?? "—"}</strong>
+          </div>
+          <div className="v2-breadth-grid">
+            <div>
+              <span>{t.advance}</span>
+              <strong data-testid="v2-spy-breadth-advance">
+                {breadth.advance ?? "—"}
+              </strong>
+            </div>
+            <div>
+              <span>{t.decline}</span>
+              <strong data-testid="v2-spy-breadth-decline">
+                {breadth.decline ?? "—"}
+              </strong>
+            </div>
+            <div>
+              <span>{t.unchanged}</span>
+              <strong>{breadth.unchanged ?? "—"}</strong>
+            </div>
+            <div>
+              <span>{t.aboveMa20}</span>
+              <strong data-testid="v2-spy-breadth-ma20">
+                {formatMetric(breadth.percentAboveMA20)}
+              </strong>
+            </div>
+            <div>
+              <span>{t.aboveMa50}</span>
+              <strong data-testid="v2-spy-breadth-ma50">
+                {formatMetric(breadth.percentAboveMA50)}
+              </strong>
+            </div>
+            <div>
+              <span>{t.new20dHighs}</span>
+              <strong data-testid="v2-spy-breadth-highs">
+                {formatMetric(breadth.new20DayHigh)}
+              </strong>
+            </div>
+            <div>
+              <span>{t.new20dLows}</span>
+              <strong data-testid="v2-spy-breadth-lows">
+                {formatMetric(breadth.new20DayLow)}
+              </strong>
+            </div>
+          </div>
+          {breadth.missingReason ? (
+            <p className="v2-breadth-note" data-testid="v2-spy-breadth-reason">
+              {breadth.missingReason}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="v2-breadth-missing" data-testid="v2-spy-breadth-reason">
+          {breadth.missingReason ?? t.unavailable}
+        </p>
+      )}
+
+      {breadth.sourceArtifact ? (
+        <p className="v2-breadth-source">{breadth.sourceArtifact}</p>
+      ) : null}
+    </section>
+  );
 }
 
 function GammaInstrument({
@@ -291,6 +430,8 @@ export function CommandCenter({
             <p className="v2-flip-warning">{t.gammaFlip}</p>
           </article>
         </section>
+
+        <SpyBreadthPanel breadth={view.spyBreadth} lang={lang} />
 
         <AllocationMap view={view} lang={lang} />
 

@@ -1,5 +1,7 @@
 import type { DominantDriver } from "@/contracts";
+import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
 import type { BoundedGammaDeskView } from "./load-bounded-gamma";
+import type { DurableBreadthReadOutcome } from "./breadth/read-durable-breadth";
 
 export type V2Language = "en" | "zh";
 
@@ -13,6 +15,22 @@ export interface V2GammaSummary {
   readonly quality: string;
   readonly source: string;
   readonly isFixture: boolean;
+}
+
+export interface V2SpyBreadthSummary {
+  readonly status: "available" | "partial" | "unavailable";
+  readonly stale: boolean;
+  readonly marketSessionDate: string | null;
+  readonly asOf: string | null;
+  readonly advance: number | null;
+  readonly decline: number | null;
+  readonly unchanged: number | null;
+  readonly percentAboveMA20: number | null;
+  readonly percentAboveMA50: number | null;
+  readonly new20DayHigh: number | null;
+  readonly new20DayLow: number | null;
+  readonly missingReason: string | null;
+  readonly sourceArtifact: string | null;
 }
 
 export interface V2CommandCenterView {
@@ -32,19 +50,119 @@ export interface V2CommandCenterView {
     | null;
   readonly evidence: readonly string[];
   readonly missingInputs: readonly string[];
+  readonly spyBreadth: V2SpyBreadthSummary;
   readonly gamma: readonly [V2GammaSummary, V2GammaSummary];
   readonly macroLabel: string | null;
   readonly sessionDate: string | null;
 }
 
-const MISSING_INPUTS = [
-  "Breadth: SPY / Nasdaq / high-beta / semis",
+const STATIC_MISSING_INPUTS = [
+  "Breadth: Nasdaq / high-beta / semis",
   "VIX term structure and positioning",
   "Credit stress",
   "Relative leadership / inferred rotation",
   "Shock and event gate",
   "Versioned exposure policy",
 ] as const;
+
+function metricPercent(
+  metric:
+    | {
+        readonly numerator: number;
+        readonly denominator: number;
+        readonly status: string;
+      }
+    | undefined,
+): number | null {
+  if (!metric || metric.status === "unavailable") return null;
+  if (metric.denominator === 0) return null;
+  return Math.round((metric.numerator / metric.denominator) * 1000) / 10;
+}
+
+export function summarizeSpyBreadthFromDurable(
+  outcome: DurableBreadthReadOutcome,
+  publicDemo: boolean,
+): V2SpyBreadthSummary {
+  const unavailableBase: V2SpyBreadthSummary = {
+    status: "unavailable",
+    stale: false,
+    marketSessionDate: null,
+    asOf: null,
+    advance: null,
+    decline: null,
+    unchanged: null,
+    percentAboveMA20: null,
+    percentAboveMA50: null,
+    new20DayHigh: null,
+    new20DayLow: null,
+    missingReason: outcome.missingReason,
+    sourceArtifact: outcome.sourceArtifact,
+  };
+
+  if (publicDemo) {
+    return {
+      ...unavailableBase,
+      missingReason: "SPY breadth is not computed on the public demo path.",
+      sourceArtifact: null,
+    };
+  }
+
+  const snapshot = outcome.snapshot;
+  if (!snapshot) {
+    return unavailableBase;
+  }
+
+  const status =
+    snapshot.status === "available"
+      ? "available"
+      : snapshot.status === "partial"
+        ? "partial"
+        : "unavailable";
+  const showValues = snapshot.status !== "unavailable";
+
+  return {
+    status,
+    stale: snapshot.stale,
+    marketSessionDate: snapshot.marketSessionDate,
+    asOf: snapshot.asOf,
+    advance: showValues ? snapshot.advance : null,
+    decline: showValues ? snapshot.decline : null,
+    unchanged: showValues ? snapshot.unchanged : null,
+    percentAboveMA20: showValues
+      ? metricPercent(snapshot.metrics.percentAboveMA20)
+      : null,
+    percentAboveMA50: showValues
+      ? metricPercent(snapshot.metrics.percentAboveMA50)
+      : null,
+    new20DayHigh: showValues
+      ? metricPercent(snapshot.metrics.new20DayHigh)
+      : null,
+    new20DayLow: showValues
+      ? metricPercent(snapshot.metrics.new20DayLow)
+      : null,
+    missingReason: snapshot.missingReason ?? outcome.missingReason,
+    sourceArtifact: outcome.sourceArtifact,
+  };
+}
+
+/** Maps a loaded breadth snapshot into the command-center field shape. */
+export function summarizeSpyBreadthFromSnapshot(
+  snapshot: BreadthInternalsSnapshot | null | undefined,
+  options?: {
+    readonly sourceArtifact?: string | null;
+    readonly missingReason?: string | null;
+    readonly publicDemo?: boolean;
+  },
+): V2SpyBreadthSummary {
+  return summarizeSpyBreadthFromDurable(
+    {
+      snapshot: snapshot ?? null,
+      sourceArtifact: options?.sourceArtifact ?? null,
+      missingReason: options?.missingReason ?? null,
+    },
+    options?.publicDemo === true,
+  );
+}
 
 function wallStrike(
   wall:
@@ -91,8 +209,19 @@ export function buildV2CommandCenterView(input: {
   readonly spyGamma: BoundedGammaDeskView;
   readonly qqqGamma: BoundedGammaDeskView;
   readonly methodologyPreview?: boolean;
+  readonly spyBreadth?: V2SpyBreadthSummary;
 }): V2CommandCenterView {
   const preview = input.methodologyPreview === true;
+  const spyBreadth =
+    input.spyBreadth ??
+    summarizeSpyBreadthFromDurable(
+      {
+        snapshot: null,
+        sourceArtifact: null,
+        missingReason: "SPY breadth was not loaded.",
+      },
+      false,
+    );
 
   return {
     decisionStatus: preview ? "methodology_preview" : "awaiting_inputs",
@@ -111,7 +240,8 @@ export function buildV2CommandCenterView(input: {
           "Gamma is context only and does not create the directional call.",
         ]
       : [],
-    missingInputs: preview ? [] : MISSING_INPUTS,
+    missingInputs: preview ? [] : [...STATIC_MISSING_INPUTS],
+    spyBreadth,
     gamma: [
       summarizeGamma("SPY", input.spyGamma),
       summarizeGamma("QQQ", input.qqqGamma),
