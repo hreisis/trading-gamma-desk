@@ -178,6 +178,29 @@ describe("GET /api/cron/breadth-daily", () => {
     });
   });
 
+  it("returns 502 when producer reports upstream bars failure", async () => {
+    process.env.CRON_SECRET = "expected-secret";
+    produceDailySpyBreadth.mockResolvedValueOnce({
+      status: "failed",
+      reason: "upstream_bars_unavailable",
+      marketSessionDate: "2026-08-06",
+      detail: "Alpaca daily bar panel returned zero symbols",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cron/breadth-daily", {
+        headers: { authorization: "Bearer expected-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    const body = (await response.json()) as { status: string; reason: string };
+    expect(body).toMatchObject({
+      status: "failed",
+      reason: "upstream_bars_unavailable",
+    });
+  });
+
   it("returns 500 when producer reports publish failure", async () => {
     process.env.CRON_SECRET = "expected-secret";
     produceDailySpyBreadth.mockResolvedValueOnce({

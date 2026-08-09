@@ -60,6 +60,8 @@ export interface ProduceDailySpyBreadthDeps {
   readonly allowUniversePersistedFallback?: boolean;
   /** Override filesystem universe persistence (default: off on Vercel). */
   readonly persistUniverse?: boolean;
+  /** Override filesystem bar cache persistence (default: off on Vercel). */
+  readonly persistBars?: boolean;
 }
 
 function upstreamBarsUnavailable(panel: AlpacaPanelLoadResult): boolean {
@@ -111,6 +113,7 @@ export async function produceDailySpyBreadth(
     dataRoot,
     bootstrap: deps.bootstrapBars ?? false,
     fetchImpl: deps.fetchImpl,
+    persistToFilesystem: deps.persistBars,
   });
 
   if (upstreamBarsUnavailable(panel)) {

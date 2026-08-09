@@ -1,5 +1,6 @@
 import { resolveAlpacaCredentials } from "@/catalyst/market-context/config";
 import { resolveCatalystMarketFeed } from "@/catalyst/market-context/config";
+import { isServerlessHost } from "@/desk/production-runtime";
 import { SPY_BREADTH_CONFIG } from "../config";
 import {
   latestCachedSession,
@@ -61,8 +62,16 @@ export async function loadAlpacaDailyBarPanel(input: {
   readonly dataRoot?: string;
   readonly bootstrap?: boolean;
   readonly fetchImpl?: typeof fetch;
+  /**
+   * When false, a successful Alpaca fetch returns in-memory series only.
+   * Defaults to false on Vercel/serverless hosts; true for local development.
+   */
+  readonly persistToFilesystem?: boolean;
 }): Promise<AlpacaPanelLoadResult> {
   const env = input.env ?? process.env;
+  const persistToFilesystem =
+    input.persistToFilesystem ??
+    !isServerlessHost(env as NodeJS.ProcessEnv);
   const credentials = resolveAlpacaCredentials(env);
   const feedRaw = resolveCatalystMarketFeed(env);
   const priceFeed: "iex" | "sip" = feedRaw === "sip" ? "sip" : "iex";
@@ -162,7 +171,9 @@ export async function loadAlpacaDailyBarPanel(input: {
           updatedAt: fetchedAt,
         };
         seriesBySymbol.set(symbol, series);
-        writeSymbolBarCache(dataRoot, series);
+        if (persistToFilesystem) {
+          writeSymbolBarCache(dataRoot, series);
+        }
       }
       pageToken = parsed.nextPageToken;
     } while (pageToken);

@@ -1,0 +1,373 @@
+import { mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { EtfUniverseArtifact } from "@/contracts/etf-universe-artifact";
+import { parseSpyHoldingsMatrix } from "@/desk/breadth/holdings/parse-spy-holdings";
+import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
+import * as barCacheModule from "@/desk/breadth/bars/cache";
+import * as breadthComputeModule from "@/desk/breadth/compute/breadth";
+import { produceDailySpyBreadth } from "@/desk/breadth/produce-daily-spy-breadth";
+import { breadthProducerHttpStatus } from "@/desk/breadth/producer-http";
+import {
+  BreadthStoreError,
+  createBlobBreadthSnapshotStore,
+  createInMemoryBlobStoreClient,
+} from "@/desk/breadth/store";
+import * as atomicWriteModule from "@/desk/atomic-write";
+
+function sampleRows(): string[][] {
+  return [
+    ["Fund Name:", "State Street® SPDR® S&P 500® ETF Trust"],
+    ["Ticker Symbol:", "SPY"],
+    ["Holdings:", "As of 05-Aug-2026"],
+    ["Name", "Ticker", "Identifier", "Weight", "Sector", "Shares Held", "Local Currency"],
+    ["NVIDIA CORP", "NVDA", "67066G104", "7.99", "-", "100", "USD"],
+    ["BERKSHIRE HATHAWAY INC CL B", "BRK.B", "084670702", "1.44", "-", "10", "USD"],
+    ["BROWN FORMAN CORP CL B", "BF.B", "115637209", "0.01", "-", "1", "USD"],
+  ];
+}
+
+function freshUniverse(): EtfUniverseArtifact {
+  const artifact = parseSpyHoldingsMatrix({
+    rows: sampleRows(),
+    fetchedAt: "2026-08-06T22:00:00.000Z",
+  });
+  return {
+    ...artifact,
+    sessionLag: 0,
+    stale: false,
+    status: "available",
+  };
+}
+
+function alpacaBarsResponse() {
+  return {
+    bars: {
+      NVDA: [
+        {
+          t: "2026-08-05T00:00:00Z",
+          o: 100,
+          h: 101,
+          l: 99,
+          c: 100.5,
+          v: 1000,
+        },
+        {
+          t: "2026-08-06T00:00:00Z",
+          o: 105,
+          h: 106,
+          l: 104,
+          c: 105.5,
+          v: 1100,
+        },
+      ],
+    },
+  };
+}
+
+function mockAlpacaFetch(): typeof fetch {
+  return vi.fn(async () => ({
+    ok: true,
+    json: async () => alpacaBarsResponse(),
+    text: async () => "",
+  })) as unknown as typeof fetch;
+}
+
+const vercelEnv = {
+  VERCEL: "1",
+  NODE_ENV: "production",
+  APCA_API_KEY_ID: "test-key",
+  APCA_API_SECRET_KEY: "test-secret",
+} as NodeJS.ProcessEnv;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("loadAlpacaDailyBarPanel filesystem persistence", () => {
+  it("does not write bar cache on Vercel after a successful Alpaca fetch", async () => {
+    const writeSpy = vi.spyOn(barCacheModule, "writeSymbolBarCache");
+
+    const panel = await loadAlpacaDailyBarPanel({
+      symbols: ["NVDA"],
+      env: vercelEnv,
+      fetchImpl: mockAlpacaFetch(),
+    });
+
+    expect(panel.provenance.returnedSymbols).toBe(1);
+    expect(panel.seriesBySymbol.get("NVDA")?.bars.length).toBeGreaterThan(0);
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
+  it("writes bar cache when explicitly enabled for local development", async () => {
+    const writeSpy = vi.spyOn(barCacheModule, "writeSymbolBarCache");
+
+    await loadAlpacaDailyBarPanel({
+      symbols: ["NVDA"],
+      env: {
+        NODE_ENV: "development",
+        APCA_API_KEY_ID: "test-key",
+        APCA_API_SECRET_KEY: "test-secret",
+      } as NodeJS.ProcessEnv,
+      dataRoot: mkdtempSync(join(process.cwd(), "tmp-bars-")),
+      persistToFilesystem: true,
+      fetchImpl: mockAlpacaFetch(),
+    });
+
+    expect(writeSpy).toHaveBeenCalled();
+  });
+
+  it("skips persistence when persistToFilesystem is explicitly false", async () => {
+    const writeSpy = vi.spyOn(barCacheModule, "writeSymbolBarCache");
+
+    await loadAlpacaDailyBarPanel({
+      symbols: ["NVDA"],
+      env: {
+        NODE_ENV: "development",
+        APCA_API_KEY_ID: "test-key",
+        APCA_API_SECRET_KEY: "test-secret",
+      } as NodeJS.ProcessEnv,
+      persistToFilesystem: false,
+      fetchImpl: mockAlpacaFetch(),
+    });
+
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("produceDailySpyBreadth production filesystem invariants", () => {
+  function barSeries(
+    symbol: string,
+    closes: Array<{ date: string; close: number }>,
+  ) {
+    return {
+      symbol,
+      updatedAt: "2026-08-06T22:00:00.000Z",
+      bars: closes.map((row) => ({
+        sessionDate: row.date,
+        open: row.close,
+        high: row.close + 1,
+        low: row.close - 1,
+        close: row.close,
+        volume: 1_000,
+      })),
+    };
+  }
+
+  function panelForTargetSession(targetSession: string) {
+    const historyDates =
+      targetSession === "2026-08-07"
+        ? ["2026-08-05", "2026-08-06", targetSession]
+        : ["2026-08-05", targetSession];
+
+    const seriesBySymbol = new Map([
+      [
+        "NVDA",
+        barSeries(
+          "NVDA",
+          historyDates.map((date, index) => ({
+            date,
+            close: 100 + index * 5,
+          })),
+        ),
+      ],
+      [
+        "BRK.B",
+        barSeries(
+          "BRK.B",
+          historyDates.map((date, index) => ({
+            date,
+            close: 50 - index,
+          })),
+        ),
+      ],
+      [
+        "BF.B",
+        barSeries(
+          "BF.B",
+          historyDates.map((date) => ({ date, close: 30 })),
+        ),
+      ],
+    ]);
+
+    return {
+      seriesBySymbol,
+      provenance: {
+        provider: "alpaca" as const,
+        priceFeed: "iex" as const,
+        isConsolidated: false,
+        adjustment: "split" as const,
+        requestedSymbols: 3,
+        returnedSymbols: 3,
+        coverage: 1,
+        pages: 1,
+        fetchedAt: "2026-08-06T22:00:00.000Z",
+        latestSessionDate: targetSession,
+        failedSymbols: [],
+      },
+    };
+  }
+
+  it("continues to breadth computation after in-memory bars without filesystem writes", async () => {
+    const computeSpy = vi.spyOn(breadthComputeModule, "computeSpyBreadthInternals");
+    const writeSpy = vi.spyOn(barCacheModule, "writeSymbolBarCache");
+    const loadBarPanel = vi.fn(async () => panelForTargetSession("2026-08-06"));
+
+    const store = createBlobBreadthSnapshotStore({
+      client: createInMemoryBlobStoreClient(),
+      prefix: "breadth",
+    });
+
+    const result = await produceDailySpyBreadth({
+      store,
+      now: () => new Date("2026-08-06T22:00:00.000Z"),
+      env: vercelEnv,
+      loadUniverse: async () => ({
+        artifact: freshUniverse(),
+        source: "network",
+        error: null,
+      }),
+      loadBarPanel,
+      allowUniversePersistedFallback: false,
+    });
+
+    expect(loadBarPanel).toHaveBeenCalledOnce();
+    expect(computeSpy).toHaveBeenCalledOnce();
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(result.status).toBe("published");
+  });
+
+  it("has zero local filesystem writes before blob publish on the production path", async () => {
+    const writeJsonSpy = vi.spyOn(atomicWriteModule, "writeJsonAtomic");
+
+    const store = createBlobBreadthSnapshotStore({
+      client: createInMemoryBlobStoreClient(),
+      prefix: "breadth",
+    });
+
+    await produceDailySpyBreadth({
+      store,
+      now: () => new Date("2026-08-06T22:00:00.000Z"),
+      env: vercelEnv,
+      loadUniverse: async () => ({
+        artifact: freshUniverse(),
+        source: "network",
+        error: null,
+      }),
+      loadBarPanel: async () => panelForTargetSession("2026-08-06"),
+      allowUniversePersistedFallback: false,
+    });
+
+    expect(writeJsonSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns published with HTTP 200 on successful production path", async () => {
+    const store = createBlobBreadthSnapshotStore({
+      client: createInMemoryBlobStoreClient(),
+      prefix: "breadth",
+    });
+
+    const result = await produceDailySpyBreadth({
+      store,
+      now: () => new Date("2026-08-06T22:00:00.000Z"),
+      env: vercelEnv,
+      loadUniverse: async () => ({
+        artifact: freshUniverse(),
+        source: "network",
+        error: null,
+      }),
+      loadBarPanel: async () => panelForTargetSession("2026-08-06"),
+      allowUniversePersistedFallback: false,
+    });
+
+    expect(result.status).toBe("published");
+    expect(breadthProducerHttpStatus(result)).toBe(200);
+  });
+
+  it("returns failed with HTTP 502 when bars upstream is unavailable", async () => {
+    const store = createBlobBreadthSnapshotStore({
+      client: createInMemoryBlobStoreClient(),
+      prefix: "breadth",
+    });
+
+    const result = await produceDailySpyBreadth({
+      store,
+      now: () => new Date("2026-08-06T22:00:00.000Z"),
+      env: vercelEnv,
+      loadUniverse: async () => ({
+        artifact: freshUniverse(),
+        source: "network",
+        error: null,
+      }),
+      loadBarPanel: async () => ({
+        seriesBySymbol: new Map(),
+        provenance: {
+          provider: "alpaca",
+          priceFeed: "iex",
+          isConsolidated: false,
+          adjustment: "split",
+          requestedSymbols: 3,
+          returnedSymbols: 0,
+          coverage: 0,
+          pages: 0,
+          fetchedAt: "2026-08-06T22:00:00.000Z",
+          latestSessionDate: null,
+          failedSymbols: ["NVDA", "BRK.B", "BF.B"],
+        },
+      }),
+      allowUniversePersistedFallback: false,
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "upstream_bars_unavailable",
+    });
+    expect(breadthProducerHttpStatus(result)).toBe(502);
+    expect(await store.readLatestPointer()).toBeNull();
+  });
+
+  it("returns failed with HTTP 500 and retains prior latest when publish fails", async () => {
+    const client = createInMemoryBlobStoreClient();
+    const store = createBlobBreadthSnapshotStore({ client, prefix: "breadth" });
+    const targetSession = "2026-08-06";
+
+    await produceDailySpyBreadth({
+      store,
+      now: () => new Date("2026-08-06T22:00:00.000Z"),
+      env: vercelEnv,
+      loadUniverse: async () => ({
+        artifact: freshUniverse(),
+        source: "network",
+        error: null,
+      }),
+      loadBarPanel: async () => panelForTargetSession(targetSession),
+      allowUniversePersistedFallback: false,
+    });
+
+    const failingStore = createBlobBreadthSnapshotStore({ client, prefix: "breadth" });
+    failingStore.publishLatest = async () => {
+      throw new BreadthStoreError("publish_failed", "simulated publish failure");
+    };
+
+    const result = await produceDailySpyBreadth({
+      store: failingStore,
+      now: () => new Date("2026-08-07T22:00:00.000Z"),
+      env: vercelEnv,
+      loadUniverse: async () => ({
+        artifact: freshUniverse(),
+        source: "network",
+        error: null,
+      }),
+      loadBarPanel: async () => panelForTargetSession("2026-08-07"),
+      allowUniversePersistedFallback: false,
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      reason: "publish_failed",
+    });
+    expect(breadthProducerHttpStatus(result)).toBe(500);
+    const latest = await store.readLatestPointer();
+    expect(latest?.marketSessionDate).toBe(targetSession);
+  });
+});
