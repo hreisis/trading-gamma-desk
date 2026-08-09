@@ -10,5 +10,6 @@ export * from "./bars/alpaca-panel";
 export * from "./compute/breadth";
 export * from "./load-spy-breadth";
 export * from "./produce-daily-spy-breadth";
+export * from "./producer-http";
 export * from "./read-durable-breadth";
 export * from "./store";

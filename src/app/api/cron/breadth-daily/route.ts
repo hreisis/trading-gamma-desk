@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { verifyCronSecret } from "@/desk/cron/verify-cron-secret";
 import { produceDailySpyBreadth } from "@/desk/breadth/produce-daily-spy-breadth";
+import {
+  breadthProducerHttpStatus,
+  logBreadthProducerResult,
+} from "@/desk/breadth/producer-http";
 import { resolveBreadthSnapshotStoreFromEnv } from "@/desk/breadth/store/create-store";
 
 /** SPY breadth daily producer — Vercel Cron only; not for browser or public polling. */
@@ -30,19 +34,29 @@ export async function GET(request: Request) {
     env: process.env,
   });
 
+  logBreadthProducerResult(result);
+
+  const status = breadthProducerHttpStatus(result);
+
   if (result.status === "published") {
-    return NextResponse.json({
-      status: result.status,
-      marketSessionDate: result.marketSessionDate,
-      snapshotIdentity: result.snapshotIdentity,
-      publishedAt: result.publishedAt,
-    });
+    return NextResponse.json(
+      {
+        status: result.status,
+        marketSessionDate: result.marketSessionDate,
+        snapshotIdentity: result.snapshotIdentity,
+        publishedAt: result.publishedAt,
+      },
+      { status },
+    );
   }
 
-  return NextResponse.json({
-    status: result.status,
-    reason: result.reason,
-    marketSessionDate: result.marketSessionDate,
-    detail: result.detail,
-  });
+  return NextResponse.json(
+    {
+      status: result.status,
+      reason: result.reason,
+      marketSessionDate: result.marketSessionDate,
+      detail: result.detail,
+    },
+    { status },
+  );
 }

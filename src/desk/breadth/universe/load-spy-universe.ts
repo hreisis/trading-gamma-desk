@@ -1,4 +1,5 @@
 import type { EtfUniverseArtifact } from "@/contracts/etf-universe-artifact";
+import { isServerlessHost } from "@/desk/production-runtime";
 import { SPY_HOLDINGS_SOURCE_URL } from "../config";
 import { readXlsxSheet1Matrix } from "../holdings/parse-xlsx";
 import { parseSpyHoldingsMatrix } from "../holdings/parse-spy-holdings";
@@ -14,6 +15,14 @@ export interface LoadSpyUniverseOptions {
   readonly dataRoot?: string;
   readonly fetchImpl?: typeof fetch;
   readonly allowPersistedFallback?: boolean;
+  readonly env?: Record<string, string | undefined>;
+  /**
+   * When false, a successful official fetch returns an in-memory artifact only.
+   * Defaults to false on Vercel/serverless hosts; true for local development.
+   */
+  readonly persistToFilesystem?: boolean;
+  /** Test injection override for official holdings fetch. */
+  readonly fetchSpyHoldings?: typeof fetchSpyHoldingsFromOfficial;
 }
 
 export interface LoadSpyUniverseResult {
@@ -49,12 +58,20 @@ export async function loadSpyUniverse(
 ): Promise<LoadSpyUniverseResult> {
   const dataRoot = options.dataRoot ?? "data";
   const fetchImpl = options.fetchImpl ?? fetch;
+  const env = options.env ?? process.env;
+  const persistToFilesystem =
+    options.persistToFilesystem ??
+    !isServerlessHost(env as NodeJS.ProcessEnv);
+  const fetchSpy = options.fetchSpyHoldings ?? fetchSpyHoldingsFromOfficial;
+
   try {
-    const artifact = await fetchSpyHoldingsFromOfficial(
+    const artifact = await fetchSpy(
       options.fetchedAt,
       fetchImpl,
     );
-    persistSpyUniverseArtifact(artifact, dataRoot);
+    if (persistToFilesystem) {
+      persistSpyUniverseArtifact(artifact, dataRoot);
+    }
     return {
       artifact: applyUniverseFreshness(
         artifact,

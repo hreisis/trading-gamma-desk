@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { verifyCronSecret } from "@/desk/cron/verify-cron-secret";
 import type { BreadthStoreResolution } from "@/desk/breadth/store/create-store";
 
+import type { ProduceDailySpyBreadthResult } from "@/desk/breadth/produce-daily-spy-breadth";
+
 const { mockStore, resolveBreadthSnapshotStoreFromEnv, produceDailySpyBreadth } =
   vi.hoisted(() => {
     const mockStore = {
@@ -19,12 +21,14 @@ const { mockStore, resolveBreadthSnapshotStoreFromEnv, produceDailySpyBreadth } 
       }),
     );
 
-    const produceDailySpyBreadth = vi.fn(async () => ({
-      status: "published",
-      marketSessionDate: "2026-08-06",
-      snapshotIdentity: "2026-08-06_20260806T220000000Z",
-      publishedAt: "2026-08-06T22:00:00.000Z",
-    }));
+    const produceDailySpyBreadth = vi.fn(
+      async (): Promise<ProduceDailySpyBreadthResult> => ({
+        status: "published",
+        marketSessionDate: "2026-08-06",
+        snapshotIdentity: "2026-08-06_20260806T220000000Z",
+        publishedAt: "2026-08-06T22:00:00.000Z",
+      }),
+    );
 
     return {
       mockStore,
@@ -149,5 +153,66 @@ describe("GET /api/cron/breadth-daily", () => {
       snapshotIdentity: "2026-08-06_20260806T220000000Z",
     });
     expect(JSON.stringify(body)).not.toMatch(/Bearer\s+/i);
+  });
+
+  it("returns 502 when producer reports upstream failure", async () => {
+    process.env.CRON_SECRET = "expected-secret";
+    produceDailySpyBreadth.mockResolvedValueOnce({
+      status: "failed",
+      reason: "upstream_universe_unavailable",
+      marketSessionDate: "2026-08-06",
+      detail: "SPY holdings HTTP 503",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cron/breadth-daily", {
+        headers: { authorization: "Bearer expected-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    const body = (await response.json()) as { status: string; reason: string };
+    expect(body).toMatchObject({
+      status: "failed",
+      reason: "upstream_universe_unavailable",
+    });
+  });
+
+  it("returns 500 when producer reports publish failure", async () => {
+    process.env.CRON_SECRET = "expected-secret";
+    produceDailySpyBreadth.mockResolvedValueOnce({
+      status: "failed",
+      reason: "publish_failed",
+      marketSessionDate: "2026-08-06",
+      detail: "blob put failed",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cron/breadth-daily", {
+        headers: { authorization: "Bearer expected-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(500);
+  });
+
+  it("returns 200 when producer is skipped", async () => {
+    process.env.CRON_SECRET = "expected-secret";
+    produceDailySpyBreadth.mockResolvedValueOnce({
+      status: "skipped",
+      reason: "breadth_unavailable",
+      marketSessionDate: "2026-08-06",
+      detail: "coverage floor",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/cron/breadth-daily", {
+        headers: { authorization: "Bearer expected-secret" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { status: string };
+    expect(body.status).toBe("skipped");
   });
 });
