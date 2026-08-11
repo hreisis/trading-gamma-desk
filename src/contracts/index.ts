@@ -23,4 +23,5 @@ export * from "./market-input-snapshot";
 export * from "./event-gate";
 export * from "./etf-universe-artifact";
 export * from "./breadth-internals";
+export * from "./breadth-risk-overlay";
 export * from "./breadth-snapshot-pointer";
