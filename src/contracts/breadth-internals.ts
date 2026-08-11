@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { IsoDate, IsoDateTime } from "./common";
 
-export const BREADTH_INTERNALS_SCHEMA_VERSION = "0.1.0" as const;
+export const BREADTH_INTERNALS_SCHEMA_VERSION = "0.2.0" as const;
+export const BREADTH_INTERNALS_LEGACY_SCHEMA_VERSION = "0.1.0" as const;
+
+export const BREADTH_INTERNALS_SCHEMA_VERSIONS = [
+  BREADTH_INTERNALS_LEGACY_SCHEMA_VERSION,
+  BREADTH_INTERNALS_SCHEMA_VERSION,
+] as const;
 
 export const BreadthMetricStatus = z.enum([
   "available",
@@ -48,11 +54,18 @@ export const BreadthAdvanceDeclineMetric = z
     }
   });
 
-export const BreadthCoverageGates = z.object({
+export const BreadthCoverageGatesLegacy = z.object({
   pricePairCoverage: z.number().min(0).max(1),
   ma20Coverage: z.number().min(0).max(1),
   ma50Coverage: z.number().min(0).max(1),
   highLow20Coverage: z.number().min(0).max(1),
+});
+
+export const BreadthCoverageGates = z.object({
+  pricePairCoverage: z.number().min(0).max(1),
+  ma20Coverage: z.number().min(0).max(1),
+  ma50Coverage: z.number().min(0).max(1),
+  closingHighLow20Coverage: z.number().min(0).max(1),
 });
 
 export const BreadthUniverseProvenance = z.object({
@@ -81,9 +94,9 @@ export const BreadthBarsProvenance = z.object({
   failedSymbols: z.array(z.string()),
 });
 
-export const BreadthInternalsSnapshot = z.object({
+export const BreadthInternalsSnapshotLegacy = z.object({
   kind: z.literal("BreadthInternals"),
-  schemaVersion: z.literal(BREADTH_INTERNALS_SCHEMA_VERSION),
+  schemaVersion: z.literal(BREADTH_INTERNALS_LEGACY_SCHEMA_VERSION),
   marketSessionDate: IsoDate,
   asOf: IsoDateTime,
   advance: z.number().int().nonnegative(),
@@ -96,6 +109,29 @@ export const BreadthInternalsSnapshot = z.object({
     new20DayHigh: BreadthMetricResult,
     new20DayLow: BreadthMetricResult,
   }),
+  coverage: BreadthCoverageGatesLegacy,
+  universe: BreadthUniverseProvenance,
+  bars: BreadthBarsProvenance,
+  status: BreadthMetricStatus,
+  stale: z.boolean(),
+  missingReason: z.string().nullable(),
+});
+
+export const BreadthInternalsSnapshot = z.object({
+  kind: z.literal("BreadthInternals"),
+  schemaVersion: z.literal(BREADTH_INTERNALS_SCHEMA_VERSION),
+  marketSessionDate: IsoDate,
+  asOf: IsoDateTime,
+  advance: z.number().int().nonnegative(),
+  decline: z.number().int().nonnegative(),
+  unchanged: z.number().int().nonnegative(),
+  metrics: z.object({
+    advanceDecline: BreadthAdvanceDeclineMetric,
+    percentAboveMA20: BreadthMetricResult,
+    percentAboveMA50: BreadthMetricResult,
+    new20DayClosingHigh: BreadthMetricResult,
+    new20DayClosingLow: BreadthMetricResult,
+  }),
   coverage: BreadthCoverageGates,
   universe: BreadthUniverseProvenance,
   bars: BreadthBarsProvenance,
@@ -104,9 +140,33 @@ export const BreadthInternalsSnapshot = z.object({
   missingReason: z.string().nullable(),
 });
 
+export const StoredBreadthInternalsSnapshot = z.discriminatedUnion(
+  "schemaVersion",
+  [BreadthInternalsSnapshotLegacy, BreadthInternalsSnapshot],
+);
+
+export type BreadthCoverageGatesLegacy = z.infer<typeof BreadthCoverageGatesLegacy>;
 export type BreadthMetricStatus = z.infer<typeof BreadthMetricStatus>;
 export type BreadthMetricResult = z.infer<typeof BreadthMetricResult>;
 export type BreadthAdvanceDeclineMetric = z.infer<
   typeof BreadthAdvanceDeclineMetric
 >;
 export type BreadthInternalsSnapshot = z.infer<typeof BreadthInternalsSnapshot>;
+export type BreadthInternalsSnapshotLegacy = z.infer<
+  typeof BreadthInternalsSnapshotLegacy
+>;
+export type StoredBreadthInternalsSnapshot = z.infer<
+  typeof StoredBreadthInternalsSnapshot
+>;
+
+export function isCurrentBreadthInternalsSnapshot(
+  snapshot: StoredBreadthInternalsSnapshot,
+): snapshot is BreadthInternalsSnapshot {
+  return snapshot.schemaVersion === BREADTH_INTERNALS_SCHEMA_VERSION;
+}
+
+export function isLegacyBreadthInternalsSnapshot(
+  snapshot: StoredBreadthInternalsSnapshot,
+): snapshot is BreadthInternalsSnapshotLegacy {
+  return snapshot.schemaVersion === BREADTH_INTERNALS_LEGACY_SCHEMA_VERSION;
+}

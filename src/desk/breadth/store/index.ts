@@ -7,5 +7,7 @@ export * from "./publish";
 export * from "./filesystem";
 export * from "./blob-client";
 export * from "./blob";
+export * from "./history";
+export * from "./snapshot-queries";
 export * from "./create-store";
 export * from "./vercel-blob-sdk";

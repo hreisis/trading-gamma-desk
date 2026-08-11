@@ -56,13 +56,18 @@ function metricResult(input: {
   includedCount: number;
   threshold: number;
   hardFloor?: number;
+  allowPartial?: boolean;
   missingReason?: string | null;
 }): BreadthMetricResult {
   const coverage =
     input.includedCount === 0 ? 0 : input.eligibleCount / input.includedCount;
+  const partialFloor =
+    input.allowPartial === false
+      ? input.threshold
+      : (input.hardFloor ?? 0);
   let status: BreadthMetricResult["status"] = "unavailable";
   if (coverage >= input.threshold) status = "available";
-  else if (coverage >= (input.hardFloor ?? 0)) status = "partial";
+  else if (coverage >= partialFloor) status = "partial";
   return {
     numerator: input.numerator,
     denominator: input.denominator,
@@ -84,15 +89,27 @@ function barsUpToTarget(
   return bars.filter((bar) => bar.sessionDate <= targetSession);
 }
 
-function priorClosesExcludingTarget(
+/** Last N session closes ending at `targetSession`, including that session's close. */
+export function closesEndingAtTarget(
   bars: readonly DailyBar[],
   targetSession: string,
   count: number,
 ): number[] {
-  const prior = bars
-    .filter((bar) => bar.sessionDate < targetSession)
-    .map((bar) => bar.close);
-  return prior.slice(-count);
+  const filtered = barsUpToTarget(bars, targetSession);
+  if (filtered.length < count) return [];
+  if (filtered.at(-1)?.sessionDate !== targetSession) return [];
+  return filtered.slice(-count).map((bar) => bar.close);
+}
+
+function firstUnavailableReason(
+  metrics: readonly BreadthMetricResult[],
+): string | null {
+  for (const metric of metrics) {
+    if (metric.status === "unavailable" && metric.missingReason) {
+      return metric.missingReason;
+    }
+  }
+  return null;
 }
 
 export function computeSpyBreadthInternals(
@@ -108,11 +125,11 @@ export function computeSpyBreadthInternals(
   let pricePairEligible = 0;
   let ma20Eligible = 0;
   let ma50Eligible = 0;
-  let hl20Eligible = 0;
+  let closingHl20Eligible = 0;
   let aboveMa20 = 0;
   let aboveMa50 = 0;
-  let new20High = 0;
-  let new20Low = 0;
+  let new20ClosingHigh = 0;
+  let new20ClosingLow = 0;
 
   for (const constituent of input.universe.constituents) {
     const series = input.seriesBySymbol.get(constituent.symbol);
@@ -129,30 +146,35 @@ export function computeSpyBreadthInternals(
     else if (delta < 0) decline += 1;
     else unchanged += 1;
 
-    const prior20 = priorClosesExcludingTarget(
+    const closes20 = closesEndingAtTarget(
       bars,
       input.targetMarketSessionDate,
-      20,
+      SPY_BREADTH_CONFIG.minSessionsMa20,
     );
-    if (prior20.length >= 20) {
+    if (closes20.length >= SPY_BREADTH_CONFIG.minSessionsMa20) {
       ma20Eligible += 1;
-      hl20Eligible += 1;
-      const ma20 = prior20.reduce((sum, value) => sum + value, 0) / prior20.length;
+      closingHl20Eligible += 1;
+      const ma20 =
+        closes20.reduce((sum, value) => sum + value, 0) / closes20.length;
       if (targetBar.close > ma20) aboveMa20 += 1;
-      const priorHigh = Math.max(...prior20);
-      const priorLow = Math.min(...prior20);
-      if (targetBar.close > priorHigh) new20High += 1;
-      if (targetBar.close < priorLow) new20Low += 1;
+      const priorCloses = closes20.slice(0, -1);
+      if (priorCloses.length > 0) {
+        const priorHigh = Math.max(...priorCloses);
+        const priorLow = Math.min(...priorCloses);
+        if (targetBar.close > priorHigh) new20ClosingHigh += 1;
+        if (targetBar.close < priorLow) new20ClosingLow += 1;
+      }
     }
 
-    const prior50 = priorClosesExcludingTarget(
+    const closes50 = closesEndingAtTarget(
       bars,
       input.targetMarketSessionDate,
-      50,
+      SPY_BREADTH_CONFIG.minSessionsMa50,
     );
-    if (prior50.length >= 50) {
+    if (closes50.length >= SPY_BREADTH_CONFIG.minSessionsMa50) {
       ma50Eligible += 1;
-      const ma50 = prior50.reduce((sum, value) => sum + value, 0) / prior50.length;
+      const ma50 =
+        closes50.reduce((sum, value) => sum + value, 0) / closes50.length;
       if (targetBar.close > ma50) aboveMa50 += 1;
     }
   }
@@ -161,8 +183,8 @@ export function computeSpyBreadthInternals(
     includedCount === 0 ? 0 : pricePairEligible / includedCount;
   const ma20Coverage = includedCount === 0 ? 0 : ma20Eligible / includedCount;
   const ma50Coverage = includedCount === 0 ? 0 : ma50Eligible / includedCount;
-  const highLow20Coverage =
-    includedCount === 0 ? 0 : hl20Eligible / includedCount;
+  const closingHighLow20Coverage =
+    includedCount === 0 ? 0 : closingHl20Eligible / includedCount;
 
   const advanceDecline = advanceDeclineMetric({
     advance,
@@ -181,6 +203,7 @@ export function computeSpyBreadthInternals(
     eligibleCount: ma20Eligible,
     includedCount,
     threshold: SPY_BREADTH_CONFIG.thresholdMa20,
+    allowPartial: false,
     missingReason: "Insufficient MA20-eligible symbols.",
   });
 
@@ -190,31 +213,41 @@ export function computeSpyBreadthInternals(
     eligibleCount: ma50Eligible,
     includedCount,
     threshold: SPY_BREADTH_CONFIG.thresholdMa50,
+    allowPartial: false,
     missingReason: "Insufficient MA50-eligible symbols.",
   });
 
-  const new20DayHigh = metricResult({
-    numerator: new20High,
-    denominator: hl20Eligible,
-    eligibleCount: hl20Eligible,
+  const new20DayClosingHigh = metricResult({
+    numerator: new20ClosingHigh,
+    denominator: closingHl20Eligible,
+    eligibleCount: closingHl20Eligible,
     includedCount,
     threshold: SPY_BREADTH_CONFIG.thresholdHighLow20,
-    missingReason: "Insufficient 20D high/low eligible symbols.",
+    allowPartial: false,
+    missingReason: "Insufficient 20D closing-high eligible symbols.",
   });
 
-  const new20DayLow = metricResult({
-    numerator: new20Low,
-    denominator: hl20Eligible,
-    eligibleCount: hl20Eligible,
+  const new20DayClosingLow = metricResult({
+    numerator: new20ClosingLow,
+    denominator: closingHl20Eligible,
+    eligibleCount: closingHl20Eligible,
     includedCount,
     threshold: SPY_BREADTH_CONFIG.thresholdHighLow20,
-    missingReason: "Insufficient 20D high/low eligible symbols.",
+    allowPartial: false,
+    missingReason: "Insufficient 20D closing-low eligible symbols.",
   });
 
   const universeStale = input.universe.stale;
   const barsSessionMismatch =
     input.barsProvenance.latestSessionDate !== null &&
     input.barsProvenance.latestSessionDate !== input.targetMarketSessionDate;
+
+  const gatedMetrics = [
+    percentAboveMA20,
+    percentAboveMA50,
+    new20DayClosingHigh,
+    new20DayClosingLow,
+  ];
 
   let status: BreadthInternalsSnapshot["status"] = "available";
   let missingReason: string | null = null;
@@ -227,22 +260,27 @@ export function computeSpyBreadthInternals(
     status = "unavailable";
     missingReason = advanceDecline.missingReason;
   } else if (
+    ma20Coverage === 0 ||
+    ma50Coverage === 0 ||
+    gatedMetrics.some((metric) => metric.status === "unavailable")
+  ) {
+    status = "unavailable";
+    missingReason =
+      firstUnavailableReason(gatedMetrics) ??
+      "MA or 20D closing-high/low coverage below production minimum.";
+  } else if (
     advanceDecline.status === "partial" ||
-    percentAboveMA20.status === "partial" ||
-    percentAboveMA50.status === "partial" ||
-    new20DayHigh.status === "partial" ||
-    new20DayLow.status === "partial" ||
     barsSessionMismatch
   ) {
     status = "partial";
     missingReason = barsSessionMismatch
       ? `Bar panel latest session ${input.barsProvenance.latestSessionDate} does not match target ${input.targetMarketSessionDate}.`
-      : "One or more breadth metrics below production coverage threshold.";
+      : "Advance/decline coverage below production threshold.";
   }
 
   return BreadthInternalsSnapshotSchema.parse({
     kind: "BreadthInternals",
-    schemaVersion: "0.1.0",
+    schemaVersion: "0.2.0",
     marketSessionDate: input.targetMarketSessionDate,
     asOf: input.asOf,
     advance,
@@ -252,14 +290,14 @@ export function computeSpyBreadthInternals(
       advanceDecline,
       percentAboveMA20,
       percentAboveMA50,
-      new20DayHigh,
-      new20DayLow,
+      new20DayClosingHigh,
+      new20DayClosingLow,
     },
     coverage: {
       pricePairCoverage,
       ma20Coverage,
       ma50Coverage,
-      highLow20Coverage,
+      closingHighLow20Coverage,
     },
     universe: {
       universeId: "spy_etf_holdings",

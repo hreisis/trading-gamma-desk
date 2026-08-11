@@ -27,8 +27,8 @@ export interface V2SpyBreadthSummary {
   readonly unchanged: number | null;
   readonly percentAboveMA20: number | null;
   readonly percentAboveMA50: number | null;
-  readonly new20DayHigh: number | null;
-  readonly new20DayLow: number | null;
+  readonly new20DayClosingHigh: number | null;
+  readonly new20DayClosingLow: number | null;
   readonly missingReason: string | null;
   readonly sourceArtifact: string | null;
 }
@@ -93,8 +93,8 @@ export function summarizeSpyBreadthFromDurable(
     unchanged: null,
     percentAboveMA20: null,
     percentAboveMA50: null,
-    new20DayHigh: null,
-    new20DayLow: null,
+    new20DayClosingHigh: null,
+    new20DayClosingLow: null,
     missingReason: outcome.missingReason,
     sourceArtifact: outcome.sourceArtifact,
   };
@@ -134,11 +134,11 @@ export function summarizeSpyBreadthFromDurable(
     percentAboveMA50: showValues
       ? metricPercent(snapshot.metrics.percentAboveMA50)
       : null,
-    new20DayHigh: showValues
-      ? metricPercent(snapshot.metrics.new20DayHigh)
+    new20DayClosingHigh: showValues
+      ? metricPercent(snapshot.metrics.new20DayClosingHigh)
       : null,
-    new20DayLow: showValues
-      ? metricPercent(snapshot.metrics.new20DayLow)
+    new20DayClosingLow: showValues
+      ? metricPercent(snapshot.metrics.new20DayClosingLow)
       : null,
     missingReason: snapshot.missingReason ?? outcome.missingReason,
     sourceArtifact: outcome.sourceArtifact,

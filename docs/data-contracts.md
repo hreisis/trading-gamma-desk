@@ -846,14 +846,20 @@ Does **not** compute Risk, Exposure, Allocation, or stance. Each `inputs[]` row 
 
 ### BreadthInternals (V2-3B3)
 
-Session-level SPY ETF-holdings breadth. Zod: `src/contracts/breadth-internals.ts`. Builder: `loadSpyBreadthInternals` → `computeSpyBreadthInternals`.
+Session-level SPY ETF-holdings breadth. Zod: `src/contracts/breadth-internals.ts`. Builder: `loadSpyBreadthInternals` → `computeSpyBreadthInternals`. **Current schema version: `0.2.0`** (legacy stored artifacts may remain at `0.1.0`).
 
 | Field | Rule |
 | --- | --- |
 | `advance` / `decline` / `unchanged` | Counts from prior-session close vs target-session close |
 | `metrics.advanceDecline` | `{ advance, decline, unchanged, eligibleCount, denominator, coverage, status }` — **no `numerator`**; invariant `advance + decline + unchanged === eligibleCount` |
-| `metrics.percentAboveMA*` / `new20Day*` | `BreadthMetricResult` with explicit numerator/denominator |
-| `status` | Gated by universe freshness and per-metric coverage thresholds |
+| `metrics.percentAboveMA20` / `percentAboveMA50` | `BreadthMetricResult`; **inclusive SMA** over the last 20 / 50 session **closes including the target session**; symbol counted above when `target close > MA` |
+| `metrics.new20DayClosingHigh` / `new20DayClosingLow` | **0.2.0 only** — `BreadthMetricResult`; target close vs max/min of the **prior 19 closes** in the inclusive 20-day window (not intraday highs/lows) |
+| `coverage.closingHighLow20Coverage` | **0.2.0** — eligible fraction for 20D closing-high/low metrics |
+| `status` | Gated by universe freshness, per-metric coverage thresholds, and MA coverage floors (see below) |
+
+**Legacy `0.1.0` field names (read-only, not upgraded):** `new20DayHigh`, `new20DayLow`, `highLow20Coverage`. Legacy snapshots used **prior-exclusive** MA windows (20/51 sessions before target) and ambiguous high/low naming — **not** interchangeable with `0.2.0` trend semantics.
+
+**Coverage gates (`SPY_BREADTH_CONFIG`):** production thresholds for price-pair, MA20, MA50, and closing-high/low eligible fractions. MA and closing metrics use **`allowPartial: false`** — coverage below threshold → metric `unavailable` (not `partial`). Overall `status` is `unavailable` when `ma20Coverage === 0`, `ma50Coverage === 0`, or any gated MA/closing metric is `unavailable`. `partial` remains only for advance/decline or bars session mismatch.
 
 Target session must be completed — intraday runs before US regular close must not treat the in-progress calendar day as the daily bar session.
 
@@ -889,6 +895,18 @@ Durable SPY breadth uses the existing `BreadthInternalsSnapshot` schema — no s
 | **Filesystem** | Local development and hermetic tests under `data/breadth/` (gitignored) |
 | **Vercel Blob** | Production persistence via injected minimal `BlobStoreClient` (`BLOB_READ_WRITE_TOKEN` or `VERCEL_BLOB_READ_WRITE_TOKEN`) |
 
+**Schema read / trend isolation:**
+
+| Operation | Behavior |
+| --- | --- |
+| `readSnapshot` / `readSnapshotBySessionDate` | Returns **stored** artifact — `schemaVersion` `0.1.0` or `0.2.0` with native field names; **no** silent upgrade to `0.2.0` semantics |
+| `readRecentSnapshots` | **0.2.0 only**; deduped by `marketSessionDate` (latest `asOf` wins); limit clamped 5–10 (default 10). Returns `{ status, snapshots, missingReason }` |
+| `status: available` | At least **5** distinct schema-`0.2.0` trading sessions in the series |
+| `status: insufficient_history` | Fewer than 5 schema-`0.2.0` sessions — **do not** pad with `0.1.0`; `snapshots` lists only the valid `0.2.0` rows present |
+| Writes / publish | **0.2.0 only**; `status: unavailable` snapshots are rejected |
+
+`loadDurableSpyBreadthForMarketInput()` uses **latest pointer → `0.2.0` snapshot only** for market input; a latest artifact at `0.1.0` is readable but yields unavailable market input with an explicit legacy-schema reason (no semantic upgrade).
+
 #### Daily breadth producer (V2-3B4B)
 
 `produceDailySpyBreadth()` in `src/desk/breadth/produce-daily-spy-breadth.ts` orchestrates: official SPY universe → Alpaca constituent daily bars → existing `computeSpyBreadthInternals` → Zod validate → `publishBreadthSnapshot()`. Upstream failure, `status: unavailable`, or publish errors leave the latest pointer unchanged (last-known-good).
@@ -897,7 +915,7 @@ Vercel Cron: `GET /api/cron/breadth-daily` (`vercel.json` schedule `0 22 * * *` 
 
 #### Durable breadth reader (V2-3B4C)
 
-`loadDurableSpyBreadthForMarketInput()` reads `latest.json` → versioned `BreadthInternalsSnapshot` only. Production page loads **never** fetch SPY holdings or ~503 constituent Alpaca bars. Missing blob token on Vercel, absent latest pointer, or malformed artifacts → `breadth_internals` **unavailable** (no `data/` fallback). Freshness compares snapshot `marketSessionDate` to `targetMarketSessionDate` via trading-session lag (weekends/holidays use last completed session, not calendar day). Stale snapshots retain true `asOf`, source artifact, and session date on the field.
+`loadDurableSpyBreadthForMarketInput()` reads `latest.json` → versioned snapshot; **market input consumes schema `0.2.0` only** (see trend isolation above). Production page loads **never** fetch SPY holdings or ~503 constituent Alpaca bars. Missing blob token on Vercel, absent latest pointer, legacy `0.1.0` latest, or malformed artifacts → `breadth_internals` **unavailable** (no `data/` fallback). Freshness compares snapshot `marketSessionDate` to `targetMarketSessionDate` via trading-session lag (weekends/holidays use last completed session, not calendar day). Stale snapshots retain true `asOf`, source artifact, and session date on the field.
 
 ### EventGate (V2-3C)
 

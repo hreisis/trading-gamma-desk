@@ -1,5 +1,11 @@
-import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
-import { BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema } from "@/contracts/breadth-internals";
+import type {
+  BreadthInternalsSnapshot,
+  StoredBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
+import {
+  BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema,
+  isCurrentBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
 import type { BreadthSnapshotPointer } from "@/contracts/breadth-snapshot-pointer";
 import { SPY_BREADTH_CONFIG } from "../config";
 import type { BlobStoreClient } from "./blob-client";
@@ -9,12 +15,17 @@ import {
   breadthSnapshotIdentity,
   breadthSnapshotRelativePath,
 } from "./identity";
-import { assertSafeStoreRelativePath } from "./path-safety";
+import { snapshotsDirectoryRelativePath } from "./history";
+import {
+  readRecentDedupedSnapshots,
+  readSnapshotBySessionFromStore,
+} from "./snapshot-queries";
 import {
   parseBreadthPointerJson,
-  parseBreadthSnapshotJson,
+  parseStoredBreadthSnapshotJson,
   snapshotsEquivalent,
 } from "./parse";
+import { assertSafeStoreRelativePath } from "./path-safety";
 import type { BreadthSnapshotStore } from "./types";
 
 export interface BlobBreadthSnapshotStoreOptions {
@@ -70,6 +81,22 @@ export function createBlobBreadthSnapshotStore(
     }
   }
 
+  function listSnapshotRelativePaths(): Promise<string[]> {
+    const trimmedPrefix = prefix.replace(/\/+$/g, "");
+    const storeKeyPrefix =
+      trimmedPrefix.length > 0 ? `${trimmedPrefix}/` : "";
+    const listPrefix = blobKey(prefix, snapshotsDirectoryRelativePath(universeId));
+    return client.list(listPrefix).then((pathnames) =>
+      pathnames
+        .filter((pathname) => pathname.endsWith(".json"))
+        .map((pathname) =>
+          storeKeyPrefix.length > 0 && pathname.startsWith(storeKeyPrefix)
+            ? pathname.slice(storeKeyPrefix.length)
+            : pathname,
+        ),
+    );
+  }
+
   return {
     mode: "blob",
 
@@ -84,7 +111,7 @@ export function createBlobBreadthSnapshotStore(
 
       const existingRaw = await client.get(key);
       if (existingRaw !== null) {
-        const existing = parseBreadthSnapshotJson(existingRaw);
+        const existing = parseStoredBreadthSnapshotJson(existingRaw);
         if (!snapshotsEquivalent(existing, validated)) {
           throw new BreadthStoreError(
             "identity_conflict",
@@ -151,15 +178,37 @@ export function createBlobBreadthSnapshotStore(
           `blob snapshot not found: ${pointer.snapshotPath}`,
         );
       }
-      return parseBreadthSnapshotJson(raw);
+      return parseStoredBreadthSnapshotJson(raw);
+    },
+
+    async readSnapshotBySessionDate(marketSessionDate) {
+      return readSnapshotBySessionFromStore(
+        listSnapshotRelativePaths,
+        async (relativePath) => await client.get(blobKey(prefix, relativePath)),
+        marketSessionDate,
+      );
+    },
+
+    async readRecentSnapshots(options) {
+      return readRecentDedupedSnapshots(
+        listSnapshotRelativePaths,
+        async (relativePath) => await client.get(blobKey(prefix, relativePath)),
+        options?.limit,
+      );
     },
   };
 }
 
 function assertPublishableSnapshotForLatest(
-  snapshot: BreadthInternalsSnapshot,
+  snapshot: StoredBreadthInternalsSnapshot,
   pointer: BreadthSnapshotPointer,
 ): void {
+  if (!isCurrentBreadthInternalsSnapshot(snapshot)) {
+    throw new BreadthStoreError(
+      "invalid_snapshot",
+      `cannot publish latest pointer to schema ${snapshot.schemaVersion} snapshot`,
+    );
+  }
   if (snapshot.status === "unavailable") {
     throw new BreadthStoreError(
       "invalid_snapshot",
@@ -194,6 +243,12 @@ function createUnavailableBlobBreadthSnapshotStore(): BreadthSnapshotStore {
     publishLatest: unavailable,
     readLatestPointer: unavailable,
     readSnapshot: unavailable,
+    readSnapshotBySessionDate: async () => null,
+    readRecentSnapshots: async () => ({
+      status: "insufficient_history",
+      snapshots: [],
+      missingReason: "Breadth blob store unavailable.",
+    }),
   };
 }
 
@@ -211,6 +266,9 @@ export function createInMemoryBlobStoreClient(
     },
     async get(path) {
       return entries.get(path) ?? null;
+    },
+    async list(prefix) {
+      return [...entries.keys()].filter((key) => key.startsWith(prefix));
     },
   };
 }

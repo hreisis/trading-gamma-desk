@@ -2,8 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
-import { parseSpyHoldingsMatrix } from "@/desk/breadth/holdings/parse-spy-holdings";
-import { computeSpyBreadthInternals } from "@/desk/breadth/compute/breadth";
 import {
   BreadthStoreError,
   createBlobBreadthSnapshotStore,
@@ -11,6 +9,10 @@ import {
   createVercelBlobStoreClient,
   publishBreadthSnapshot,
 } from "@/desk/breadth/store";
+import {
+  computePublishableSnapshotForSession,
+  samplePublishableBreadthSnapshot,
+} from "./helpers/breadth-fixtures";
 
 const blobPutMock = vi.hoisted(() => vi.fn());
 const blobGetMock = vi.hoisted(() => vi.fn());
@@ -63,84 +65,11 @@ vi.mock("@vercel/blob", () => {
   };
 });
 
-function sampleRows(): string[][] {
-  return [
-    ["Fund Name:", "State Street® SPDR® S&P 500® ETF Trust"],
-    ["Ticker Symbol:", "SPY"],
-    ["Holdings:", "As of 05-Aug-2026"],
-    ["Name", "Ticker", "Identifier", "Weight", "Sector", "Shares Held", "Local Currency"],
-    ["NVIDIA CORP", "NVDA", "67066G104", "7.99", "-", "100", "USD"],
-    ["BERKSHIRE HATHAWAY INC CL B", "BRK.B", "084670702", "1.44", "-", "10", "USD"],
-    ["BROWN FORMAN CORP CL B", "BF.B", "115637209", "0.01", "-", "1", "USD"],
-  ];
-}
-
-function barSeries(
-  symbol: string,
-  closes: Array<{ date: string; close: number }>,
-) {
-  return {
-    symbol,
-    updatedAt: "2026-08-06T16:00:00.000Z",
-    bars: closes.map((row) => ({
-      sessionDate: row.date,
-      open: row.close,
-      high: row.close + 1,
-      low: row.close - 1,
-      close: row.close,
-      volume: 1_000,
-    })),
-  };
-}
-
 function sampleBreadthSnapshot(): BreadthInternalsSnapshot {
-  const universe = parseSpyHoldingsMatrix({
-    rows: sampleRows(),
-    fetchedAt: "2026-08-06T16:00:00.000Z",
-  });
-  const seriesBySymbol = new Map([
-    [
-      "NVDA",
-      barSeries("NVDA", [
-        { date: "2026-08-05", close: 105 },
-        { date: "2026-08-06", close: 110 },
-      ]),
-    ],
-    [
-      "BRK.B",
-      barSeries("BRK.B", [
-        { date: "2026-08-05", close: 50 },
-        { date: "2026-08-06", close: 48 },
-      ]),
-    ],
-    [
-      "BF.B",
-      barSeries("BF.B", [
-        { date: "2026-08-05", close: 30 },
-        { date: "2026-08-06", close: 30 },
-      ]),
-    ],
-  ]);
-
-  return computeSpyBreadthInternals({
-    universe: { ...universe, sessionLag: 0, stale: false, status: "available" },
-    targetMarketSessionDate: "2026-08-06",
-    asOf: "2026-08-06T16:00:00.000Z",
-    seriesBySymbol,
-    barsProvenance: {
-      provider: "alpaca",
-      priceFeed: "iex",
-      isConsolidated: false,
-      adjustment: "split",
-      requestedSymbols: 3,
-      returnedSymbols: 3,
-      coverage: 1,
-      pages: 1,
-      fetchedAt: "2026-08-06T16:00:00.000Z",
-      latestSessionDate: "2026-08-06",
-      failedSymbols: [],
-    },
-  });
+  return samplePublishableBreadthSnapshot(
+    "2026-08-06",
+    "2026-08-06T16:00:00.000Z",
+  );
 }
 
 function mockReadableStream(text: string): ReadableStream<Uint8Array> {
@@ -303,20 +232,15 @@ describe("private blob breadth store semantics", () => {
           }
           return null;
         },
+        list: failingClient.list,
       },
       prefix: "breadth",
     });
 
-    const second = {
-      ...first,
-      marketSessionDate: "2026-08-07",
-      asOf: "2026-08-07T16:00:00.000Z",
-      bars: {
-        ...first.bars,
-        fetchedAt: "2026-08-07T16:00:00.000Z",
-        latestSessionDate: "2026-08-07",
-      },
-    } as BreadthInternalsSnapshot;
+    const second = computePublishableSnapshotForSession(
+      "2026-08-07",
+      "2026-08-07T16:00:00.000Z",
+    );
 
     await expect(
       publishBreadthSnapshot(failingStore, second, "2026-08-07T16:05:00.000Z"),
@@ -335,16 +259,10 @@ describe("private blob breadth store semantics", () => {
     const first = sampleBreadthSnapshot();
     await publishBreadthSnapshot(store, first, "2026-08-06T16:05:00.000Z");
 
-    const second = {
-      ...first,
-      marketSessionDate: "2026-08-07",
-      asOf: "2026-08-07T16:00:00.000Z",
-      bars: {
-        ...first.bars,
-        fetchedAt: "2026-08-07T16:00:00.000Z",
-        latestSessionDate: "2026-08-07",
-      },
-    } as BreadthInternalsSnapshot;
+    const second = computePublishableSnapshotForSession(
+      "2026-08-07",
+      "2026-08-07T16:00:00.000Z",
+    );
 
     const failingStore = createBlobBreadthSnapshotStore({
       client: {
@@ -355,6 +273,7 @@ describe("private blob breadth store semantics", () => {
           await baseClient.put(path, body, options);
         },
         get: baseClient.get,
+        list: baseClient.list,
       },
       prefix: "breadth",
     });

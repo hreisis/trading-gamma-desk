@@ -1,7 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
-import { BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema } from "@/contracts/breadth-internals";
+import type {
+  BreadthInternalsSnapshot,
+  StoredBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
+import {
+  BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema,
+  isCurrentBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
 import type { BreadthSnapshotPointer } from "@/contracts/breadth-snapshot-pointer";
 import { writeJsonAtomic } from "@/desk/atomic-write";
 import { SPY_BREADTH_CONFIG } from "../config";
@@ -11,8 +17,19 @@ import {
   breadthSnapshotIdentity,
   breadthSnapshotRelativePath,
 } from "./identity";
+import {
+  snapshotsDirectoryRelativePath,
+} from "./history";
+import {
+  readRecentDedupedSnapshots,
+  readSnapshotBySessionFromStore,
+} from "./snapshot-queries";
 import { assertSafeStoreRelativePath } from "./path-safety";
-import { parseBreadthPointerJson, parseBreadthSnapshotJson, snapshotsEquivalent } from "./parse";
+import {
+  parseBreadthPointerJson,
+  parseStoredBreadthSnapshotJson,
+  snapshotsEquivalent,
+} from "./parse";
 import type { BreadthSnapshotStore } from "./types";
 
 export interface FilesystemBreadthSnapshotStoreOptions {
@@ -86,7 +103,7 @@ export function createFilesystemBreadthSnapshotStore(
       const absolutePath = absoluteFromRelative(root, snapshotPath);
 
       if (existsSync(absolutePath)) {
-        const existing = parseBreadthSnapshotJson(
+        const existing = parseStoredBreadthSnapshotJson(
           readFileSync(absolutePath, "utf8"),
         );
         if (!snapshotsEquivalent(existing, validated)) {
@@ -153,15 +170,59 @@ export function createFilesystemBreadthSnapshotStore(
         );
       }
 
-      return parseBreadthSnapshotJson(readFileSync(absolutePath, "utf8"));
+      return parseStoredBreadthSnapshotJson(readFileSync(absolutePath, "utf8"));
+    },
+
+    async readSnapshotBySessionDate(marketSessionDate) {
+      return readSnapshotBySessionFromStore(
+        async () => listFilesystemSnapshotPaths(root, universeId),
+        async (relativePath) => {
+          const absolutePath = absoluteFromRelative(root, relativePath);
+          if (!existsSync(absolutePath)) return null;
+          return readFileSync(absolutePath, "utf8");
+        },
+        marketSessionDate,
+      );
+    },
+
+    async readRecentSnapshots(options) {
+      return readRecentDedupedSnapshots(
+        async () => listFilesystemSnapshotPaths(root, universeId),
+        async (relativePath) => {
+          const absolutePath = absoluteFromRelative(root, relativePath);
+          if (!existsSync(absolutePath)) return null;
+          return readFileSync(absolutePath, "utf8");
+        },
+        options?.limit,
+      );
     },
   };
 }
 
+function listFilesystemSnapshotPaths(
+  root: string,
+  universeId: string,
+): string[] {
+  const snapshotsDir = join(root, snapshotsDirectoryRelativePath(universeId));
+  if (!existsSync(snapshotsDir)) return [];
+  return readdirSync(snapshotsDir)
+    .filter((filename) => filename.endsWith(".json"))
+    .map((filename) => {
+      const identity = filename.slice(0, -".json".length);
+      return breadthSnapshotRelativePath(universeId, identity);
+    });
+}
+
 function assertPublishableSnapshotForLatest(
-  snapshot: BreadthInternalsSnapshot,
+  snapshot: StoredBreadthInternalsSnapshot,
   pointer: BreadthSnapshotPointer,
 ): void {
+  if (!isCurrentBreadthInternalsSnapshot(snapshot)) {
+    throw new BreadthStoreError(
+      "invalid_snapshot",
+      `cannot publish latest pointer to schema ${snapshot.schemaVersion} snapshot`,
+    );
+  }
   if (snapshot.status === "unavailable") {
     throw new BreadthStoreError(
       "invalid_snapshot",

@@ -1,5 +1,9 @@
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
-import { BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema } from "@/contracts/breadth-internals";
+import {
+  BREADTH_INTERNALS_SCHEMA_VERSION,
+  BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema,
+  isCurrentBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
 import type { BreadthSnapshotPointer } from "@/contracts/breadth-snapshot-pointer";
 import { defaultSessionCalendar } from "@/macro/calendar";
 import { tradingSessionLag } from "./universe/session-lag";
@@ -113,16 +117,24 @@ export async function loadDurableSpyBreadthForMarketInput(
       };
     }
 
-    const snapshot = await store.readSnapshot(pointer);
+    const stored = await store.readSnapshot(pointer);
+    if (!isCurrentBreadthInternalsSnapshot(stored)) {
+      return {
+        snapshot: null,
+        sourceArtifact: artifactFromPointer(pointer),
+        missingReason: `Durable breadth latest is schema ${stored.schemaVersion}; only ${BREADTH_INTERNALS_SCHEMA_VERSION} snapshots feed market input.`,
+      };
+    }
+
     const sessionFreshness = evaluateDurableBreadthSessionFreshness({
-      snapshotMarketSessionDate: snapshot.marketSessionDate,
+      snapshotMarketSessionDate: stored.marketSessionDate,
       targetMarketSessionDate: options.targetMarketSessionDate,
     });
 
     const merged = BreadthInternalsSnapshotSchema.parse({
-      ...snapshot,
-      stale: snapshot.stale || sessionFreshness.stale,
-      missingReason: sessionFreshness.missingReason ?? snapshot.missingReason,
+      ...stored,
+      stale: stored.stale || sessionFreshness.stale,
+      missingReason: sessionFreshness.missingReason ?? stored.missingReason,
     });
 
     return {

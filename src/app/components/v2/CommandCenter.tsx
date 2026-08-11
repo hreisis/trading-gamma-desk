@@ -38,8 +38,8 @@ const copy = {
     unchanged: "Unchanged",
     aboveMa20: "> MA20",
     aboveMa50: "> MA50",
-    new20dHighs: "20D highs",
-    new20dLows: "20D lows",
+    new20dHighs: "20D closing highs",
+    new20dLows: "20D closing lows",
     stale: "Stale",
     spot: "Spot",
     putWall: "Put wall",
@@ -212,13 +212,13 @@ function SpyBreadthPanel({
             <div>
               <span>{t.new20dHighs}</span>
               <strong data-testid="v2-spy-breadth-highs">
-                {formatMetric(breadth.new20DayHigh)}
+                {formatMetric(breadth.new20DayClosingHigh)}
               </strong>
             </div>
             <div>
               <span>{t.new20dLows}</span>
               <strong data-testid="v2-spy-breadth-lows">
-                {formatMetric(breadth.new20DayLow)}
+                {formatMetric(breadth.new20DayClosingLow)}
               </strong>
             </div>
           </div>

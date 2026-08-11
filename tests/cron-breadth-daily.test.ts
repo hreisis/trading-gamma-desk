@@ -12,6 +12,8 @@ const { mockStore, resolveBreadthSnapshotStoreFromEnv, produceDailySpyBreadth } 
       publishLatest: vi.fn(),
       readLatestPointer: vi.fn(),
       readSnapshot: vi.fn(),
+      readSnapshotBySessionDate: vi.fn(),
+      readRecentSnapshots: vi.fn(),
     };
 
     const resolveBreadthSnapshotStoreFromEnv = vi.fn(

@@ -131,7 +131,7 @@ async function main(): Promise<void> {
             count: ma50Eligible,
             coverage: included ? ma50Eligible / included : 0,
           },
-          highLow20: {
+          closingHighLow20: {
             count: hl20Eligible,
             coverage: included ? hl20Eligible / included : 0,
           },

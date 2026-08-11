@@ -1,5 +1,8 @@
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
-import { BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema } from "@/contracts/breadth-internals";
+import {
+  BreadthInternalsSnapshot as BreadthInternalsSnapshotSchema,
+  isCurrentBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
 import {
   BREADTH_SNAPSHOT_POINTER_SCHEMA_VERSION,
   type BreadthSnapshotPointer,
@@ -62,7 +65,7 @@ export async function publishBreadthSnapshot(
     publishedAt,
   });
 
-  let readBack: BreadthInternalsSnapshot;
+  let readBack;
   try {
     readBack = await store.readSnapshot(preliminaryPointer);
   } catch (error) {
@@ -73,6 +76,13 @@ export async function publishBreadthSnapshot(
     throw new BreadthStoreError(
       "read_failed",
       `breadth snapshot read-back failed: ${detail}`,
+    );
+  }
+
+  if (!isCurrentBreadthInternalsSnapshot(readBack)) {
+    throw new BreadthStoreError(
+      "invalid_snapshot",
+      `read-back snapshot schema ${readBack.schemaVersion} is not publishable`,
     );
   }
 

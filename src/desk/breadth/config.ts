@@ -6,11 +6,11 @@ export const SPY_BREADTH_CONFIG = {
   universeId: "spy_etf_holdings",
   fundSymbol: "SPY",
   maxUniverseSessionLag: 1,
-  /** Minimum sessions for each eligibility class */
+  /** Minimum sessions for each eligibility class (inclusive MA / closing windows). */
   minSessionsPricePair: 2,
-  minSessionsMa20: 21,
-  minSessionsMa50: 51,
-  minSessionsHighLow20: 21,
+  minSessionsMa20: 20,
+  minSessionsMa50: 50,
+  minSessionsClosingHighLow20: 20,
   /** Production coverage thresholds (included constituents) */
   thresholdPricePair: 0.9,
   thresholdMa20: 0.85,

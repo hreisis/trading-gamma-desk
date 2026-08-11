@@ -9,6 +9,7 @@ import {
   BlobStoreNotFoundError,
   BlobStoreSuspendedError,
   get as blobGet,
+  list as blobList,
   put as blobPut,
 } from "@vercel/blob";
 import type { BlobStoreClient, BlobStorePutOptions } from "./blob-client";
@@ -132,6 +133,16 @@ export function createVercelBlobStoreClient(input: {
         if (error instanceof BlobNotFoundError) {
           return null;
         }
+        logBlobStoreError("get", error);
+        throw toSafeBlobClientError("get", error);
+      }
+    },
+
+    async list(prefix) {
+      try {
+        const result = await blobList({ prefix, token });
+        return result.blobs.map((blob) => blob.pathname);
+      } catch (error) {
         logBlobStoreError("get", error);
         throw toSafeBlobClientError("get", error);
       }

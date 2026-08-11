@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,8 +7,6 @@ import {
   BREADTH_SNAPSHOT_POINTER_SCHEMA_VERSION,
   type BreadthSnapshotPointer,
 } from "@/contracts/breadth-snapshot-pointer";
-import { parseSpyHoldingsMatrix } from "@/desk/breadth/holdings/parse-spy-holdings";
-import { computeSpyBreadthInternals } from "@/desk/breadth/compute/breadth";
 import {
   BreadthStoreError,
   createBlobBreadthSnapshotStore,
@@ -16,89 +14,24 @@ import {
   createInMemoryBlobStoreClient,
   publishBreadthSnapshot,
 } from "@/desk/breadth/store";
-
-function sampleRows(): string[][] {
-  return [
-    ["Fund Name:", "State Street® SPDR® S&P 500® ETF Trust"],
-    ["Ticker Symbol:", "SPY"],
-    ["Holdings:", "As of 05-Aug-2026"],
-    ["Name", "Ticker", "Identifier", "Weight", "Sector", "Shares Held", "Local Currency"],
-    ["NVIDIA CORP", "NVDA", "67066G104", "7.99", "-", "100", "USD"],
-    ["BERKSHIRE HATHAWAY INC CL B", "BRK.B", "084670702", "1.44", "-", "10", "USD"],
-    ["BROWN FORMAN CORP CL B", "BF.B", "115637209", "0.01", "-", "1", "USD"],
-  ];
-}
-
-function barSeries(
-  symbol: string,
-  closes: Array<{ date: string; close: number }>,
-) {
-  return {
-    symbol,
-    updatedAt: "2026-08-06T12:00:00.000Z",
-    bars: closes.map((row) => ({
-      sessionDate: row.date,
-      open: row.close,
-      high: row.close + 1,
-      low: row.close - 1,
-      close: row.close,
-      volume: 1_000,
-    })),
-  };
-}
-
-function baseUniverse() {
-  return parseSpyHoldingsMatrix({
-    rows: sampleRows(),
-    fetchedAt: "2026-08-06T12:00:00.000Z",
-  });
-}
+import {
+  computePublishableSnapshotForSession,
+  legacyStoredSnapshotJson,
+  samplePublishableBreadthSnapshot,
+  tradingDaysEndingAt,
+} from "./helpers/breadth-fixtures";
+import {
+  breadthSnapshotIdentity,
+  breadthSnapshotRelativePath,
+} from "@/desk/breadth/store/identity";
+import {
+  BREADTH_INTERNALS_LEGACY_SCHEMA_VERSION,
+  BREADTH_INTERNALS_SCHEMA_VERSION,
+  isLegacyBreadthInternalsSnapshot,
+} from "@/contracts/breadth-internals";
 
 function sampleBreadthSnapshot(): BreadthInternalsSnapshot {
-  const universe = baseUniverse();
-  const seriesBySymbol = new Map([
-    [
-      "NVDA",
-      barSeries("NVDA", [
-        { date: "2026-08-05", close: 105 },
-        { date: "2026-08-06", close: 110 },
-      ]),
-    ],
-    [
-      "BRK.B",
-      barSeries("BRK.B", [
-        { date: "2026-08-05", close: 50 },
-        { date: "2026-08-06", close: 48 },
-      ]),
-    ],
-    [
-      "BF.B",
-      barSeries("BF.B", [
-        { date: "2026-08-05", close: 30 },
-        { date: "2026-08-06", close: 30 },
-      ]),
-    ],
-  ]);
-
-  return computeSpyBreadthInternals({
-    universe: { ...universe, sessionLag: 0, stale: false, status: "available" },
-    targetMarketSessionDate: "2026-08-06",
-    asOf: "2026-08-06T16:00:00.000Z",
-    seriesBySymbol,
-    barsProvenance: {
-      provider: "alpaca",
-      priceFeed: "iex",
-      isConsolidated: false,
-      adjustment: "split",
-      requestedSymbols: 3,
-      returnedSymbols: 3,
-      coverage: 1,
-      pages: 1,
-      fetchedAt: "2026-08-06T16:00:00.000Z",
-      latestSessionDate: "2026-08-06",
-      failedSymbols: [],
-    },
-  });
+  return samplePublishableBreadthSnapshot();
 }
 
 function tempDataRoot(): string {
@@ -181,44 +114,10 @@ describe("filesystem breadth snapshot store", () => {
 
     await publishBreadthSnapshot(store, first, "2026-08-06T16:05:00.000Z");
 
-    const second = computeSpyBreadthInternals({
-      universe: {
-        ...baseUniverse(),
-        sessionLag: 0,
-        stale: false,
-        status: "available",
-      },
-      targetMarketSessionDate: "2026-08-07",
-      asOf: "2026-08-07T16:00:00.000Z",
-      seriesBySymbol: new Map([
-        [
-          "NVDA",
-          barSeries("NVDA", [
-            { date: "2026-08-06", close: 110 },
-            { date: "2026-08-07", close: 112 },
-          ]),
-        ],
-        [
-          "BRK.B",
-          barSeries("BRK.B", [
-            { date: "2026-08-06", close: 48 },
-            { date: "2026-08-07", close: 47 },
-          ]),
-        ],
-        [
-          "BF.B",
-          barSeries("BF.B", [
-            { date: "2026-08-06", close: 30 },
-            { date: "2026-08-07", close: 30 },
-          ]),
-        ],
-      ]),
-      barsProvenance: {
-        ...first.bars,
-        fetchedAt: "2026-08-07T16:00:00.000Z",
-        latestSessionDate: "2026-08-07",
-      },
-    });
+    const second = computePublishableSnapshotForSession(
+      "2026-08-07",
+      "2026-08-07T16:00:00.000Z",
+    );
 
     const failingStore = createFilesystemBreadthSnapshotStore({ dataRoot });
     failingStore.publishLatest = async () => {
@@ -305,6 +204,129 @@ describe("filesystem breadth snapshot store", () => {
       code: "path_escape",
     });
   });
+
+  it("reads snapshot by session, recent history sorted deduped, and missing session", async () => {
+    const dataRoot = tempDataRoot();
+    const store = createFilesystemBreadthSnapshotStore({ dataRoot });
+    const sessions = tradingDaysEndingAt("2026-08-07", 5);
+    for (const session of sessions) {
+      const snapshot = computePublishableSnapshotForSession(
+        session,
+        `${session}T16:00:00.000Z`,
+      );
+      await publishBreadthSnapshot(store, snapshot, `${session}T16:05:00.000Z`);
+    }
+
+    const latestSession = sessions.at(-1)!;
+    const duplicateLatest = {
+      ...computePublishableSnapshotForSession(
+        latestSession,
+        `${latestSession}T16:00:00.000Z`,
+      ),
+      asOf: `${latestSession}T17:00:00.000Z`,
+    };
+    await store.writeVersioned(duplicateLatest);
+
+    const firstSession = sessions[0]!;
+    const bySession = await store.readSnapshotBySessionDate(firstSession);
+    expect(bySession?.marketSessionDate).toBe(firstSession);
+    expect(bySession?.schemaVersion).toBe(BREADTH_INTERNALS_SCHEMA_VERSION);
+
+    expect(await store.readSnapshotBySessionDate("2026-07-01")).toBeNull();
+
+    const recent = await store.readRecentSnapshots({ limit: 5 });
+    expect(recent.status).toBe("available");
+    expect(recent.snapshots.map((row) => row.marketSessionDate)).toEqual(
+      [...sessions].reverse(),
+    );
+    expect(recent.snapshots[0]?.asOf).toBe(`${latestSession}T17:00:00.000Z`);
+  });
+
+  it("isolates legacy 0.1.0 from recent trend series", async () => {
+    const dataRoot = tempDataRoot();
+    const store = createFilesystemBreadthSnapshotStore({ dataRoot });
+    const currentSessions = tradingDaysEndingAt("2026-08-07", 5);
+    for (const session of currentSessions) {
+      const snapshot = computePublishableSnapshotForSession(
+        session,
+        `${session}T16:00:00.000Z`,
+      );
+      await publishBreadthSnapshot(store, snapshot, `${session}T16:05:00.000Z`);
+    }
+
+    const legacySessions = tradingDaysEndingAt("2026-07-31", 3);
+    for (const session of legacySessions) {
+      const snapshot = computePublishableSnapshotForSession(
+        session,
+        `${session}T16:00:00.000Z`,
+      );
+      const identity = breadthSnapshotIdentity(snapshot);
+      const relativePath = breadthSnapshotRelativePath(
+        "spy_etf_holdings",
+        identity,
+      );
+      const absolutePath = join(dataRoot, "breadth", relativePath);
+      mkdirSync(join(dataRoot, "breadth", "spy_etf_holdings", "snapshots"), {
+        recursive: true,
+      });
+      writeFileSync(absolutePath, legacyStoredSnapshotJson(snapshot));
+    }
+
+    const recent = await store.readRecentSnapshots({ limit: 10 });
+    expect(recent.status).toBe("available");
+    expect(recent.snapshots).toHaveLength(5);
+    expect(
+      recent.snapshots.every(
+        (row) => row.schemaVersion === BREADTH_INTERNALS_SCHEMA_VERSION,
+      ),
+    ).toBe(true);
+    expect(
+      recent.snapshots.some((row) =>
+        legacySessions.includes(row.marketSessionDate),
+      ),
+    ).toBe(false);
+
+    const legacySession = legacySessions[0]!;
+    const legacyRead = await store.readSnapshotBySessionDate(legacySession);
+    expect(legacyRead).not.toBeNull();
+    expect(isLegacyBreadthInternalsSnapshot(legacyRead!)).toBe(true);
+    expect(legacyRead?.schemaVersion).toBe(BREADTH_INTERNALS_LEGACY_SCHEMA_VERSION);
+    expect(legacyRead?.metrics).toHaveProperty("new20DayHigh");
+    expect(legacyRead?.metrics).not.toHaveProperty("new20DayClosingHigh");
+  });
+
+  it("returns insufficient_history without padding legacy snapshots", async () => {
+    const dataRoot = tempDataRoot();
+    const store = createFilesystemBreadthSnapshotStore({ dataRoot });
+    const sessions = tradingDaysEndingAt("2026-08-06", 3);
+    for (const session of sessions) {
+      const snapshot = computePublishableSnapshotForSession(
+        session,
+        `${session}T16:00:00.000Z`,
+      );
+      await publishBreadthSnapshot(store, snapshot, `${session}T16:05:00.000Z`);
+    }
+
+    const legacySnapshot = computePublishableSnapshotForSession(
+      "2026-07-25",
+      "2026-07-25T16:00:00.000Z",
+    );
+    const legacyIdentity = breadthSnapshotIdentity(legacySnapshot);
+    const legacyPath = join(
+      dataRoot,
+      "breadth",
+      breadthSnapshotRelativePath("spy_etf_holdings", legacyIdentity),
+    );
+    mkdirSync(join(dataRoot, "breadth", "spy_etf_holdings", "snapshots"), {
+      recursive: true,
+    });
+    writeFileSync(legacyPath, legacyStoredSnapshotJson(legacySnapshot));
+
+    const recent = await store.readRecentSnapshots({ limit: 10 });
+    expect(recent.status).toBe("insufficient_history");
+    expect(recent.snapshots).toHaveLength(3);
+    expect(recent.missingReason).toMatch(/Only 3 schema 0\.2\.0/);
+  });
 });
 
 describe("blob breadth snapshot store", () => {
@@ -347,16 +369,10 @@ describe("blob breadth snapshot store", () => {
     const first = sampleBreadthSnapshot();
     await publishBreadthSnapshot(store, first, "2026-08-06T16:05:00.000Z");
 
-    const second = {
-      ...first,
-      marketSessionDate: "2026-08-07",
-      asOf: "2026-08-07T16:00:00.000Z",
-      bars: {
-        ...first.bars,
-        fetchedAt: "2026-08-07T16:00:00.000Z",
-        latestSessionDate: "2026-08-07",
-      },
-    } as BreadthInternalsSnapshot;
+    const second = computePublishableSnapshotForSession(
+      "2026-08-07",
+      "2026-08-07T16:00:00.000Z",
+    );
 
     const failingClient = createInMemoryBlobStoreClient(
       Object.fromEntries(client.entries),
@@ -365,6 +381,7 @@ describe("blob breadth snapshot store", () => {
       client: {
         put: failingClient.put,
         get: failingClient.get,
+        list: failingClient.list,
       },
       prefix: "breadth",
     });
@@ -382,6 +399,29 @@ describe("blob breadth snapshot store", () => {
 
     const latest = await store.readLatestPointer();
     expect(latest?.generatedAt).toBe(first.asOf);
+  });
+
+  it("reads recent and session snapshots from blob store", async () => {
+    const client = createInMemoryBlobStoreClient();
+    const store = createBlobBreadthSnapshotStore({ client, prefix: "breadth" });
+    const sessions = tradingDaysEndingAt("2026-08-07", 5);
+    for (const session of sessions) {
+      const snapshot = computePublishableSnapshotForSession(
+        session,
+        `${session}T16:00:00.000Z`,
+      );
+      await publishBreadthSnapshot(store, snapshot, `${session}T16:05:00.000Z`);
+    }
+
+    const latestSession = sessions.at(-1)!;
+    const bySession = await store.readSnapshotBySessionDate(latestSession);
+    expect(bySession?.schemaVersion).toBe(BREADTH_INTERNALS_SCHEMA_VERSION);
+
+    const recent = await store.readRecentSnapshots({ limit: 6 });
+    expect(recent.status).toBe("available");
+    expect(recent.snapshots.map((row) => row.marketSessionDate)).toEqual(
+      [...sessions].reverse(),
+    );
   });
 
   it("rejects unsafe blob prefix at write time", async () => {

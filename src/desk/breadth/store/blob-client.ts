@@ -10,6 +10,8 @@ export interface BlobStorePutOptions {
 export interface BlobStoreClient {
   put(path: string, body: string, options?: BlobStorePutOptions): Promise<void>;
   get(path: string): Promise<string | null>;
+  /** List blob pathnames under a prefix; used for snapshot history reads. */
+  list(prefix: string): Promise<readonly string[]>;
 }
 
 export const BREADTH_BLOB_TOKEN_ENV_KEYS = [

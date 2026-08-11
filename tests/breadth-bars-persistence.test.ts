@@ -2,7 +2,6 @@ import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EtfUniverseArtifact } from "@/contracts/etf-universe-artifact";
-import { parseSpyHoldingsMatrix } from "@/desk/breadth/holdings/parse-spy-holdings";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
 import * as barCacheModule from "@/desk/breadth/bars/cache";
 import * as breadthComputeModule from "@/desk/breadth/compute/breadth";
@@ -14,31 +13,10 @@ import {
   createInMemoryBlobStoreClient,
 } from "@/desk/breadth/store";
 import * as atomicWriteModule from "@/desk/atomic-write";
-
-function sampleRows(): string[][] {
-  return [
-    ["Fund Name:", "State Street® SPDR® S&P 500® ETF Trust"],
-    ["Ticker Symbol:", "SPY"],
-    ["Holdings:", "As of 05-Aug-2026"],
-    ["Name", "Ticker", "Identifier", "Weight", "Sector", "Shares Held", "Local Currency"],
-    ["NVIDIA CORP", "NVDA", "67066G104", "7.99", "-", "100", "USD"],
-    ["BERKSHIRE HATHAWAY INC CL B", "BRK.B", "084670702", "1.44", "-", "10", "USD"],
-    ["BROWN FORMAN CORP CL B", "BF.B", "115637209", "0.01", "-", "1", "USD"],
-  ];
-}
-
-function freshUniverse(): EtfUniverseArtifact {
-  const artifact = parseSpyHoldingsMatrix({
-    rows: sampleRows(),
-    fetchedAt: "2026-08-06T22:00:00.000Z",
-  });
-  return {
-    ...artifact,
-    sessionLag: 0,
-    stale: false,
-    status: "available",
-  };
-}
+import {
+  freshUniverse,
+  publishablePanelForTargetSession,
+} from "./helpers/breadth-fixtures";
 
 function alpacaBarsResponse() {
   return {
@@ -136,76 +114,8 @@ describe("loadAlpacaDailyBarPanel filesystem persistence", () => {
 });
 
 describe("produceDailySpyBreadth production filesystem invariants", () => {
-  function barSeries(
-    symbol: string,
-    closes: Array<{ date: string; close: number }>,
-  ) {
-    return {
-      symbol,
-      updatedAt: "2026-08-06T22:00:00.000Z",
-      bars: closes.map((row) => ({
-        sessionDate: row.date,
-        open: row.close,
-        high: row.close + 1,
-        low: row.close - 1,
-        close: row.close,
-        volume: 1_000,
-      })),
-    };
-  }
-
   function panelForTargetSession(targetSession: string) {
-    const historyDates =
-      targetSession === "2026-08-07"
-        ? ["2026-08-05", "2026-08-06", targetSession]
-        : ["2026-08-05", targetSession];
-
-    const seriesBySymbol = new Map([
-      [
-        "NVDA",
-        barSeries(
-          "NVDA",
-          historyDates.map((date, index) => ({
-            date,
-            close: 100 + index * 5,
-          })),
-        ),
-      ],
-      [
-        "BRK.B",
-        barSeries(
-          "BRK.B",
-          historyDates.map((date, index) => ({
-            date,
-            close: 50 - index,
-          })),
-        ),
-      ],
-      [
-        "BF.B",
-        barSeries(
-          "BF.B",
-          historyDates.map((date) => ({ date, close: 30 })),
-        ),
-      ],
-    ]);
-
-    return {
-      seriesBySymbol,
-      provenance: {
-        provider: "alpaca" as const,
-        priceFeed: "iex" as const,
-        isConsolidated: false,
-        adjustment: "split" as const,
-        requestedSymbols: 3,
-        returnedSymbols: 3,
-        coverage: 1,
-        pages: 1,
-        fetchedAt: "2026-08-06T22:00:00.000Z",
-        latestSessionDate: targetSession,
-        failedSymbols: [],
-      },
-    };
+    return publishablePanelForTargetSession(targetSession);
   }
 
   it("continues to breadth computation after in-memory bars without filesystem writes", async () => {
