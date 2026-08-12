@@ -263,7 +263,7 @@ describe("buildMarketInputSnapshot", () => {
     });
   });
 
-  it("preserves bounded put/call wall order and unavailable gamma flip", () => {
+  it("preserves bounded put/call wall order and persisted gamma flip", () => {
     const snapshot = buildMarketInputSnapshot({
       targetMarketSessionDate: "2026-07-28",
       generatedAt: "2026-07-29T12:00:00-04:00",
@@ -278,14 +278,14 @@ describe("buildMarketInputSnapshot", () => {
     const gamma = field(snapshot, "spy_gamma").value as {
       boundedPutWall: number | null;
       boundedCallWall: number | null;
-      gammaFlip: { status: string };
+      gammaFlip: { status: string; strike?: number };
       snapshotStatus: string;
     };
 
     expect(gamma.boundedPutWall).toBe(743);
     expect(gamma.boundedCallWall).toBe(745);
-    expect(gamma.boundedPutWall).toBeLessThan(gamma.boundedCallWall!);
-    expect(gamma.gammaFlip.status).toBe("unavailable");
+    expect(gamma.gammaFlip.status).toBe("available");
+    expect(gamma.gammaFlip.strike).toBe(745.9);
     expect(field(snapshot, "spy_gamma").status).toBe("incomplete");
   });
 

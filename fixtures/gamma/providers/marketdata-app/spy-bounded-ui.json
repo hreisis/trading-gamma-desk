@@ -50,7 +50,7 @@
     "OI=0 and gamma=0 are valid (contribute zero GEX). Missing, negative, or non-finite OI/gamma, expired contracts, and invalid strike/multiplier/spot are excluded.",
     "Call wall = strike maximizing call GEX among strikes with callGex > 0; ties break to the lowest strike. Put wall = strike minimizing put GEX among strikes with putGex < 0; ties break to the highest strike. All-zero GEX does not fabricate walls.",
     "Near-zero regime uses |totalGex| / grossGex where grossGex = Σ(|callGex|+|putGex|). 0DTE share = gross 0DTE GEX / gross total GEX (no clamping).",
-    "Gamma Flip is not estimated via strike interpolation; requires a future path that recomputes gamma from spot, IV, rates, and time-to-expiry.",
+    "Gamma Flip uses spot-shock Black–Scholes gamma on the bounded contract set (fixed IV per contract, flat risk-free rate); not strike-GEX interpolation.",
     "GEX is an amplifier/compressor structure estimate — not a directional buy/sell signal for the underlying.",
     "22 contract(s) excluded (see coverage.skipReasons).",
     "22 contract(s) with positive OI excluded as suspect_vendor_greeks (vendor gamma=0 with collapsed delta/IV). Original vendor Greeks preserved in chain.dataQuality audit.",
@@ -70,6 +70,15 @@
     "strike": 743,
     "gex": -2349942630.695592,
     "reason": "Suspect vendor Greeks excluded from this side — wall may be incomplete",
+    "scope": "bounded_single_expiry"
+  },
+  "gammaFlip": {
+    "status": "available",
+    "strike": 745.9,
+    "level": 745.9,
+    "method": "spot_shock_bs_gamma",
+    "lowerStrike": 745.3381499999989,
+    "upperStrike": 747.1922249999989,
     "scope": "bounded_single_expiry"
   },
   "byStrike": [
@@ -908,5 +917,11 @@
     "usableGammaCoveragePct": 86.42,
     "suspectVendorGreeksCount": 22
   },
-  "synthetic": true
+  "synthetic": true,
+  "representativeIv": {
+    "status": "available",
+    "value": 0.142,
+    "sessionDate": "2026-07-30",
+    "asOf": "2026-07-30T20:00:00.000Z"
+  }
 }

@@ -15,6 +15,7 @@ import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
 import { filterTier1Catalysts } from "@/catalyst/public-feed";
 import type { CatalystFeedResponse } from "@/catalyst/types";
 import { sessionDateFromIso } from "@/gamma/marketdata-app/time";
+import { wallStrikeWhenAvailable } from "./bounded-gamma-freshness";
 import {
   loadBoundedGammaDeskView,
   type BoundedGammaDeskView,
@@ -25,9 +26,6 @@ import {
   resolveDeskRequestAsync,
 } from "./production-runtime";
 import { resolveDeskRequest } from "./resolve-desk-request";
-
-const GAMMA_FLIP_UNAVAILABLE_REASON =
-  "Gamma Flip is not estimated; requires recomputing gamma from spot, IV, rates, and time-to-expiry rather than interpolating strike GEX";
 
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
 
@@ -426,12 +424,6 @@ function deriveEventGateField(
   };
 }
 
-function wallStrike(
-  wall: NonNullable<BoundedGammaDeskView["snapshot"]>["boundedCallWall"],
-): number | null {
-  return wall.status === "unavailable" ? null : (wall.strike ?? null);
-}
-
 function deriveGammaField(
   key: Extract<MarketInputKey, "spy_gamma" | "qqq_gamma">,
   symbol: "SPY" | "QQQ",
@@ -440,7 +432,8 @@ function deriveGammaField(
 ): MarketInputField {
   const label = MARKET_INPUT_LABELS[key];
 
-  if (view.status === "empty" || view.snapshot === null) {
+  const snapshot = view.snapshot ?? view.withheldSnapshot;
+  if (view.status === "empty" || snapshot === null) {
     return {
       key,
       label,
@@ -458,8 +451,6 @@ function deriveGammaField(
       isProxy: false,
     };
   }
-
-  const snapshot = view.snapshot;
   const crossSession = snapshot.sessionDate !== targetSession;
   const stale = crossSession;
   let status: MarketInputField["status"] = "available";
@@ -469,8 +460,8 @@ function deriveGammaField(
     status = "partial";
   }
 
-  const putWall = wallStrike(snapshot.boundedPutWall);
-  const callWall = wallStrike(snapshot.boundedCallWall);
+  const putWall = wallStrikeWhenAvailable(snapshot.boundedPutWall);
+  const callWall = wallStrikeWhenAvailable(snapshot.boundedCallWall);
 
   return {
     key,
@@ -484,10 +475,7 @@ function deriveGammaField(
       gammaRegime: snapshot.gammaRegime,
       snapshotStatus: snapshot.status,
       vendorAsOf: snapshot.vendorAsOf,
-      gammaFlip: {
-        status: "unavailable" as const,
-        reason: GAMMA_FLIP_UNAVAILABLE_REASON,
-      },
+      gammaFlip: snapshot.gammaFlip,
       coverage: {
         contractsUsed: snapshot.coverage.contractsUsed,
         contractsIn: snapshot.coverage.contractsIn,

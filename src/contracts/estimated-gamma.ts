@@ -103,17 +103,30 @@ export const WallLevel = z.object({
 });
 
 /**
- * Gamma Flip is reserved for a future path that recomputes gamma from
- * spot / IV / rates / time-to-expiry. M4-1 does not interpolate a fake level.
+ * Gamma Flip from spot-shock modeled net GEX (bounded pipeline).
+ * Unavailable carries optional bounds when a crossing interval was not found.
  */
-export const GammaFlipLevel = z.object({
+export const GammaFlipAvailable = z.object({
+  status: z.literal("available"),
+  strike: z.number().finite().positive(),
+  level: z.number().finite().positive(),
+  method: z.literal("spot_shock_bs_gamma"),
+  lowerStrike: z.number().finite().positive().optional(),
+  upperStrike: z.number().finite().positive().optional(),
+});
+
+export const GammaFlipUnavailable = z.object({
   status: z.literal("unavailable"),
   reason: z.string().min(1),
-  /** Optional bounds if a future method reports a crossing interval. */
   lowerStrike: z.number().finite().positive().optional(),
   upperStrike: z.number().finite().positive().optional(),
   level: z.number().finite().positive().optional(),
 });
+
+export const GammaFlipLevel = z.discriminatedUnion("status", [
+  GammaFlipAvailable,
+  GammaFlipUnavailable,
+]);
 
 export const GexCoverage = z.object({
   contractsIn: z.number().int().nonnegative(),

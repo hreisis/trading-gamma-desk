@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalystQuery, CatalystFeedResponse } from "@/catalyst/types";
 import { fetchOfficialCalendar } from "@/catalyst/fetch-calendar";
@@ -8,6 +8,10 @@ import { resolveMarketDataApiToken } from "@/gamma/marketdata-app/config";
 import { resolveBoundedGammaExpiration } from "@/gamma/marketdata-app/resolve-expiration";
 import { runBoundedGammaProvider } from "@/gamma/marketdata-app/run";
 import { boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
+import {
+  isBoundedGammaSessionStale,
+  resolveBoundedGammaTargetSession,
+} from "./bounded-gamma-freshness";
 import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
 import { runDailyPipeline } from "@/pipeline/run-daily";
 import { loadMacroDesk } from "./load-macro-desk";
@@ -32,14 +36,16 @@ export function isServerlessHost(env: NodeJS.ProcessEnv = process.env): boolean 
 }
 
 /**
- * Local dev uses gitignored `data/`. Vercel uses writable `/tmp` (not durable
- * across cold starts, but sufficient for request-scoped provider refresh).
+ * Local dev uses gitignored `data/`. Vercel uses writable `/tmp` when local
+ * `data/` is absent (true serverless cold start). If `data/` exists locally,
+ * prefer it even when VERCEL is set in env — avoids missing cached artifacts.
  */
 export function resolveRuntimeDataRoot(env: NodeJS.ProcessEnv = process.env): string {
-  if (isServerlessHost(env)) {
-    return join("/tmp", "gammadesk-data");
+  const localRoot = join(process.cwd(), "data");
+  if (!isServerlessHost(env) || existsSync(localRoot)) {
+    return localRoot;
   }
-  return join(process.cwd(), "data");
+  return join("/tmp", "gammadesk-data");
 }
 
 function ensureDir(path: string): void {
@@ -213,31 +219,30 @@ export async function loadCatalystFeedAsync(
   if (
     options.publicDemo ||
     options.forceSynthetic ||
-    sync.mode === "official_calendar" ||
-    sync.mode === "stale_calendar"
+    sync.mode === "official_calendar"
   ) {
     return sync;
   }
 
-  if (sync.mode !== "live_unavailable") {
-    return sync;
+  if (sync.mode === "stale_calendar" || sync.mode === "live_unavailable") {
+    try {
+      await ensureCatalystCaches(dataRoot, env);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ...sync,
+        disclaimer: `${sync.disclaimer} Runtime calendar fetch failed: ${message}`,
+      };
+    }
+
+    return loadCatalystFeed(query, {
+      ...options,
+      dataRoot,
+      publicDemo: false,
+    });
   }
 
-  try {
-    await ensureCatalystCaches(dataRoot, env);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      ...sync,
-      disclaimer: `${sync.disclaimer} Runtime calendar fetch failed: ${message}`,
-    };
-  }
-
-  return loadCatalystFeed(query, {
-    ...options,
-    dataRoot,
-    publicDemo: false,
-  });
+  return sync;
 }
 
 function parseOptionalNumber(raw: string | undefined): number | null {
@@ -267,27 +272,15 @@ function resolveGammaStrikeParams(
 
 function boundedGammaNeedsRefresh(
   view: BoundedGammaDeskView,
-  sessionDate: string,
+  targetSession: string,
 ): boolean {
   if (view.status === "empty") return true;
   const snap = view.snapshot;
   if (!snap) return true;
   if (snap.status === "unavailable") return true;
-
-  const generatedAt = Date.parse(snap.generatedAt);
-  const staleByAge =
-    Number.isFinite(generatedAt) &&
-    Date.now() - generatedAt > RUNTIME_ARTIFACT_TTL_MS;
-
-  if (snap.sessionDate !== sessionDate) {
-    // Vendor session may lag the calendar session until the chain updates.
-    return staleByAge;
+  if (isBoundedGammaSessionStale(snap.sessionDate, targetSession)) {
+    return true;
   }
-
-  if (snap.status === "incomplete") {
-    return staleByAge;
-  }
-
   return false;
 }
 
@@ -310,7 +303,7 @@ async function ensureBoundedGammaSnapshot(options: {
   }
 
   const params = resolveGammaStrikeParams(options.symbol, options.env);
-  const sessionDate = resolveCurrentMarketSessionDate();
+  const sessionDate = resolveBoundedGammaTargetSession();
   const expiration = await resolveBoundedGammaExpiration({
     symbol: options.symbol,
     sessionDate,
@@ -359,26 +352,51 @@ export async function loadBoundedGammaDeskViewAsync(
   const dataRoot =
     options.dataRoot ??
     join(resolveRuntimeDataRoot(env), "gamma", "providers", "marketdata-app");
+  const targetSession =
+    options.targetSession ??
+    resolveBoundedGammaTargetSession(options.now ?? new Date());
 
   const sync = loadBoundedGammaDeskView({
     ...options,
     dataRoot,
     publicDemo: options.publicDemo ?? false,
+    targetSession,
   });
 
-  const sessionDate = resolveCurrentMarketSessionDate();
   if (
     options.publicDemo ||
     options.forceFixture ||
-    !boundedGammaNeedsRefresh(sync, sessionDate)
+    !boundedGammaNeedsRefresh(sync, targetSession)
   ) {
     return sync;
   }
 
   const refresh = await ensureBoundedGammaSnapshot({ symbol, dataRoot, env });
+
+  const reloaded = loadBoundedGammaDeskView({
+    ...options,
+    dataRoot,
+    publicDemo: false,
+    targetSession,
+  });
+
   if (!refresh.ok) {
+    if (reloaded.snapshot !== null) {
+      const sessionLabel = reloaded.snapshot.sessionDate;
+      return {
+        ...reloaded,
+        error: {
+          code: "refresh_failed",
+          message: `${refresh.error ?? "Bounded gamma refresh failed"} — showing cached snapshot (${sessionLabel}).`,
+        },
+      };
+    }
+
     return {
-      ...sync,
+      ...reloaded,
+      status: "empty",
+      snapshot: null,
+      withheldSnapshot: null,
       error: {
         code: "empty",
         message:
@@ -388,9 +406,5 @@ export async function loadBoundedGammaDeskViewAsync(
     };
   }
 
-  return loadBoundedGammaDeskView({
-    ...options,
-    dataRoot,
-    publicDemo: false,
-  });
+  return reloaded;
 }

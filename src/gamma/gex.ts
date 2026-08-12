@@ -1,4 +1,9 @@
-import { GEX_PCT_MOVE } from "./methodology";
+import {
+  GEX_PCT_MOVE,
+  FLIP_SHOCK_GRID_MAX_PCT,
+  FLIP_SHOCK_GRID_MIN_PCT,
+  FLIP_SHOCK_GRID_STEP_PCT,
+} from "./methodology";
 import { excludedSymbolsFromQuality } from "./marketdata-app/quality";
 import type {
   ContractGexContribution,
@@ -149,4 +154,100 @@ export function unsignedUnitGex(input: {
     input.spot *
     GEX_PCT_MOVE
   );
+}
+
+const SQRT_TWO_PI = Math.sqrt(2 * Math.PI);
+
+function normalPdf(x: number): number {
+  return Math.exp(-0.5 * x * x) / SQRT_TWO_PI;
+}
+
+/** Calendar year fraction between session and expiry (minimum one day). */
+export function calendarYearFraction(
+  sessionDate: string,
+  expiry: string,
+): number | null {
+  const start = Date.parse(`${sessionDate}T12:00:00Z`);
+  const end = Date.parse(`${expiry}T12:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  const days = (end - start) / 86400000;
+  if (!Number.isFinite(days) || days < 0) return null;
+  return Math.max(days / 365, 1 / 365);
+}
+
+/** Black–Scholes gamma (∂Δ/∂S) per option unit at a shocked spot. */
+export function blackScholesGammaPerUnit(
+  spot: number,
+  strike: number,
+  yearFraction: number,
+  riskFreeRate: number,
+  iv: number,
+): number | null {
+  if (!Number.isFinite(spot) || spot <= 0) return null;
+  if (!Number.isFinite(strike) || strike <= 0) return null;
+  if (!Number.isFinite(iv) || iv <= 0) return null;
+  if (!Number.isFinite(yearFraction) || yearFraction <= 0) return null;
+
+  const sigma = iv;
+  const sqrtT = Math.sqrt(yearFraction);
+  const d1 =
+    (Math.log(spot / strike) +
+      (riskFreeRate + 0.5 * sigma * sigma) * yearFraction) /
+    (sigma * sqrtT);
+  const pdf = normalPdf(d1);
+  const gamma = pdf / (spot * sigma * sqrtT);
+  return Number.isFinite(gamma) && gamma >= 0 ? gamma : null;
+}
+
+export function buildSpotShockGrid(spot: number): number[] {
+  const shocks: number[] = [];
+  for (
+    let pct = FLIP_SHOCK_GRID_MIN_PCT;
+    pct <= FLIP_SHOCK_GRID_MAX_PCT + 1e-9;
+    pct += FLIP_SHOCK_GRID_STEP_PCT
+  ) {
+    shocks.push(spot * pct);
+  }
+  return shocks;
+}
+
+/** Modeled signed GEX for one contract at a shocked spot using BS gamma. */
+export function modeledGexAtSpot(
+  contract: OptionsContract,
+  shockedSpot: number,
+  sessionDate: string,
+  riskFreeRate: number,
+  ivFallback: number | null,
+): number | null {
+  const iv =
+    contract.iv !== null &&
+    contract.iv !== undefined &&
+    Number.isFinite(contract.iv) &&
+    contract.iv > 0
+      ? contract.iv
+      : ivFallback;
+  if (iv === null || iv <= 0) return null;
+
+  const yearFraction = calendarYearFraction(sessionDate, contract.expiry);
+  if (yearFraction === null) return null;
+
+  const gamma = blackScholesGammaPerUnit(
+    shockedSpot,
+    contract.strike,
+    yearFraction,
+    riskFreeRate,
+    iv,
+  );
+  if (gamma === null) return null;
+
+  const oi = contract.openInterest;
+  if (oi === null || !Number.isFinite(oi) || oi < 0) return null;
+  const mult = contract.multiplier;
+  if (!Number.isFinite(mult) || mult <= 0) return null;
+
+  const unsigned =
+    gamma * oi * mult * shockedSpot * shockedSpot * GEX_PCT_MOVE;
+  if (!Number.isFinite(unsigned)) return null;
+  const signed = contract.right === "put" ? -unsigned : unsigned;
+  return signed === 0 ? 0 : signed;
 }

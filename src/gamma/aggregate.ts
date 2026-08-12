@@ -1,14 +1,19 @@
 import type {
   ExpiryGexBreakdown,
+  GammaFlipLevel,
   GammaRegime,
   StrikeGexLevel,
   WallLevel,
   ZeroDteGexBreakdown,
 } from "@/contracts";
 import { NEAR_ZERO_GROSS_SHARE } from "./methodology";
-import { grossGex } from "./gex";
+import { grossGex, modeledGexAtSpot, buildSpotShockGrid } from "./gex";
+import { GEX_RISK_FREE_RATE } from "./methodology";
 import { normalizeShareOfGrossGex } from "./share";
-import type { ContractGexContribution } from "./types";
+import type {
+  ContractGexContribution,
+  OptionsChainSnapshot,
+} from "./types";
 
 export function aggregateByStrike(
   used: readonly ContractGexContribution[],
@@ -232,11 +237,177 @@ export function deriveZeroDte(
   };
 }
 
-/** Reserved: Flip requires gamma recompute from spot/IV/rates/TTE — not strike interpolation. */
-export function unavailableGammaFlip() {
+/** Flip unavailable — explicit reason for audit. */
+export function unavailableGammaFlip(reason?: string): GammaFlipLevel {
   return {
-    status: "unavailable" as const,
+    status: "unavailable",
     reason:
-      "Gamma Flip is not estimated in M4-1; requires recomputing gamma from spot, IV, rates, and time-to-expiry rather than interpolating strike GEX",
+      reason ??
+      "Gamma Flip unavailable — insufficient spot-shock modeled net GEX inputs",
   };
+}
+
+const FLIP_MIN_MODELED_SHARE = 0.5;
+
+function interpolateZeroCrossing(
+  spotLow: number,
+  gexLow: number,
+  spotHigh: number,
+  gexHigh: number,
+): number | null {
+  if (gexLow === 0) return spotLow;
+  if (gexHigh === 0) return spotHigh;
+  if (gexLow * gexHigh > 0) return null;
+  const t = -gexLow / (gexHigh - gexLow);
+  if (!Number.isFinite(t)) return null;
+  return spotLow + t * (spotHigh - spotLow);
+}
+
+/**
+ * Spot-shock gamma flip: recompute BS gamma GEX across shocked spots for contracts
+ * already used in the bounded aggregate; linearly interpolate the zero crossing.
+ */
+export function deriveGammaFlipSpotShock(
+  chain: OptionsChainSnapshot,
+  used: readonly ContractGexContribution[],
+): GammaFlipLevel {
+  const spot = chain.spot;
+  if (spot === null || !Number.isFinite(spot) || spot <= 0) {
+    return unavailableGammaFlip("Gamma Flip unavailable — spot missing or invalid");
+  }
+  if (used.length === 0) {
+    return unavailableGammaFlip(
+      "Gamma Flip unavailable — no usable contracts in bounded aggregate",
+    );
+  }
+
+  const ivFallback = extractRepresentativeIvFromChain(chain).value;
+  let modeledAtSpot = 0;
+  for (const row of used) {
+    if (
+      modeledGexAtSpot(
+        row.contract,
+        spot,
+        chain.sessionDate,
+        GEX_RISK_FREE_RATE,
+        ivFallback,
+      ) !== null
+    ) {
+      modeledAtSpot += 1;
+    }
+  }
+  if (modeledAtSpot / used.length < FLIP_MIN_MODELED_SHARE) {
+    return unavailableGammaFlip(
+      "Gamma Flip unavailable — fewer than 50% of used contracts have IV for BS gamma recompute",
+    );
+  }
+
+  const shockSpots = buildSpotShockGrid(spot);
+  const totals: number[] = [];
+
+  for (const shockedSpot of shockSpots) {
+    let total = 0;
+    for (const row of used) {
+      const gex = modeledGexAtSpot(
+        row.contract,
+        shockedSpot,
+        chain.sessionDate,
+        GEX_RISK_FREE_RATE,
+        ivFallback,
+      );
+      if (gex !== null) total += gex;
+    }
+    totals.push(total);
+  }
+
+  let bestFlip: number | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bracketLow: number | null = null;
+  let bracketHigh: number | null = null;
+
+  for (let index = 0; index < shockSpots.length - 1; index += 1) {
+    const s0 = shockSpots[index]!;
+    const s1 = shockSpots[index + 1]!;
+    const g0 = totals[index]!;
+    const g1 = totals[index + 1]!;
+    const cross = interpolateZeroCrossing(s0, g0, s1, g1);
+    if (cross === null || !Number.isFinite(cross) || cross <= 0) continue;
+    const distance = Math.abs(cross - spot);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestFlip = cross;
+      bracketLow = s0;
+      bracketHigh = s1;
+    }
+  }
+
+  if (bestFlip === null) {
+    return unavailableGammaFlip(
+      "Gamma Flip unavailable — no net GEX sign change in spot-shock grid",
+    );
+  }
+
+  const rounded =
+    bestFlip >= 100
+      ? Math.round(bestFlip * 10) / 10
+      : Math.round(bestFlip * 100) / 100;
+
+  return {
+    status: "available",
+    strike: rounded,
+    level: rounded,
+    method: "spot_shock_bs_gamma",
+    lowerStrike: bracketLow ?? undefined,
+    upperStrike: bracketHigh ?? undefined,
+  };
+}
+
+/**
+ * Nearest-strike mean of vendor IV at the chain spot — one representative decimal IV.
+ */
+export function extractRepresentativeIvFromChain(
+  chain: OptionsChainSnapshot,
+): {
+  readonly status: "available" | "unavailable";
+  readonly value: number | null;
+} {
+  const spot = chain.spot;
+  if (spot === null || !Number.isFinite(spot) || spot <= 0) {
+    return { status: "unavailable", value: null };
+  }
+
+  const withIv = chain.contracts.filter(
+    (contract) =>
+      contract.iv !== null &&
+      contract.iv !== undefined &&
+      Number.isFinite(contract.iv) &&
+      contract.iv > 0,
+  );
+  if (withIv.length === 0) {
+    return { status: "unavailable", value: null };
+  }
+
+  let nearestStrike = withIv[0]!.strike;
+  let nearestDistance = Math.abs(withIv[0]!.strike - spot);
+  for (const contract of withIv) {
+    const distance = Math.abs(contract.strike - spot);
+    if (
+      distance < nearestDistance ||
+      (distance === nearestDistance && contract.strike < nearestStrike)
+    ) {
+      nearestStrike = contract.strike;
+      nearestDistance = distance;
+    }
+  }
+
+  const ivs = withIv
+    .filter((contract) => contract.strike === nearestStrike)
+    .map((contract) => contract.iv!)
+    .filter((iv) => iv > 0);
+  if (ivs.length === 0) {
+    return { status: "unavailable", value: null };
+  }
+
+  const value = ivs.reduce((sum, iv) => sum + iv, 0) / ivs.length;
+  return { status: "available", value };
 }

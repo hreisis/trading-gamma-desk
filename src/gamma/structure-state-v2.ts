@@ -9,6 +9,7 @@ import {
   BOUNDED_GAMMA_PROVIDER_SCHEMA_VERSION,
   BOUNDED_GAMMA_SCOPE,
   type BoundedGammaProviderSnapshot,
+  type BoundedGammaFlipLevel,
   type BoundedWallLevel,
   type CoverageRatio,
   type GammaChangeSet,
@@ -23,7 +24,12 @@ import {
   type WallDistance,
   type ZeroDteShareFeature,
 } from "@/contracts";
-import { unavailableGammaFlip } from "./aggregate";
+
+/** Strip bounded scope for MarketStructureStateV2 flip field. */
+function gammaFlipFromBounded(flip: BoundedGammaFlipLevel): GammaFlipLevel {
+  const { scope: _scope, ...level } = flip;
+  return level;
+}
 
 /** Forbidden substrings for interpretation copy (case-insensitive). */
 const FORBIDDEN_INTERPRETATION = [
@@ -530,7 +536,7 @@ export interface BuildMarketStructureStateV2Input {
 /**
  * Pure: MarketStructureState v0.2.0 from a BoundedGammaProviderSnapshot.
  * Optional GammaChangeSet — mismatched/missing → changeContext unavailable.
- * Never fabricates flip, repairs Greeks, or invents full-chain walls.
+ * Never fabricates flip from strike GEX interpolation, repairs Greeks, or invents full-chain walls.
  */
 export function buildMarketStructureStateV2(
   input: BuildMarketStructureStateV2Input,
@@ -562,7 +568,7 @@ export function buildMarketStructureStateV2(
   const changeContext = resolveChangeContext(snapshot, input.changeSet);
   const evidence = buildEvidence(snapshot, distCall, distPut, changeContext);
   const interpretation = buildInterpretation(snapshot, condition);
-  const flip: GammaFlipLevel = unavailableGammaFlip();
+  const flip = gammaFlipFromBounded(snapshot.gammaFlip);
   const generatedAt = input.generatedAt ?? snapshot.generatedAt;
 
   const result: MarketStructureStateV2Dto = {

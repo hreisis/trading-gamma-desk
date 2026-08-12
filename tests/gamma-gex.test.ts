@@ -13,7 +13,6 @@ import {
   parseOptionsChainFixture,
   scoreChain,
   scoreContract,
-  unavailableGammaFlip,
   unsignedUnitGex,
   type OptionsChainSnapshot,
   type OptionsContract,
@@ -288,7 +287,10 @@ describe("computeEstimatedGammaStructure", () => {
     expect(out.byExpiry.length).toBe(2);
     expect(out.zeroDte.status).toBe("available");
     expect(out.zeroDte.expiry).toBe("2026-07-29");
-    expect(out.gammaFlip).toEqual(unavailableGammaFlip());
+    expect(out.gammaFlip.status).toBe("unavailable");
+    if (out.gammaFlip.status === "unavailable") {
+      expect(out.gammaFlip.reason).toMatch(/IV/i);
+    }
     expect(out.asOf).toBeTruthy();
     expect(out.source.provider).toBe("fixture");
     expect(out.methodology.assumptions.length).toBeGreaterThan(0);
@@ -365,6 +367,60 @@ describe("computeEstimatedGammaStructure", () => {
     expect(out.gammaFlip.status).toBe("unavailable");
     expect(out.gammaFlip.level).toBeUndefined();
     expect(out.gammaRegime).toBe("negative");
+  });
+
+  it("estimates gamma flip via spot-shock BS gamma when IV is present", () => {
+    const out = computeEstimatedGammaStructure(
+      chain({
+        contracts: [
+          contract({
+            strike: 90,
+            right: "put",
+            expiry: "2026-08-21",
+            openInterest: 80,
+            gamma: 0.02,
+            iv: 0.3,
+          }),
+          contract({
+            strike: 95,
+            right: "put",
+            expiry: "2026-08-21",
+            openInterest: 60,
+            gamma: 0.02,
+            iv: 0.28,
+          }),
+          contract({
+            strike: 100,
+            right: "call",
+            expiry: "2026-08-21",
+            openInterest: 100,
+            gamma: 0.02,
+            iv: 0.25,
+          }),
+          contract({
+            strike: 105,
+            right: "call",
+            expiry: "2026-08-21",
+            openInterest: 120,
+            gamma: 0.02,
+            iv: 0.22,
+          }),
+          contract({
+            strike: 110,
+            right: "call",
+            expiry: "2026-08-21",
+            openInterest: 150,
+            gamma: 0.02,
+            iv: 0.2,
+          }),
+        ],
+      }),
+    );
+    expect(out.gammaFlip.status).toBe("available");
+    if (out.gammaFlip.status !== "available") return;
+    expect(out.gammaFlip.method).toBe("spot_shock_bs_gamma");
+    expect(out.gammaFlip.strike).toBeLessThan(100);
+    expect(out.gammaFlip.level).toBe(out.gammaFlip.strike);
   });
 
   it("loads the SPX fixture via provider and validates Zod", () => {

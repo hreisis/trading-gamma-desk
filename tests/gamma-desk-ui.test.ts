@@ -16,9 +16,9 @@ function renderGamma(view: BoundedGammaDeskView): string {
 }
 
 describe("bounded gamma desk loader", () => {
-  it("loads the UI fixture in forceFixture / public-demo mode", () => {
+  it("loads the UI fixture in forceFixture / public-demo mode as incomplete", () => {
     const view = loadBoundedGammaDeskView({ forceFixture: true });
-    expect(view.status).toBe("ready");
+    expect(view.status).toBe("incomplete");
     expect(view.snapshot?.synthetic).toBe(true);
     expect(view.snapshot?.scope).toBe("bounded_single_expiry");
     expect(JSON.stringify(view.snapshot)).not.toContain("Bearer ");
@@ -51,11 +51,11 @@ describe("bounded gamma desk loader", () => {
 });
 
 describe("GammaDesk SSR markup", () => {
-  it("renders incomplete ready state with bounded wall labels", () => {
+  it("renders incomplete state with bounded wall labels", () => {
     const view = loadBoundedGammaDeskView({ forceFixture: true });
     const html = renderGamma(view);
 
-    expect(html).toContain('data-testid="gamma-state-ready"');
+    expect(html).toContain('data-testid="gamma-state-incomplete"');
     expect(html).toContain("BOUNDED · SINGLE EXPIRY");
     expect(html).toContain("Bounded Call Wall");
     expect(html).toContain("Bounded Put Wall");
@@ -77,6 +77,7 @@ describe("GammaDesk SSR markup", () => {
     const html = renderGamma({
       status: "empty",
       snapshot: null,
+      withheldSnapshot: null,
       sourceLabel: "none",
       isFixture: false,
       error: {
@@ -92,6 +93,7 @@ describe("GammaDesk SSR markup", () => {
     const html = renderGamma({
       status: "malformed",
       snapshot: null,
+      withheldSnapshot: null,
       sourceLabel: "bad",
       isFixture: false,
       error: {

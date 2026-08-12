@@ -30,17 +30,4 @@ export function gammaRegimeSignLabel(
   }
 }
 
-/** Bounded snapshot has no gamma flip field — only show when contract adds it later. */
-export function readGammaFlipStrike(
-  snapshot: BoundedGammaProviderSnapshot,
-): number | null {
-  const candidate = snapshot as BoundedGammaProviderSnapshot & {
-    gammaFlip?: { status?: string; strike?: number | null };
-  };
-  const flip = candidate.gammaFlip;
-  if (!flip || flip.status === "unavailable" || flip.strike == null) {
-    return null;
-  }
-  if (!Number.isFinite(flip.strike)) return null;
-  return flip.strike;
-}
+export { readGammaFlipStrike } from "@/desk/format-gamma";

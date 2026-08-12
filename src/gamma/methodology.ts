@@ -15,6 +15,14 @@ import {
  */
 export const GEX_PCT_MOVE = 0.01;
 
+/** Annual risk-free rate for spot-shock gamma flip recompute (deterministic default). */
+export const GEX_RISK_FREE_RATE = 0.04;
+
+/** Spot-shock grid for gamma flip: ±6% around spot in 0.25% steps. */
+export const FLIP_SHOCK_GRID_MIN_PCT = 0.94;
+export const FLIP_SHOCK_GRID_MAX_PCT = 1.06;
+export const FLIP_SHOCK_GRID_STEP_PCT = 0.0025;
+
 export const GEX_FORMULA =
   "unsignedUnitGex = gamma * openInterest * multiplier * spot^2 * 0.01; callGex = +unsignedUnitGex; putGex = -unsignedUnitGex; totalGex = sum(callGex)+sum(putGex); grossGex = sum(|callGex|+|putGex|)";
 
@@ -24,7 +32,7 @@ export const GEX_ASSUMPTIONS: readonly string[] = [
   "OI=0 and gamma=0 are valid (contribute zero GEX). Missing, negative, or non-finite OI/gamma, expired contracts, and invalid strike/multiplier/spot are excluded.",
   "Call wall = strike maximizing call GEX among strikes with callGex > 0; ties break to the lowest strike. Put wall = strike minimizing put GEX among strikes with putGex < 0; ties break to the highest strike. All-zero GEX does not fabricate walls.",
   "Near-zero regime uses |totalGex| / grossGex where grossGex = Σ(|callGex|+|putGex|). 0DTE share = gross 0DTE GEX / gross total GEX (no clamping).",
-  "Gamma Flip is not estimated via strike interpolation; requires a future path that recomputes gamma from spot, IV, rates, and time-to-expiry.",
+  "Gamma Flip uses spot-shock Black–Scholes gamma on the bounded contract set (fixed IV per contract, flat risk-free rate); not strike-GEX interpolation.",
   "GEX is an amplifier/compressor structure estimate — not a directional buy/sell signal for the underlying.",
 ];
 

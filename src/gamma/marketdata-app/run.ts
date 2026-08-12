@@ -8,6 +8,7 @@ import {
 import { writeJsonAtomic } from "@/desk/atomic-write";
 import type { FetchLike } from "@/ingest/http";
 import { computeEstimatedGammaStructure } from "../compute";
+import { extractRepresentativeIvFromChain } from "../aggregate";
 import { grossGex } from "../gex";
 import { resolveMarketDataApiToken } from "./config";
 import { fetchBoundedMarketDataAppChain } from "./fetch";
@@ -75,6 +76,28 @@ function toBoundedWall(
 ): BoundedWallLevel {
   return {
     ...wall,
+    scope: BOUNDED_GAMMA_SCOPE,
+  };
+}
+
+function toBoundedFlip(
+  flip: {
+    status: "available";
+    strike: number;
+    level: number;
+    method: "spot_shock_bs_gamma";
+    lowerStrike?: number;
+    upperStrike?: number;
+  } | {
+    status: "unavailable";
+    reason: string;
+    lowerStrike?: number;
+    upperStrike?: number;
+    level?: number;
+  },
+): BoundedGammaProviderSnapshotDto["gammaFlip"] {
+  return {
+    ...flip,
     scope: BOUNDED_GAMMA_SCOPE,
   };
 }
@@ -290,6 +313,7 @@ export async function runBoundedGammaProvider(
   const structure = computeEstimatedGammaStructure(chain);
   const gross = grossGex(structure.byStrike);
   const strikeReturned = returnedStrikeRange(structure.byStrike);
+  const representativeIvExtract = extractRepresentativeIvFromChain(chain);
 
   const limitations = [
     SCOPE_LIMITATION,
@@ -335,10 +359,17 @@ export async function runBoundedGammaProvider(
     gammaRegime: structure.gammaRegime,
     boundedCallWall: toBoundedWall(structure.callWall),
     boundedPutWall: toBoundedWall(structure.putWall),
+    gammaFlip: toBoundedFlip(structure.gammaFlip),
     byStrike: structure.byStrike,
     byExpiry: structure.byExpiry,
     coverage: structure.coverage,
     synthetic: structure.synthetic,
+    representativeIv: {
+      status: representativeIvExtract.status,
+      value: representativeIvExtract.value,
+      sessionDate,
+      asOf: chain.asOf,
+    },
   });
 
   const serialized = JSON.stringify(snapshot);

@@ -24,7 +24,7 @@ const METHOD_NOTE =
 function wallValue(
   wall: BoundedGammaProviderSnapshot["boundedCallWall"],
 ): string {
-  if (wall.status === "unavailable") return "—";
+  if (wall.status !== "available") return "—";
   return formatSpot(wall.strike);
 }
 
@@ -76,11 +76,13 @@ function CompactBody({
   sourceLabel,
   isFixture,
   variant,
+  stateTestId = "gamma-state-ready",
 }: {
   snapshot: BoundedGammaProviderSnapshot;
   sourceLabel: string;
   isFixture: boolean;
   variant: "spy" | "qqq" | "default";
+  stateTestId?: string;
 }) {
   const suspect = snapshot.coverage.suspectVendorGreeksCount ?? 0;
   const regimeLight = gammaRegimeRiskLight(snapshot.gammaRegime);
@@ -95,7 +97,7 @@ function CompactBody({
   return (
     <article
       className={`signal-gamma-card ${panelClass}`}
-      data-testid="gamma-state-ready"
+      data-testid={stateTestId}
     >
       <header className="gex-profile-header" data-testid="gamma-header">
         <div className="gex-profile-header-left">
@@ -164,13 +166,13 @@ function CompactBody({
           <span>Coverage {formatPct(snapshot.coverage.usableGammaCoveragePct)}</span>
           <span>
             Bounded Call Wall{" "}
-            {snapshot.boundedCallWall.status !== "unavailable"
+            {snapshot.boundedCallWall.status === "available"
               ? snapshot.boundedCallWall.strike
               : "—"}
           </span>
           <span>
             Bounded Put Wall{" "}
-            {snapshot.boundedPutWall.status !== "unavailable"
+            {snapshot.boundedPutWall.status === "available"
               ? snapshot.boundedPutWall.strike
               : "—"}
           </span>
@@ -304,12 +306,16 @@ export function GammaDesk({
     );
   }
 
+  const stateTestId =
+    view.status === "incomplete" ? "gamma-state-incomplete" : "gamma-state-ready";
+
   return (
     <CompactBody
       snapshot={view.snapshot}
       sourceLabel={view.sourceLabel}
       isFixture={view.isFixture}
       variant={variant}
+      stateTestId={stateTestId}
     />
   );
 }

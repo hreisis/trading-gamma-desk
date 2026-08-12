@@ -6,6 +6,7 @@ import { parseSpyHoldingsMatrix } from "@/desk/breadth/holdings/parse-spy-holdin
 import { computeSpyBreadthInternals } from "@/desk/breadth/compute/breadth";
 import {
   buildV2CommandCenterView,
+  deriveBreadthActionableSignal,
   summarizeSpyBreadthFromDurable,
   summarizeSpyBreadthFromSnapshot,
 } from "@/desk/v2-command-center";
@@ -13,16 +14,19 @@ import { loadBoundedGammaDeskView } from "@/desk";
 
 const {
   loadDurableSpyBreadthForMarketInput,
+  ensureDurableSpyBreadthForMarketInput,
   loadSpyUniverse,
   loadAlpacaDailyBarPanel,
 } = vi.hoisted(() => ({
   loadDurableSpyBreadthForMarketInput: vi.fn(),
+  ensureDurableSpyBreadthForMarketInput: vi.fn(),
   loadSpyUniverse: vi.fn(),
-  loadAlpacaDailyBarPanel: vi.fn(),
+  loadAlpacaDailyBarPanel: vi.fn(async () => null),
 }));
 
 vi.mock("@/desk/breadth/read-durable-breadth", () => ({
   loadDurableSpyBreadthForMarketInput,
+  ensureDurableSpyBreadthForMarketInput,
 }));
 
 vi.mock("@/desk/breadth/universe/load-spy-universe", () => ({
@@ -109,6 +113,7 @@ function sampleBreadthSnapshot(
 afterEach(() => {
   vi.restoreAllMocks();
   loadDurableSpyBreadthForMarketInput.mockReset();
+  ensureDurableSpyBreadthForMarketInput.mockReset();
 });
 
 describe("summarizeSpyBreadthFromDurable", () => {
@@ -154,6 +159,7 @@ describe("summarizeSpyBreadthFromDurable", () => {
     expect(summary.stale).toBe(true);
     expect(summary.status).not.toBe("unavailable");
     expect(summary.advance).not.toBeNull();
+    expect(summary.breadthSignalStatus).toBe("available");
     expect(summary.missingReason).toMatch(/lags target/);
   });
 
@@ -171,6 +177,74 @@ describe("summarizeSpyBreadthFromDurable", () => {
     expect(summary.advance).toBeNull();
     expect(summary.percentAboveMA20).toBeNull();
     expect(summary.missingReason).toMatch(/latest pointer/i);
+    expect(summary.breadthSignalStatus).toBe("unavailable");
+  });
+
+  it("derives actionable breadth signal from advance and MA metrics", () => {
+    const snapshot = sampleBreadthSnapshot();
+    const summary = summarizeSpyBreadthFromDurable(
+      {
+        snapshot,
+        sourceArtifact: "breadth/spy_etf_holdings/snapshots/test.json",
+        missingReason: null,
+      },
+      false,
+    );
+
+    expect(summary.breadthSignalStatus).toBe("available");
+    expect(summary.breadthSignal).not.toBeNull();
+    expect(summary.breadthContextLine).toMatch(/% advancing ·/);
+    expect(summary.advancingPct).not.toBeNull();
+  });
+});
+
+describe("deriveBreadthActionableSignal", () => {
+  const base = {
+    status: "available" as const,
+    stale: false,
+    marketSessionDate: "2026-08-06",
+    asOf: "2026-08-06T16:00:00.000Z",
+    advance: 73,
+    decline: 20,
+    unchanged: 7,
+    percentAboveMA20: 60,
+    percentAboveMA50: 55,
+    new20DayClosingHigh: null,
+    new20DayClosingLow: null,
+    missingReason: null,
+    sourceArtifact: null,
+    advancingPct: null,
+    breadthSignal: null,
+    breadthSignalStatus: "unavailable" as const,
+    breadthContextLine: null,
+  };
+
+  it("classifies strong breadth when advance and MA thresholds pass", () => {
+    const signal = deriveBreadthActionableSignal(base);
+    expect(signal.breadthSignalStatus).toBe("available");
+    expect(signal.breadthSignal).toBe("strong");
+    expect(signal.breadthContextLine).toBe("73% advancing · broad participation");
+  });
+
+  it("classifies weak breadth when participation is thin", () => {
+    const signal = deriveBreadthActionableSignal({
+      ...base,
+      advance: 42,
+      decline: 50,
+      unchanged: 8,
+      percentAboveMA20: 35,
+      percentAboveMA50: 38,
+    });
+    expect(signal.breadthSignal).toBe("weak");
+    expect(signal.breadthContextLine).toBe(
+      "42% advancing · participation weakening",
+    );
+  });
+
+  it("keeps actionable signal when snapshot is stale but metrics are present", () => {
+    const signal = deriveBreadthActionableSignal({ ...base, stale: true });
+    expect(signal.breadthSignalStatus).toBe("available");
+    expect(signal.breadthSignal).toBe("strong");
   });
 });
 
@@ -222,7 +296,10 @@ describe("MarketInputSnapshot durable breadth field", () => {
 });
 
 describe("loadV2HomePage durable breadth", () => {
-  it("does not call universe or Alpaca bar producers on page load", async () => {
+  it("loads SPY/QQQ daily bars for vol context without universe producers", async () => {
+    ensureDurableSpyBreadthForMarketInput.mockImplementation(async (opts) =>
+      loadDurableSpyBreadthForMarketInput(opts),
+    );
     loadDurableSpyBreadthForMarketInput.mockResolvedValue({
       snapshot: null,
       sourceArtifact: null,
@@ -232,13 +309,13 @@ describe("loadV2HomePage durable breadth", () => {
     const { loadV2HomePage } = await import("@/desk/load-v2-home");
     await loadV2HomePage({ demo: false, forceFixture: true });
 
-    expect(loadDurableSpyBreadthForMarketInput).toHaveBeenCalledOnce();
+    expect(ensureDurableSpyBreadthForMarketInput).toHaveBeenCalledOnce();
     expect(loadSpyUniverse).not.toHaveBeenCalled();
-    expect(loadAlpacaDailyBarPanel).not.toHaveBeenCalled();
+    expect(loadAlpacaDailyBarPanel).toHaveBeenCalledOnce();
   });
 
   it("degrades gracefully when durable read throws", async () => {
-    loadDurableSpyBreadthForMarketInput.mockRejectedValue(
+    ensureDurableSpyBreadthForMarketInput.mockRejectedValue(
       new Error("blob auth failed secret-token"),
     );
 
@@ -247,11 +324,14 @@ describe("loadV2HomePage durable breadth", () => {
 
     expect(view.spyBreadth.status).toBe("unavailable");
     expect(view.spyBreadth.missingReason).toMatch(/Durable breadth read failed/i);
-    expect(view.gamma[0].status).toBe("ready");
+    expect(view.gamma[0].status).toBe("incomplete");
   });
 
   it("surfaces published snapshot on the command center view", async () => {
     const snapshot = sampleBreadthSnapshot();
+    ensureDurableSpyBreadthForMarketInput.mockImplementation(async (opts) =>
+      loadDurableSpyBreadthForMarketInput(opts),
+    );
     loadDurableSpyBreadthForMarketInput.mockResolvedValue({
       snapshot,
       sourceArtifact: "breadth/spy_etf_holdings/snapshots/test.json",
@@ -264,6 +344,7 @@ describe("loadV2HomePage durable breadth", () => {
     expect(view.spyBreadth.status).toBe("available");
     expect(view.spyBreadth.advance).toBe(snapshot.advance);
     expect(view.spyBreadth.sourceArtifact).toContain("breadth/");
+    expect(view.spyBreadth.breadthSignalStatus).toBe("available");
   });
 });
 

@@ -12,7 +12,7 @@ import {
   deriveGammaRegime,
   derivePutWall,
   deriveZeroDte,
-  unavailableGammaFlip,
+  deriveGammaFlipSpotShock,
 } from "./aggregate";
 import { scoreChain } from "./gex";
 import { suspectExcludedOnSide } from "./marketdata-app/quality";
@@ -179,7 +179,7 @@ export function computeEstimatedGammaStructure(
     gammaRegime: deriveGammaRegime(totalGex, byStrike),
     callWall,
     putWall,
-    gammaFlip: unavailableGammaFlip(),
+    gammaFlip: deriveGammaFlipSpotShock(chain, used),
     byStrike,
     byExpiry,
     zeroDte: deriveZeroDte(chain.sessionDate, byExpiry, byStrike),

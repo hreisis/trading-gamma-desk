@@ -39,6 +39,7 @@ function withBounded(overrides: Partial<BoundedDto> = {}): BoundedDto {
     zeroDte: overrides.zeroDte ?? base.zeroDte,
     boundedCallWall: overrides.boundedCallWall ?? base.boundedCallWall,
     boundedPutWall: overrides.boundedPutWall ?? base.boundedPutWall,
+    gammaFlip: overrides.gammaFlip ?? base.gammaFlip,
     coverage: overrides.coverage ?? base.coverage,
     byStrike: overrides.byStrike ?? base.byStrike,
     byExpiry: overrides.byExpiry ?? base.byExpiry,
@@ -264,6 +265,11 @@ describe("M4-3C MarketStructureState v0.2.0 condition taxonomy", () => {
           scope: BOUNDED_GAMMA_SCOPE,
         },
         limitations: ["no usable contracts"],
+        gammaFlip: {
+          status: "unavailable",
+          reason: "Gamma Flip unavailable — no usable contracts in bounded aggregate",
+          scope: BOUNDED_GAMMA_SCOPE,
+        },
       }),
     });
     expect(unavailable.condition).toBe("unavailable");
@@ -305,26 +311,13 @@ describe("M4-3C bounded fixture + incomplete coverage", () => {
     expect(state.boundedPutWall.scope).toBe("bounded_single_expiry");
   });
 
-  it("never fabricates flip", () => {
-    const state = buildMarketStructureStateV2({
-      bounded: withBounded({
-        status: "available",
-        gammaRegime: "positive",
-        coverage: {
-          contractsIn: 10,
-          contractsUsed: 10,
-          contractsSkipped: 0,
-          skipReasons: {},
-          suspectVendorGreeksCount: 0,
-        },
-        limitations: ["BOUNDED"],
-      }),
-    });
-    expect(state.flip).toEqual({
-      status: "unavailable",
-      reason: expect.stringMatching(/not estimated/i),
-    });
-    expect(state.flip.level).toBeUndefined();
+  it("passes through persisted bounded gamma flip", () => {
+    const state = buildMarketStructureStateV2({ bounded: loadBounded() });
+    expect(state.flip.status).toBe("available");
+    if (state.flip.status !== "available") return;
+    expect(state.flip.strike).toBe(745.9);
+    expect(state.flip.method).toBe("spot_shock_bs_gamma");
+    expect(state.flip.level).toBe(745.9);
   });
 });
 

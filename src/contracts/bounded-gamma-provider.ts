@@ -3,6 +3,8 @@ import { IsoDate, IsoDateTime } from "./common";
 import {
   ExpiryGexBreakdown,
   GammaAvailability,
+  GammaFlipAvailable,
+  GammaFlipUnavailable,
   GammaRegime,
   StrikeGexLevel,
   WallLevel,
@@ -34,6 +36,23 @@ export const BoundedGammaStrikeReturned = z.object({
   min: z.number().finite().nullable(),
   max: z.number().finite().nullable(),
 });
+
+/** Near-spot IV from the bounded chain sample — not a full surface. */
+export const BoundedRepresentativeIv = z.object({
+  status: z.enum(["available", "unavailable"]),
+  value: z.number().finite().nonnegative().nullable(),
+  sessionDate: IsoDate,
+  asOf: IsoDateTime,
+});
+
+export const BoundedGammaFlipLevel = z.discriminatedUnion("status", [
+  GammaFlipAvailable.extend({
+    scope: z.literal(BOUNDED_GAMMA_SCOPE),
+  }),
+  GammaFlipUnavailable.extend({
+    scope: z.literal(BOUNDED_GAMMA_SCOPE),
+  }),
+]);
 
 /**
  * Derived bounded MarketData.app → Gamma Engine snapshot for UI consumption.
@@ -69,6 +88,7 @@ export const BoundedGammaProviderSnapshot = z.object({
   gammaRegime: GammaRegime,
   boundedCallWall: BoundedWallLevel,
   boundedPutWall: BoundedWallLevel,
+  gammaFlip: BoundedGammaFlipLevel,
   byStrike: z.array(StrikeGexLevel),
   byExpiry: z.array(ExpiryGexBreakdown),
   coverage: z.object({
@@ -83,7 +103,11 @@ export const BoundedGammaProviderSnapshot = z.object({
     suspectVendorGreeksCount: z.number().int().nonnegative().optional(),
   }),
   synthetic: z.boolean(),
+  representativeIv: BoundedRepresentativeIv.optional(),
 });
+
+export type BoundedRepresentativeIv = z.infer<typeof BoundedRepresentativeIv>;
+export type BoundedGammaFlipLevel = z.infer<typeof BoundedGammaFlipLevel>;
 
 export type BoundedWallLevel = z.infer<typeof BoundedWallLevel>;
 export type BoundedGammaProviderSnapshot = z.infer<

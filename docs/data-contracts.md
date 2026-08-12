@@ -715,7 +715,7 @@ OI-based GEX proxy from a provider-neutral options chain. **Not** dealer positio
 | `dataDelay` | `realtime` \| `delayed_15m` \| `eod` \| `fixture` \| `unknown` |
 | `status` | `available` (complete) \| `incomplete` (usable GEX with suspect vendor-Greek exclusions) \| `partial` (other skips) \| `unavailable` |
 | `gammaRegime` | `positive` \| `negative` \| `near_zero` \| `unavailable` |
-| `gammaFlip` | **Contract reserved.** M4-1 always `unavailable` — no strike-interpolation fake level |
+| `gammaFlip` | Spot-shock BS gamma flip when inputs suffice (`method: spot_shock_bs_gamma`); otherwise `unavailable` + `reason` — never strike-GEX interpolated |
 | `zeroDte.shareOfGrossGex` | Gross 0DTE / gross total; **0.1.1+** validated in `[0, 1]` (was `shareOfAbsStrikeGex` in 0.1.0) |
 | `zeroDte` | `unavailable` when chain has no expiry equal to `sessionDate` |
 
@@ -742,6 +742,7 @@ Credit-bounded, single-expiry MarketData.app → Gamma Engine derived snapshot f
 | `vendorAsOf` / `vendorUpdatedMin` / `vendorUpdatedMax` | From vendor `updated` unix timestamps — never wall-clock evaluation time |
 | `sessionDate` / `dte` | Derived from vendor asOf (America/New_York) vs requested `expiration` |
 | `boundedCallWall` / `boundedPutWall` | Engine walls + `scope: bounded_single_expiry` — not unqualified market walls |
+| `gammaFlip` | Spot-shock modeled flip + `scope: bounded_single_expiry`; `method: spot_shock_bs_gamma` when available |
 | `status` | Same engine semantics: `available` \| `incomplete` \| `partial` \| `unavailable` |
 | Credits | `credits.consumed` / `credits.remaining` from vendor rate-limit headers when present |
 | Persistence | `data/gamma/providers/marketdata-app/{SYMBOL}-bounded-latest.json` (gitignored); write only on success |
@@ -764,7 +765,7 @@ Metrics: `spot`, `totalGex`, `gammaRegime`, `callWall`, `putWall`, `zeroDteShare
 
 Deterministic, contract-valid **conditional structure interpretation** derived from one `BoundedGammaProviderSnapshot` plus an optional compatible `GammaChangeSet`. Zod: `src/contracts/market-structure-state-v2.ts`. Shared feature schemas: `src/contracts/market-structure-state.ts`. Builder: `buildMarketStructureStateV2` in `src/gamma/structure-state-v2.ts`.
 
-Does **not** call live APIs from the builder, change GEX math, or fabricate Flip / full-chain walls.
+Does **not** call live APIs from the builder, change GEX math, or fabricate flip via strike-GEX interpolation / full-chain walls.
 
 **Semantics:** Gamma is a conditional amplifier/compressor for the **bounded single-expiry** sample — not a directional predictor. Walls remain `boundedCallWall` / `boundedPutWall` with `scope: "bounded_single_expiry"`.
 

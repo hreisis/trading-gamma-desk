@@ -116,7 +116,7 @@ export const MarketStructureStateV2 = z.object({
   grossGex: z.number().finite().nonnegative(),
   boundedCallWall: BoundedWallLevel,
   boundedPutWall: BoundedWallLevel,
-  /** Always unavailable unless a future supported input supplies flip — never interpolated. */
+  /** Spot-shock modeled flip from bounded provider snapshot when available — never strike-GEX interpolated. */
   flip: GammaFlipLevel,
   spotWallCorridor: SpotWallCorridor,
   distanceToBoundedCallWall: WallDistance,

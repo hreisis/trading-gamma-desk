@@ -6,6 +6,7 @@ import {
 } from "@/contracts/breadth-internals";
 import type { BreadthSnapshotPointer } from "@/contracts/breadth-snapshot-pointer";
 import { defaultSessionCalendar } from "@/macro/calendar";
+import { isServerlessHost } from "@/desk/production-runtime";
 import { tradingSessionLag } from "./universe/session-lag";
 import {
   BreadthStoreError,
@@ -157,4 +158,67 @@ export async function loadDurableSpyBreadthForMarketInput(
       missingReason: `Durable breadth read failed: ${detail}`,
     };
   }
+}
+
+const BREADTH_POINTER_MISSING = "No durable breadth latest pointer published.";
+
+/**
+ * Load durable SPY breadth; when the latest pointer is absent, run the daily
+ * producer once so local dev can publish from Alpaca without a separate cron step.
+ */
+export async function ensureDurableSpyBreadthForMarketInput(
+  options: LoadDurableSpyBreadthOptions,
+): Promise<DurableBreadthReadOutcome> {
+  const outcome = await loadDurableSpyBreadthForMarketInput(options);
+  if (outcome.snapshot || options.publicDemo) {
+    return outcome;
+  }
+
+  const pointerMissing =
+    outcome.missingReason === BREADTH_POINTER_MISSING ||
+    outcome.missingReason?.includes("No durable breadth latest pointer");
+  if (!pointerMissing) {
+    return outcome;
+  }
+
+  const env = options.env ?? process.env;
+  const dataRoot = options.dataRoot ?? "data";
+  let store: BreadthSnapshotStore;
+  if (options.store) {
+    store = options.store;
+  } else {
+    const resolution = resolveBreadthSnapshotStoreFromEnv(env, { dataRoot });
+    if (!resolution.ok) {
+      return outcome;
+    }
+    store = resolution.store;
+  }
+
+  const serverless = isServerlessHost(env as NodeJS.ProcessEnv);
+  const { produceDailySpyBreadth } = await import("./produce-daily-spy-breadth");
+  const produce = await produceDailySpyBreadth({
+    store,
+    dataRoot,
+    env: env as NodeJS.ProcessEnv,
+    bootstrapBars: true,
+    allowUniversePersistedFallback: true,
+    persistUniverse: !serverless,
+    persistBars: !serverless,
+  });
+
+  if (produce.status !== "published") {
+    return {
+      ...outcome,
+      missingReason:
+        produce.status === "skipped"
+          ? `Breadth producer skipped: ${produce.detail ?? produce.reason}`
+          : `Breadth producer failed: ${produce.detail ?? produce.reason}`,
+    };
+  }
+
+  return loadDurableSpyBreadthForMarketInput({
+    ...options,
+    store,
+    dataRoot,
+  });
 }
