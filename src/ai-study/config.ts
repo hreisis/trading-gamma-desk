@@ -30,6 +30,39 @@ export interface AiStudyLlmRuntimeConfig {
   readonly parseRetries: number;
 }
 
+export function describeMissingAiStudyLlmEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): readonly string[] {
+  const missing: string[] = [];
+  if (!resolveOpenAiApiKey(env)) {
+    missing.push("OPENAI_API_KEY");
+  }
+  return missing;
+}
+
+export function describeAiStudyLlmModelSource(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const fromEnv = (env.AI_STUDY_LLM_MODEL ?? "").trim();
+  if (fromEnv) return `AI_STUDY_LLM_MODEL=${fromEnv}`;
+  return `default (${AI_STUDY_DEFAULT_LLM_MODEL})`;
+}
+
+/**
+ * Responses API `reasoning.effort` is only accepted on reasoning-model families
+ * (e.g. gpt-5*, o-series). Chat models such as gpt-4.1-mini reject the parameter.
+ */
+export function openAiResponsesReasoningEffort(
+  model: string,
+): { readonly effort: "none" } | undefined {
+  const id = model.trim().toLowerCase();
+  if (!id) return undefined;
+  if (/^gpt-5/.test(id) || /^o\d/.test(id)) {
+    return { effort: "none" };
+  }
+  return undefined;
+}
+
 export function loadAiStudyLlmConfig(
   env: NodeJS.ProcessEnv = process.env,
   overrides: Partial<AiStudyLlmRuntimeConfig> = {},

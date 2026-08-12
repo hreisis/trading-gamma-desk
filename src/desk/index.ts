@@ -6,6 +6,7 @@ export * from "./pipeline-status";
 export * from "./public-demo";
 export * from "./load-macro-desk";
 export * from "./load-bounded-gamma";
+export * from "./command-center-v1";
 export * from "./v2-command-center";
 export * from "./risk-decision-v1";
 export * from "./load-v2-home";

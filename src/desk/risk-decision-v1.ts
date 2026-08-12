@@ -1,5 +1,9 @@
 import type { DominantDriver } from "@/contracts";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
+import { writeJsonAtomic } from "./atomic-write";
 import type {
   CtaProxySummary,
   VolMispricingSummary,
@@ -23,6 +27,12 @@ export interface RiskDecisionV1Coverage {
   readonly confidence: RiskDecisionConfidence;
 }
 
+export interface RiskFactorContributionSnapshot {
+  readonly id: string;
+  readonly score: number;
+  readonly effectiveWeight: number;
+}
+
 export interface RiskDecisionV1Result {
   readonly status: "ready" | "withheld";
   readonly riskScore: number | null;
@@ -35,6 +45,23 @@ export interface RiskDecisionV1Result {
   readonly withheldReason: string | null;
   /** Human-readable factors not contributing to the score when status is withheld. */
   readonly withheldFactors: readonly string[];
+  readonly factorContributions: readonly RiskFactorContributionSnapshot[];
+}
+
+export interface RiskDecisionV1DailyRecord {
+  readonly schemaVersion: typeof RISK_DECISION_V1_VERSION;
+  /** ET calendar date when this Command Center risk record was published. */
+  readonly publicationDate?: string;
+  /** Market session the decision inputs were aligned to. */
+  readonly marketSessionDate: string;
+  readonly generatedAt: string;
+  readonly riskScore: number;
+  readonly factorContributions: readonly RiskFactorContributionSnapshot[];
+}
+
+export interface RiskDecisionDayOverDay {
+  readonly riskChange: number | null;
+  readonly riskChangeReason: string | null;
 }
 
 interface RiskFactorContribution {
@@ -238,6 +265,257 @@ function buildEvidence(
   }
 
   return lines;
+}
+
+function snapshotContributions(
+  factors: readonly RiskFactorContribution[],
+): readonly RiskFactorContributionSnapshot[] {
+  return factors.map((row) => ({
+    id: row.id,
+    score: row.score,
+    effectiveWeight: row.effectiveWeight,
+  }));
+}
+
+const FACTOR_CHANGE_LABELS: Record<
+  string,
+  { readonly short: string; readonly eased: string; readonly rose: string }
+> = {
+  breadth: {
+    short: "breadth",
+    eased: "breadth improved",
+    rose: "breadth weakened",
+  },
+  macro: {
+    short: "macro",
+    eased: "macro eased",
+    rose: "macro added risk",
+  },
+  cta: {
+    short: "CTA",
+    eased: "CTA strengthened",
+    rose: "CTA weakened",
+  },
+  vol: {
+    short: "vol mispricing",
+    eased: "vol mispricing eased",
+    rose: "vol mispricing worsened",
+  },
+  gamma: {
+    short: "dealer flow",
+    eased: "dealer flow eased",
+    rose: "dealer flow amplified",
+  },
+  event_gate: {
+    short: "event gate",
+    eased: "event gate eased",
+    rose: "event gate tightened",
+  },
+};
+
+function factorWeightedContribution(
+  row: RiskFactorContributionSnapshot,
+): number {
+  return row.score * row.effectiveWeight;
+}
+
+function factorContributionDeltas(
+  today: readonly RiskFactorContributionSnapshot[],
+  previous: readonly RiskFactorContributionSnapshot[],
+): { readonly id: string; readonly delta: number; readonly weight: number }[] {
+  const previousById = new Map(previous.map((row) => [row.id, row]));
+  const todayById = new Map(today.map((row) => [row.id, row]));
+  const ids = new Set([
+    ...today.map((row) => row.id),
+    ...previous.map((row) => row.id),
+  ]);
+  const deltas: { id: string; delta: number; weight: number }[] = [];
+
+  for (const id of ids) {
+    const todayRow = todayById.get(id);
+    const prior = previousById.get(id);
+    const todayWeighted = todayRow ? factorWeightedContribution(todayRow) : 0;
+    const priorWeighted = prior ? factorWeightedContribution(prior) : 0;
+    const delta = todayWeighted - priorWeighted;
+    if (delta === 0) continue;
+    deltas.push({
+      id,
+      delta,
+      weight: Math.abs(delta),
+    });
+  }
+
+  return deltas.sort((left, right) => right.weight - left.weight);
+}
+
+export function buildRiskChangeReason(
+  riskChange: number,
+  today: readonly RiskFactorContributionSnapshot[],
+  previous: readonly RiskFactorContributionSnapshot[],
+): string | null {
+  const deltas = factorContributionDeltas(today, previous);
+  if (deltas.length === 0) return null;
+
+  const parts = deltas.slice(0, 2).map((row) => {
+    const labels = FACTOR_CHANGE_LABELS[row.id];
+    if (!labels) return row.id;
+    return row.delta < 0 ? labels.eased : labels.rose;
+  });
+
+  const head =
+    riskChange < 0
+      ? "Risk eased"
+      : riskChange > 0
+        ? "Risk rose"
+        : "Risk unchanged";
+
+  return `${head}: ${parts.join(" · ")}`;
+}
+
+export function resolveRiskPublicationDate(now = new Date()): string {
+  return resolveCurrentMarketSessionDate(now);
+}
+
+export function riskDecisionPublicationDate(
+  record: RiskDecisionV1DailyRecord,
+): string {
+  return record.publicationDate ?? record.marketSessionDate;
+}
+
+function isValidRiskPublicationDate(publicationDate: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(publicationDate);
+}
+
+export function riskDecisionV1DailyPath(
+  dataRoot: string,
+  publicationDate: string,
+): string {
+  return join(dataRoot, "risk-decision-v1", `${publicationDate}.json`);
+}
+
+export function riskDecisionV1LatestPath(dataRoot: string): string {
+  return join(dataRoot, "risk-decision-v1", "latest.json");
+}
+
+export function loadRiskDecisionV1Daily(
+  dataRoot: string,
+  publicationDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const path = riskDecisionV1DailyPath(dataRoot, publicationDate);
+  if (!existsSync(path)) return null;
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf8")) as RiskDecisionV1DailyRecord;
+    const recordPublicationDate = raw.publicationDate ?? raw.marketSessionDate;
+    if (
+      recordPublicationDate !== publicationDate ||
+      typeof raw.riskScore !== "number" ||
+      !Array.isArray(raw.factorContributions)
+    ) {
+      return null;
+    }
+    return {
+      ...raw,
+      publicationDate: recordPublicationDate,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function listRiskDecisionV1DailyRecords(
+  dataRoot: string,
+): readonly RiskDecisionV1DailyRecord[] {
+  const dir = join(dataRoot, "risk-decision-v1");
+  if (!existsSync(dir)) return [];
+
+  const records: RiskDecisionV1DailyRecord[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".json") || name === "latest.json") continue;
+    const publicationDate = name.slice(0, -5);
+    const record = loadRiskDecisionV1Daily(dataRoot, publicationDate);
+    if (record) records.push(record);
+  }
+
+  return records.sort((left, right) =>
+    riskDecisionPublicationDate(left).localeCompare(
+      riskDecisionPublicationDate(right),
+    ),
+  );
+}
+
+export function loadPriorPublishedRiskDecision(
+  dataRoot: string,
+  publicationDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const prior = listRiskDecisionV1DailyRecords(dataRoot).filter(
+    (record) => riskDecisionPublicationDate(record) < publicationDate,
+  );
+  return prior.at(-1) ?? null;
+}
+
+export function persistRiskDecisionV1Daily(
+  dataRoot: string,
+  record: RiskDecisionV1DailyRecord,
+): boolean {
+  const publicationDate = riskDecisionPublicationDate(record);
+  if (!isValidRiskPublicationDate(publicationDate)) return false;
+
+  const path = riskDecisionV1DailyPath(dataRoot, publicationDate);
+  if (existsSync(path)) return false;
+
+  const normalized: RiskDecisionV1DailyRecord = {
+    ...record,
+    publicationDate,
+  };
+  writeJsonAtomic(path, normalized);
+  writeJsonAtomic(riskDecisionV1LatestPath(dataRoot), normalized);
+  return true;
+}
+
+export function resolveRiskDecisionDayOverDay(input: {
+  readonly dataRoot: string | null | undefined;
+  readonly publicationDate: string;
+  readonly decisionSessionDate: string;
+  readonly today: RiskDecisionV1Result;
+  readonly now?: Date;
+}): RiskDecisionDayOverDay {
+  if (
+    input.today.status !== "ready" ||
+    input.today.riskScore === null ||
+    input.today.factorContributions.length === 0
+  ) {
+    return { riskChange: null, riskChangeReason: null };
+  }
+
+  const dataRoot = input.dataRoot;
+  if (!dataRoot) {
+    return { riskChange: null, riskChangeReason: null };
+  }
+
+  const previous = loadPriorPublishedRiskDecision(dataRoot, input.publicationDate);
+
+  const generatedAt = input.now?.toISOString() ?? new Date().toISOString();
+  persistRiskDecisionV1Daily(dataRoot, {
+    schemaVersion: RISK_DECISION_V1_VERSION,
+    publicationDate: input.publicationDate,
+    marketSessionDate: input.decisionSessionDate,
+    generatedAt,
+    riskScore: input.today.riskScore,
+    factorContributions: input.today.factorContributions,
+  });
+
+  if (!previous) {
+    return { riskChange: null, riskChangeReason: null };
+  }
+
+  const riskChange = input.today.riskScore - previous.riskScore;
+  const riskChangeReason = buildRiskChangeReason(
+    riskChange,
+    input.today.factorContributions,
+    previous.factorContributions,
+  );
+
+  return { riskChange, riskChangeReason };
 }
 
 export interface RiskDecisionSpyBreadthInput {
@@ -474,10 +752,12 @@ export function deriveRiskDecisionV1(
       withheldReason:
         "Structural risk withheld — fewer than 45% of model weight has defensible live inputs.",
       withheldFactors: auditWithheldFactors(input, usedIds, effectiveWeight),
+      factorContributions: [],
     };
   }
 
   const riskScore = aggregateRiskScore(factors);
+  const factorContributions = snapshotContributions(factors);
   const coverage: RiskDecisionV1Coverage = {
     effectiveWeight,
     factorsUsed: factors.map((row) => row.id),
@@ -495,6 +775,7 @@ export function deriveRiskDecisionV1(
     coverage,
     withheldReason: null,
     withheldFactors: [],
+    factorContributions,
   };
 }
 

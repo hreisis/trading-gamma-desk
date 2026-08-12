@@ -1,18 +1,25 @@
 import type { ReactNode } from "react";
 import type {
+  V2AiStudyInterpretation,
   V2CommandCenterView,
+  V2DailyReview,
   V2GammaSummary,
   V2Language,
+  V2SectorRotationRow,
+  V2SectorRotationSummary,
   V2SpyBreadthSummary,
 } from "@/desk";
-import { breadthSignalLabel } from "@/desk/v2-command-center";
+import type { V2CommandCenterPageView } from "@/desk/load-v2-home";
+import { breadthSignalLabel, formatSectorEtfLabel, sectorRotationBarScale, sectorRotationBarWidthPct } from "@/desk/v2-command-center";
 import {
   ctaProxySignalLabel,
   formatGexCompact,
   formatIvHvSpreadVolPts,
   formatRestOfDayRangeLabel,
   formatVolMispricingPct,
+  remainingRegularSessionFraction,
   volMispricingSignalLabel,
+  type RestOfDayRange,
   type VolMispricingSummary,
 } from "@/desk/format-gamma";
 
@@ -25,8 +32,27 @@ const copy = {
     flow: "Flow / Participation",
     macro: "Macro Focus",
     rotation: "Rotation",
+    rotationLeading: "Leading / improving",
+    rotationWeakening: "Weakening",
+    rs1d: "1D RS",
+    rs5d: "5D RS",
     study: "AI Study",
+    studyNote: "AI interpretation of existing model outputs — not a separate signal engine.",
+    marketSetup: "Market setup",
+    keyUpside: "Key upside trigger",
+    keyDownside: "Key downside trigger",
+    mainSupporting: "Main supporting signal",
+    mainConflicting: "Main conflicting signal",
+    deterministicFallback: "Deterministic fallback",
     review: "Daily Review",
+    reviewNote: "End-of-day comparison of the published command center snapshot vs session outcomes.",
+    reviewSession: "Session",
+    morningStance: "Morning stance",
+    actualOutcome: "Actual outcome",
+    whatWorked: "What worked",
+    whatFailed: "What failed",
+    tomorrowWatch: "Tomorrow watch",
+    reviewPending: "Pending",
     preview: "Illustrative methodology preview · synthetic decision values",
     liveReady: "Live decision from connected inputs · review evidence and missing fields",
     liveBlocked: "Live decision withheld · required inputs are not connected",
@@ -58,9 +84,13 @@ const copy = {
     new20dLows: "20D lows",
     stale: "Stale",
     spot: "Spot",
+    axisPut: "Put",
+    axisCall: "Call",
+    axisFlip: "Flip",
     putWall: "Put wall",
     callWall: "Call wall",
     restOfDayRange: "ROD 90%",
+    marketClosed: "Market closed",
     iv: "IV",
     hv20: "HV20",
     ivMinusHv: "IV − HV",
@@ -90,8 +120,27 @@ const copy = {
     flow: "流向 / 参与度",
     macro: "宏观重点",
     rotation: "板块轮动",
+    rotationLeading: "领先 / 改善",
+    rotationWeakening: "走弱",
+    rs1d: "1日相对强度",
+    rs5d: "5日相对强度",
     study: "AI 研究",
+    studyNote: "对现有模型输出的 AI 解读 · 非独立信号引擎。",
+    marketSetup: "市场背景",
+    keyUpside: "主要上行触发",
+    keyDownside: "主要下行触发",
+    mainSupporting: "主要支撑信号",
+    mainConflicting: "主要冲突/风险信号",
+    deterministicFallback: "确定性回退摘要",
     review: "每日复盘",
+    reviewNote: "对已发布指挥中心快照与当日结果的对照复盘。",
+    reviewSession: "交易日",
+    morningStance: "早盘立场",
+    actualOutcome: "实际结果",
+    whatWorked: "有效部分",
+    whatFailed: "失效部分",
+    tomorrowWatch: "明日关注",
+    reviewPending: "待生成",
     preview: "方法论预览 · 决策数值为明确标注的模拟数据",
     liveReady: "已接入输入的实时决策 · 请结合依据与缺失项审阅",
     liveBlocked: "实时决策暂不输出 · 必要输入尚未接通",
@@ -123,9 +172,13 @@ const copy = {
     new20dLows: "20 日新低",
     stale: "滞后",
     spot: "现货",
+    axisPut: "Put",
+    axisCall: "Call",
+    axisFlip: "Flip",
     putWall: "Put Wall",
     callWall: "Call Wall",
     restOfDayRange: "日内 90%",
+    marketClosed: "市场已收盘",
     iv: "IV",
     hv20: "HV20",
     ivMinusHv: "IV − HV",
@@ -161,6 +214,16 @@ function formatMetric(value: number | null): string {
   return `${value}%`;
 }
 
+function formatRiskChangeLine(
+  change: number | null,
+  vsYesterday: string,
+): string {
+  if (change === null) return "—";
+  if (change === 0) return "0";
+  const arrow = change > 0 ? "↑" : "↓";
+  return `${arrow} ${Math.abs(change)} ${vsYesterday}`;
+}
+
 function wallTouchPercentLabel(
   touch: V2GammaSummary["callWallTouch"],
 ): string | null {
@@ -168,6 +231,24 @@ function wallTouchPercentLabel(
     return null;
   }
   return `${touch.percent}%`;
+}
+
+export function isRegularSessionClosed(now: Date): boolean {
+  return remainingRegularSessionFraction(now) === 0;
+}
+
+export function formatStructureRodDisplayLabel(
+  range: RestOfDayRange,
+  lang: V2Language,
+  now: Date = new Date(),
+): string {
+  if (range.status === "available") {
+    return formatRestOfDayRangeLabel(range);
+  }
+  if (isRegularSessionClosed(now)) {
+    return copy[lang].marketClosed;
+  }
+  return formatRestOfDayRangeLabel(range);
 }
 
 export function collectStructureAxisValues(item: V2GammaSummary): number[] {
@@ -205,108 +286,33 @@ export function structureAxisPercent(
   return ((value - scale.min) / span) * 100;
 }
 
-const STRUCTURE_AXIS_COLLISION_PCT = 11;
-
-export function assignStructureAxisLanes(
-  items: readonly { id: string; leftPct: number }[],
-  threshold = STRUCTURE_AXIS_COLLISION_PCT,
-): Record<string, number> {
-  const sorted = [...items].sort((a, b) => a.leftPct - b.leftPct);
-  const lanes: { id: string; leftPct: number }[][] = [];
-  const out: Record<string, number> = {};
-
-  for (const item of sorted) {
-    let laneIdx = 0;
-    while (
-      laneIdx < lanes.length &&
-      lanes[laneIdx]!.some(
-        (marker) => Math.abs(marker.leftPct - item.leftPct) < threshold,
-      )
-    ) {
-      laneIdx++;
-    }
-    if (laneIdx >= lanes.length) lanes.push([]);
-    lanes[laneIdx]!.push(item);
-    out[item.id] = laneIdx;
-  }
-
-  return out;
+export function formatStructureAxisLevelRow(
+  item: V2GammaSummary,
+  labels: { put: string; flip: string; call: string },
+): string {
+  const put =
+    item.putWall !== null ? `${labels.put} ${formatLevel(item.putWall)}` : "—";
+  const flip =
+    item.gammaFlip !== null
+      ? `${labels.flip} ${formatLevel(item.gammaFlip)}`
+      : "—";
+  const call =
+    item.callWall !== null ? `${labels.call} ${formatLevel(item.callWall)}` : "—";
+  return `${put}   |   ${flip}   |   ${call}`;
 }
 
-function structureAxisFlipLabelOffset(
-  flipPct: number,
-  spotPct: number | null,
-  threshold = STRUCTURE_AXIS_COLLISION_PCT,
-): "left" | "right" | null {
-  if (spotPct === null) return null;
-  if (Math.abs(flipPct - spotPct) >= threshold) return null;
-  return flipPct < spotPct ? "left" : "right";
-}
-
-function StructureAxisMarker({
+function StructureAxisTick({
   leftPct,
   tone,
-  label,
-  value,
-  placement,
-  lane = 0,
-  flipLabelOffset = null,
-  touchLabel,
-  testId,
-  valueTestId,
 }: {
   leftPct: number;
-  tone: "put" | "call" | "flip" | "spot";
-  label: string;
-  value: string;
-  placement: "above" | "below" | "flip";
-  lane?: number;
-  flipLabelOffset?: "left" | "right" | null;
-  touchLabel?: string | null;
-  testId?: string;
-  valueTestId?: string;
+  tone: "put" | "call" | "flip";
 }) {
-  const laneClass = lane > 0 ? ` is-lane-${lane}` : "";
-  const offsetClass =
-    placement === "flip" && flipLabelOffset ? ` is-offset-${flipLabelOffset}` : "";
-
   return (
     <div
-      className={`v2-structure-axis-marker is-${tone} is-${placement}${laneClass}${offsetClass}`}
+      className={`v2-structure-axis-tick-marker is-${tone}`}
       style={{ left: `${leftPct}%` }}
-      data-testid={testId}
-    >
-      {placement === "above" ? (
-        <>
-          <span className="v2-structure-axis-marker-label">{label}</span>
-          <strong className="v2-structure-axis-marker-value" data-testid={valueTestId}>
-            {value}
-          </strong>
-          <span className="v2-structure-axis-tick" />
-        </>
-      ) : placement === "below" ? (
-        <>
-          <span className="v2-structure-axis-tick" />
-          <span className="v2-structure-axis-marker-label">{label}</span>
-          <strong className="v2-structure-axis-marker-value" data-testid={valueTestId}>
-            {value}
-          </strong>
-          {touchLabel ? (
-            <span className="v2-structure-axis-touch">{touchLabel}</span>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <span className="v2-structure-axis-tick" />
-          <div className="v2-structure-axis-flip-label">
-            <span className="v2-structure-axis-marker-label">{label}</span>
-            <strong className="v2-structure-axis-marker-value" data-testid={valueTestId}>
-              {value}
-            </strong>
-          </div>
-        </>
-      )}
-    </div>
+    />
   );
 }
 
@@ -322,20 +328,9 @@ function StructureAxis({
   if (!scale) return null;
 
   const pct = (value: number) => structureAxisPercent(value, scale);
-  const spotPct = item.spot !== null ? pct(item.spot) : null;
-  const belowLaneItems: { id: string; leftPct: number }[] = [];
-  if (item.putWall !== null) {
-    belowLaneItems.push({ id: "put", leftPct: pct(item.putWall) });
-  }
-  if (item.callWall !== null) {
-    belowLaneItems.push({ id: "call", leftPct: pct(item.callWall) });
-  }
-  const belowLanes = assignStructureAxisLanes(belowLaneItems);
-
-  const flipPct =
-    item.gammaFlip !== null ? pct(item.gammaFlip) : null;
-  const flipLabelOffset =
-    flipPct !== null ? structureAxisFlipLabelOffset(flipPct, spotPct) : null;
+  const now = new Date();
+  const sessionClosed =
+    item.restOfDayRange.status !== "available" && isRegularSessionClosed(now);
 
   const rod =
     item.restOfDayRange.status === "available" &&
@@ -346,6 +341,15 @@ function StructureAxis({
           width: pct(item.restOfDayRange.upper) - pct(item.restOfDayRange.lower),
         }
       : null;
+
+  const putLabel =
+    item.putWall !== null ? `${t.axisPut.toUpperCase()} ${formatLevel(item.putWall)}` : "—";
+  const flipLabel =
+    item.gammaFlip !== null
+      ? `${t.axisFlip.toUpperCase()} ${formatLevel(item.gammaFlip)}`
+      : "—";
+  const callLabel =
+    item.callWall !== null ? `${t.axisCall.toUpperCase()} ${formatLevel(item.callWall)}` : "—";
 
   return (
     <div
@@ -359,57 +363,371 @@ function StructureAxis({
           {rod ? (
             <div
               className="v2-structure-axis-rod"
-              style={{ left: `${rod.left}%`, width: `${rod.width}%` }}
+              style={{
+                left: `${rod.left}%`,
+                width: `${Math.max(rod.width, 0.4)}%`,
+              }}
               data-testid={`v2-gamma-${item.symbol}-rod-band`}
             />
+          ) : sessionClosed ? (
+            <div
+              className="v2-structure-axis-rod is-closed"
+              data-testid={`v2-gamma-${item.symbol}-rod-band`}
+              aria-hidden="true"
+            />
+          ) : null}
+          {item.putWall !== null ? (
+            <StructureAxisTick leftPct={pct(item.putWall)} tone="put" />
+          ) : null}
+          {item.gammaFlip !== null ? (
+            <StructureAxisTick leftPct={pct(item.gammaFlip)} tone="flip" />
+          ) : null}
+          {item.callWall !== null ? (
+            <StructureAxisTick leftPct={pct(item.callWall)} tone="call" />
           ) : null}
         </div>
         {item.spot !== null ? (
-          <StructureAxisMarker
-            leftPct={pct(item.spot)}
-            tone="spot"
-            label={t.spot}
-            value={formatLevel(item.spot)}
-            placement="above"
-          />
-        ) : null}
-        {item.gammaFlip !== null ? (
-          <StructureAxisMarker
-            leftPct={pct(item.gammaFlip)}
-            tone="flip"
-            label={t.gammaFlipLevel}
-            value={formatLevel(item.gammaFlip)}
-            placement="flip"
-            flipLabelOffset={flipLabelOffset}
-            valueTestId={`v2-gamma-${item.symbol}-flip`}
-          />
-        ) : null}
-        {item.putWall !== null ? (
-          <StructureAxisMarker
-            leftPct={pct(item.putWall)}
-            tone="put"
-            label={t.putWall}
-            value={formatLevel(item.putWall)}
-            placement="below"
-            lane={belowLanes.put ?? 0}
-            touchLabel={wallTouchPercentLabel(item.putWallTouch)}
-            testId={`v2-gamma-${item.symbol}-put-touch`}
-          />
-        ) : null}
-        {item.callWall !== null ? (
-          <StructureAxisMarker
-            leftPct={pct(item.callWall)}
-            tone="call"
-            label={t.callWall}
-            value={formatLevel(item.callWall)}
-            placement="below"
-            lane={belowLanes.call ?? 0}
-            touchLabel={wallTouchPercentLabel(item.callWallTouch)}
-            testId={`v2-gamma-${item.symbol}-call-touch`}
-          />
+          <div
+            className="v2-structure-axis-spot"
+            style={{ left: `${pct(item.spot)}%` }}
+          >
+            <span className="v2-structure-axis-marker-label">{t.spot}</span>
+            <strong className="v2-structure-axis-marker-value">
+              {formatLevel(item.spot)}
+            </strong>
+            <span className="v2-structure-axis-tick is-spot" />
+          </div>
         ) : null}
       </div>
+      <div
+        className="v2-structure-axis-label-row"
+        data-testid={`v2-gamma-${item.symbol}-structure-labels`}
+      >
+        <span
+          className="v2-structure-axis-label-cell is-put"
+          data-testid={`v2-gamma-${item.symbol}-put-touch`}
+        >
+          {putLabel}
+          {wallTouchPercentLabel(item.putWallTouch)
+            ? ` · ${wallTouchPercentLabel(item.putWallTouch)}`
+            : null}
+        </span>
+        <span className="v2-structure-axis-label-divider">|</span>
+        <span
+          className="v2-structure-axis-label-cell is-flip"
+          data-testid={`v2-gamma-${item.symbol}-flip`}
+        >
+          {flipLabel}
+        </span>
+        <span className="v2-structure-axis-label-divider">|</span>
+        <span
+          className="v2-structure-axis-label-cell is-call"
+          data-testid={`v2-gamma-${item.symbol}-call-touch`}
+        >
+          {callLabel}
+          {wallTouchPercentLabel(item.callWallTouch)
+            ? ` · ${wallTouchPercentLabel(item.callWallTouch)}`
+            : null}
+        </span>
+      </div>
     </div>
+  );
+}
+
+function formatRelativeStrengthPct(value: number | null): string {
+  if (value === null) return "—";
+  const rounded = Math.round(value * 10) / 10;
+  if (rounded === 0) return "0%";
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
+}
+
+function SectorRotationBarRow({
+  row,
+  scale,
+  rs1dLabel,
+  rs5dLabel,
+  showDivider,
+}: {
+  row: V2SectorRotationRow;
+  scale: number;
+  rs1dLabel: string;
+  rs5dLabel: string;
+  showDivider: boolean;
+}) {
+  const widthPct = sectorRotationBarWidthPct(row.rs5d, scale);
+  const positive = row.rs5d >= 0;
+
+  return (
+    <>
+      {showDivider ? <div className="v2-rotation-bar-divider" aria-hidden="true" /> : null}
+      <div
+        className={`v2-rotation-bar-row is-${row.classification}`}
+        data-testid={`v2-sector-rotation-row-${row.symbol}`}
+      >
+        <div className="v2-rotation-bar-label">{formatSectorEtfLabel(row.symbol)}</div>
+        <div className="v2-rotation-bar-track" aria-hidden="true">
+          <div className="v2-rotation-bar-zero" />
+          <div
+            className={`v2-rotation-bar-fill is-${positive ? "pos" : "neg"}`}
+            style={{ width: `${widthPct}%` }}
+          />
+        </div>
+        <div className="v2-rotation-bar-values">
+          <strong title={rs5dLabel}>{formatRelativeStrengthPct(row.rs5d)}</strong>
+          <span title={rs1dLabel}>{formatRelativeStrengthPct(row.rs1d)}</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SectorRotationSection({
+  rotation,
+  lang,
+}: {
+  rotation: V2SectorRotationSummary;
+  lang: V2Language;
+}) {
+  const t = copy[lang];
+  const ready = rotation.status === "available";
+
+  return (
+    <section
+      className="v2-rotation-section"
+      id="rotation"
+      aria-label={t.rotation}
+      data-testid="v2-sector-rotation"
+    >
+      <div className="v2-section-head v2-rotation-head">
+        <p className="v2-eyebrow">04 / {t.rotation.toUpperCase()}</p>
+        <div className="v2-rotation-meta" data-testid="v2-sector-rotation-meta">
+          <span>{t.session}</span>
+          <strong data-testid="v2-sector-rotation-session">
+            {rotation.sessionDate ?? "—"}
+          </strong>
+          {rotation.stale ? (
+            <span className="v2-flow-badge is-stale" data-testid="v2-sector-rotation-stale">
+              {t.stale}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {ready ? (
+        <>
+          <div className="v2-rotation-summary" data-testid="v2-sector-rotation-summary">
+            <p className="v2-rotation-summary-line" data-testid="v2-sector-rotation-leading">
+              <span className="v2-rotation-summary-label">{t.rotationLeading}</span>
+              {rotation.topLeadingImproving.length > 0
+                ? rotation.topLeadingImproving
+                    .map((row) => formatSectorEtfLabel(row.symbol))
+                    .join(" · ")
+                : "—"}
+            </p>
+            <p className="v2-rotation-summary-line" data-testid="v2-sector-rotation-weakening">
+              <span className="v2-rotation-summary-label">{t.rotationWeakening}</span>
+              {rotation.bottomWeakening.length > 0
+                ? rotation.bottomWeakening
+                    .map((row) => formatSectorEtfLabel(row.symbol))
+                    .join(" · ")
+                : "—"}
+            </p>
+          </div>
+          <div className="v2-rotation-chart" data-testid="v2-sector-rotation-chart">
+            <div className="v2-rotation-chart-head">
+              <span>{t.rs5d} vs SPY</span>
+              <span className="v2-rotation-chart-axis" aria-hidden="true">
+                <span>−</span>
+                <span>SPY</span>
+                <span>+</span>
+              </span>
+            </div>
+            {(() => {
+              const sorted = [...rotation.sectors].sort(
+                (left, right) => right.rs5d - left.rs5d,
+              );
+              const scale = sectorRotationBarScale(sorted);
+              let sawPositive = false;
+              return sorted.map((row) => {
+                const showDivider =
+                  sawPositive && row.rs5d < 0 && sorted.some((item) => item.rs5d > 0);
+                if (row.rs5d > 0) sawPositive = true;
+                return (
+                  <SectorRotationBarRow
+                    key={row.symbol}
+                    row={row}
+                    scale={scale}
+                    rs1dLabel={t.rs1d}
+                    rs5dLabel={t.rs5d}
+                    showDivider={showDivider}
+                  />
+                );
+              });
+            })()}
+          </div>
+        </>
+      ) : (
+        <p className="v2-rotation-missing" data-testid="v2-sector-rotation-reason">
+          {rotation.missingReason ?? "—"}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function DailyReviewSection({
+  review,
+  lang,
+}: {
+  review: V2DailyReview;
+  lang: V2Language;
+}) {
+  const t = copy[lang];
+
+  return (
+    <section
+      className="v2-daily-review-section"
+      id="daily-review"
+      aria-label={t.review}
+      data-testid="v2-daily-review"
+    >
+      <div className="v2-section-head v2-daily-review-head">
+        <div>
+          <p className="v2-eyebrow">06 / {t.review.toUpperCase()}</p>
+          <p className="v2-daily-review-note">{t.reviewNote}</p>
+        </div>
+        {review.status === "pending" ? (
+          <span className="v2-flow-badge is-stale" data-testid="v2-daily-review-pending">
+            {t.reviewPending}
+          </span>
+        ) : null}
+      </div>
+      <article className="v2-daily-review-card" data-testid="v2-daily-review-card">
+        {review.sessionDate ? (
+          <p className="v2-daily-review-session" data-testid="v2-daily-review-session">
+            {t.reviewSession}: <strong>{review.sessionDate}</strong>
+          </p>
+        ) : null}
+        <dl className="v2-daily-review-list">
+          <div>
+            <dt>{t.morningStance}</dt>
+            <dd data-testid="v2-daily-review-morning">
+              {review.morningStance ?? "—"}
+            </dd>
+          </div>
+          <div>
+            <dt>{t.actualOutcome}</dt>
+            <dd data-testid="v2-daily-review-outcome">{review.actualOutcome}</dd>
+          </div>
+          <div>
+            <dt>{t.whatWorked}</dt>
+            <dd data-testid="v2-daily-review-worked">
+              {review.whatWorked.length > 0 ? (
+                <ul>
+                  {review.whatWorked.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>{t.whatFailed}</dt>
+            <dd data-testid="v2-daily-review-failed">
+              {review.whatFailed.length > 0 ? (
+                <ul>
+                  {review.whatFailed.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>{t.tomorrowWatch}</dt>
+            <dd data-testid="v2-daily-review-watch">
+              {review.tomorrowWatch.length > 0 ? (
+                <ul>
+                  {review.tomorrowWatch.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+        </dl>
+        {review.missingReason ? (
+          <p className="v2-daily-review-missing" data-testid="v2-daily-review-reason">
+            {review.missingReason}
+          </p>
+        ) : null}
+      </article>
+    </section>
+  );
+}
+
+function AiStudySection({
+  aiStudy,
+  lang,
+}: {
+  aiStudy: V2AiStudyInterpretation;
+  lang: V2Language;
+}) {
+  const t = copy[lang];
+
+  return (
+    <section
+      className="v2-ai-study-section"
+      id="ai-study"
+      aria-label={t.study}
+      data-testid="v2-ai-study"
+    >
+      <div className="v2-section-head v2-ai-study-head">
+        <div>
+          <p className="v2-eyebrow">05 / {t.study.toUpperCase()}</p>
+          <p className="v2-ai-study-note">{t.studyNote}</p>
+        </div>
+        {aiStudy.source === "deterministic" || aiStudy.status === "fallback" ? (
+          <span className="v2-flow-badge is-stale" data-testid="v2-ai-study-fallback">
+            {t.deterministicFallback}
+          </span>
+        ) : null}
+      </div>
+      <article className="v2-ai-study-card" data-testid="v2-ai-study-card">
+        <dl className="v2-ai-study-list">
+          <div>
+            <dt>{t.marketSetup}</dt>
+            <dd data-testid="v2-ai-study-market-setup">{aiStudy.marketSetup}</dd>
+          </div>
+          <div>
+            <dt>{t.keyUpside}</dt>
+            <dd data-testid="v2-ai-study-upside">{aiStudy.keyUpsideTrigger}</dd>
+          </div>
+          <div>
+            <dt>{t.keyDownside}</dt>
+            <dd data-testid="v2-ai-study-downside">{aiStudy.keyDownsideTrigger}</dd>
+          </div>
+          <div>
+            <dt>{t.mainSupporting}</dt>
+            <dd data-testid="v2-ai-study-supporting">{aiStudy.mainSupportingSignal}</dd>
+          </div>
+          <div>
+            <dt>{t.mainConflicting}</dt>
+            <dd data-testid="v2-ai-study-conflicting">{aiStudy.mainConflictingSignal}</dd>
+          </div>
+        </dl>
+        {aiStudy.missingReason ? (
+          <p className="v2-ai-study-missing" data-testid="v2-ai-study-reason">
+            {aiStudy.missingReason}
+          </p>
+        ) : null}
+      </article>
+    </section>
   );
 }
 
@@ -672,7 +990,7 @@ function GammaInstrument({
               data-testid={`v2-gamma-${item.symbol}-rod-range`}
             >
               <span>{t.restOfDayRange}</span>
-              <strong>{formatRestOfDayRangeLabel(item.restOfDayRange)}</strong>
+              <strong>{formatStructureRodDisplayLabel(item.restOfDayRange, lang)}</strong>
             </div>
           </div>
 
@@ -800,7 +1118,7 @@ export function CommandCenter({
   lang,
   demoMode = false,
 }: {
-  view: V2CommandCenterView;
+  view: V2CommandCenterPageView;
   lang: V2Language;
   demoMode?: boolean;
 }) {
@@ -820,8 +1138,8 @@ export function CommandCenter({
           <a href="#gamma"><span>02</span>{t.structure}</a>
           <a href="#flow"><span>03</span>{t.flow}</a>
           <a href="#rotation"><span>04</span>{t.rotation}</a>
-          <a href="#overview"><span>05</span>{t.study}</a>
-          <a href="#overview"><span>06</span>{t.review}</a>
+          <a href="#ai-study"><span>05</span>{t.study}</a>
+          <a href="#daily-review"><span>06</span>{t.review}</a>
         </nav>
       </aside>
 
@@ -861,7 +1179,29 @@ export function CommandCenter({
                 </div>
                 <div className="v2-macro-focus">
                   <span>{t.macroFocus}</span>
-                  <strong>{view.macroLabel ?? t.noMacro}</strong>
+                  <strong>
+                    {view.macroSummary?.label ?? view.macroLabel ?? t.noMacro}
+                  </strong>
+                  {view.macroSummary?.interpretation ? (
+                    <p
+                      className="v2-macro-interpretation"
+                      data-testid="v2-macro-interpretation"
+                    >
+                      {view.macroSummary.interpretation}
+                    </p>
+                  ) : null}
+                  {view.macroSummary &&
+                  view.macroSummary.evidence.length > 0 &&
+                  !view.macroSummary.interpretation ? (
+                    <ul
+                      className="v2-macro-evidence"
+                      data-testid="v2-macro-evidence"
+                    >
+                      {view.macroSummary.evidence.slice(0, 2).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               </article>
 
@@ -870,12 +1210,22 @@ export function CommandCenter({
                 <div className="v2-risk-content">
                   <RiskGauge score={view.riskScore} />
                   <div className="v2-risk-stats">
-                    <strong>
-                      {view.riskChange === null
-                        ? "—"
-                        : `${view.riskChange > 0 ? "+" : ""}${view.riskChange}`}
-                      <small>{t.vsYesterday}</small>
-                    </strong>
+                    <div className="v2-risk-delta">
+                      <strong
+                        className="v2-risk-change"
+                        data-testid="v2-risk-change"
+                      >
+                        {formatRiskChangeLine(view.riskChange, t.vsYesterday)}
+                      </strong>
+                      {view.riskChangeReason ? (
+                        <p
+                          className="v2-risk-change-reason"
+                          data-testid="v2-risk-change-reason"
+                        >
+                          {view.riskChangeReason}
+                        </p>
+                      ) : null}
+                    </div>
                     <strong>
                       {view.opportunityScore ?? "—"}
                       <small>/ 100 {t.opportunity}</small>
@@ -914,15 +1264,11 @@ export function CommandCenter({
           </div>
         </section>
 
-        <section
-          className="v2-rotation-section"
-          id="rotation"
-          aria-label={t.rotation}
-          data-testid="v2-rotation-placeholder"
-        >
-          <p className="v2-eyebrow">04 / {t.rotation.toUpperCase()}</p>
-          <p className="v2-section-placeholder">—</p>
-        </section>
+        <SectorRotationSection rotation={view.sectorRotation} lang={lang} />
+
+        <AiStudySection aiStudy={view.aiStudy} lang={lang} />
+
+        <DailyReviewSection review={view.dailyReview} lang={lang} />
 
         <section className="v2-evidence-grid">
           <article>

@@ -11,3 +11,4 @@ export * from "./usage";
 export * from "./evidence-corpus";
 export * from "./claim-utils";
 export * from "./session";
+export * from "./v2-command-interpret";

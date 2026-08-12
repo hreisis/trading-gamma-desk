@@ -1,7 +1,19 @@
 import { join } from "node:path";
-import type { V2CommandCenterView, V2Language } from "./v2-command-center";
+import {
+  buildV2AiStudyPayload,
+  generateV2CommandAiStudyInterpretation,
+  previewV2AiStudyInterpretation,
+} from "@/ai-study/v2-command-interpret";
+import { loadAiStudyLlmConfig } from "@/ai-study/config";
+import type {
+  V2AiStudyInterpretation,
+  V2CommandCenterView,
+  V2Language,
+} from "./v2-command-center";
 import {
   buildV2CommandCenterView,
+  eventGateFromMarketInput,
+  sectorRotationBarSymbols,
   summarizeSpyBreadthFromDurable,
 } from "./v2-command-center";
 import {
@@ -18,6 +30,7 @@ import {
 } from "./production-runtime";
 import { loadAlpacaMarketPanel } from "@/alpaca";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
+import type { DailyBar } from "@/desk/breadth/bars/types";
 import { resolveRuntimeDataRoot } from "@/desk/production-runtime";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
 import {
@@ -25,6 +38,11 @@ import {
 } from "./build-market-input-snapshot";
 import { loadCatalystFeedAsync } from "./production-runtime";
 import { ensureDurableSpyBreadthForMarketInput } from "./breadth/read-durable-breadth";
+import {
+  buildV2DailyReview,
+  maybePersistCommandCenterV1Daily,
+  type V2DailyReview,
+} from "./command-center-v1";
 
 export interface LoadV2HomePageInput {
   readonly demo: boolean;
@@ -32,8 +50,13 @@ export interface LoadV2HomePageInput {
   readonly forceFixture?: boolean;
 }
 
+export type V2CommandCenterPageView = V2CommandCenterView & {
+  readonly aiStudy: V2AiStudyInterpretation;
+  readonly dailyReview: V2DailyReview;
+};
+
 export interface V2HomePageModel {
-  readonly view: V2CommandCenterView;
+  readonly view: V2CommandCenterPageView;
   readonly lang: V2Language;
   readonly demoMode: boolean;
 }
@@ -127,7 +150,7 @@ export async function loadV2HomePage(
       env: runtimeEnv,
     }).catch(() => null),
     loadAlpacaDailyBarPanel({
-      symbols: ["SPY", "QQQ"],
+      symbols: [...new Set(["QQQ", ...sectorRotationBarSymbols()])],
       env: runtimeEnv,
       dataRoot,
     }).catch(() => null),
@@ -141,10 +164,7 @@ export async function loadV2HomePage(
         }).catch(() => null),
   ]);
 
-  const equityBarsBySymbol = new Map<
-    string,
-    readonly { sessionDate: string; close: number }[]
-  >();
+  const equityBarsBySymbol = new Map<string, readonly DailyBar[]>();
   if (equityBars?.seriesBySymbol) {
     for (const [symbol, series] of equityBars.seriesBySymbol.entries()) {
       equityBarsBySymbol.set(symbol, series.bars);
@@ -167,7 +187,7 @@ export async function loadV2HomePage(
     },
   });
 
-  const view = buildV2CommandCenterView({
+  const baseView = buildV2CommandCenterView({
     driver: macro.driver,
     spyGamma,
     qqqGamma,
@@ -177,7 +197,43 @@ export async function loadV2HomePage(
     equityBarsBySymbol,
     now,
     marketInputSnapshot,
+    dataRoot,
+    barPanelLatestSession: equityBars?.provenance.latestSessionDate ?? null,
   });
+
+  if (!input.demo) {
+    maybePersistCommandCenterV1Daily({
+      dataRoot,
+      view: baseView,
+      generatedAt: now.toISOString(),
+      now,
+      force: runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
+    });
+  }
+
+  const dailyReview = buildV2DailyReview({
+    now,
+    demo: input.demo,
+    dataRoot,
+    equityBarsBySymbol,
+  });
+
+  const eventGate = eventGateFromMarketInput(marketInputSnapshot);
+  const payload = buildV2AiStudyPayload(baseView, eventGate);
+  const llmEnv: NodeJS.ProcessEnv = {
+    ...runtimeEnv,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    AI_STUDY_LLM_MODEL: process.env.AI_STUDY_LLM_MODEL,
+  };
+  const aiStudy = input.demo
+    ? previewV2AiStudyInterpretation()
+    : await generateV2CommandAiStudyInterpretation({
+        payload,
+        config: loadAiStudyLlmConfig(llmEnv),
+        env: llmEnv,
+      });
+
+  const view: V2CommandCenterPageView = { ...baseView, aiStudy, dailyReview };
 
   return { view, lang, demoMode: input.demo };
 }

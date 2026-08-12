@@ -9,12 +9,16 @@ import { wallStrikeWhenAvailable } from "./bounded-gamma-freshness";
 import type { DurableBreadthReadOutcome } from "./breadth/read-durable-breadth";
 import type { BoundedGammaProviderSnapshot } from "@/contracts";
 import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
-import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
+import {
+  resolveCurrentMarketSessionDate,
+  resolveLastCompletedMarketSessionDate,
+} from "@/ai-study/session";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
-import { deriveRiskDecisionV1 } from "./risk-decision-v1";
+import { deriveRiskDecisionV1, resolveRiskDecisionDayOverDay } from "./risk-decision-v1";
 import {
   dealerFlowContextLines,
   dealerFlowRegimeLabel,
+  computeCloseMovingAverage,
   estimateRestOfDayRange,
   estimateWallTouchProbabilities,
   formatOptionsDataCloseLabel,
@@ -74,17 +78,108 @@ export interface V2SpyBreadthSummary {
   readonly breadthContextLine: string | null;
 }
 
+export const SECTOR_ETF_SYMBOLS = [
+  "XLK",
+  "XLF",
+  "XLE",
+  "XLI",
+  "XLV",
+  "XLY",
+  "XLP",
+  "XLU",
+  "XLB",
+  "XLRE",
+  "XLC",
+] as const;
+
+export const SECTOR_ROTATION_BENCHMARK_SYMBOL = "SPY";
+
+export const SECTOR_ETF_NAMES: Record<string, string> = {
+  XLK: "Technology",
+  XLF: "Financials",
+  XLE: "Energy",
+  XLI: "Industrials",
+  XLV: "Health Care",
+  XLY: "Consumer Discretionary",
+  XLP: "Consumer Staples",
+  XLU: "Utilities",
+  XLB: "Materials",
+  XLRE: "Real Estate",
+  XLC: "Communication Services",
+};
+
+export function formatSectorEtfLabel(symbol: string): string {
+  const name = SECTOR_ETF_NAMES[symbol];
+  return name ? `${symbol} · ${name}` : symbol;
+}
+
+/** Half-width scale for diverging relative-strength bars (min 0.5% keeps thin bars readable). */
+export function sectorRotationBarScale(
+  sectors: readonly V2SectorRotationRow[],
+  minScale = 0.5,
+): number {
+  if (sectors.length === 0) return minScale;
+  const maxAbs = Math.max(...sectors.map((row) => Math.abs(row.rs5d)));
+  return Math.max(maxAbs, minScale);
+}
+
+export function sectorRotationBarWidthPct(rs5d: number, scale: number): number {
+  return Math.min(50, (Math.abs(rs5d) / scale) * 50);
+}
+
+export function sectorRotationBarSymbols(): readonly string[] {
+  return [SECTOR_ROTATION_BENCHMARK_SYMBOL, ...SECTOR_ETF_SYMBOLS];
+}
+
+export type V2SectorRotationClass =
+  | "leading"
+  | "improving"
+  | "neutral"
+  | "weakening";
+
+export interface V2SectorRotationRow {
+  readonly symbol: string;
+  readonly classification: V2SectorRotationClass;
+  readonly return1d: number;
+  readonly return5d: number;
+  readonly return20d: number;
+  readonly rs1d: number;
+  readonly rs5d: number;
+  readonly rs20d: number;
+  readonly aboveMa20: boolean;
+  readonly aboveMa50: boolean;
+}
+
+export interface V2SectorRotationSummary {
+  readonly status: "available" | "unavailable";
+  readonly stale: boolean;
+  readonly sessionDate: string | null;
+  readonly sectors: readonly V2SectorRotationRow[];
+  readonly topLeadingImproving: readonly V2SectorRotationRow[];
+  readonly bottomWeakening: readonly V2SectorRotationRow[];
+  readonly missingReason: string | null;
+}
+
 export type V2DecisionStance = "buy" | "hold" | "reduce";
 export type V2DecisionStatus =
   | "ready"
   | "methodology_preview"
   | "awaiting_inputs";
 
+export interface V2MacroSummary {
+  readonly label: string;
+  readonly primaryRegime: string;
+  readonly riskDirection: string | null;
+  readonly interpretation: string | null;
+  readonly evidence: readonly string[];
+}
+
 export interface V2CommandCenterView {
   readonly decisionStatus: V2DecisionStatus;
   readonly stance: V2DecisionStance | null;
   readonly riskScore: number | null;
   readonly riskChange: number | null;
+  readonly riskChangeReason: string | null;
   readonly opportunityScore: number | null;
   readonly exposure: { readonly min: number; readonly max: number } | null;
   readonly allocation:
@@ -101,7 +196,20 @@ export interface V2CommandCenterView {
   readonly ctaProxy: CtaProxySummary;
   readonly gamma: readonly [V2GammaSummary, V2GammaSummary];
   readonly macroLabel: string | null;
+  readonly macroSummary: V2MacroSummary | null;
   readonly sessionDate: string | null;
+  readonly sectorRotation: V2SectorRotationSummary;
+}
+
+export interface V2AiStudyInterpretation {
+  readonly status: "ready" | "fallback" | "preview" | "unavailable";
+  readonly source: "openai" | "deterministic" | "preview" | "unavailable";
+  readonly marketSetup: string;
+  readonly keyUpsideTrigger: string;
+  readonly keyDownsideTrigger: string;
+  readonly mainSupportingSignal: string;
+  readonly mainConflictingSignal: string;
+  readonly missingReason: string | null;
 }
 
 const STATIC_MISSING_INPUTS = [
@@ -147,6 +255,24 @@ function deriveEvidenceFromDriver(
     }
   }
   return lines;
+}
+
+export function summarizeMacroFromDriver(
+  driver: DominantDriver | null,
+): V2MacroSummary | null {
+  if (!driver) return null;
+  const interpretation = driver.interpretation.text.trim();
+  const evidence = driver.evidence
+    .map((item) => item.statement.trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 4);
+  return {
+    label: driver.label,
+    primaryRegime: driver.primaryRegime,
+    riskDirection: driver.riskDirection,
+    interpretation: interpretation.length > 0 ? interpretation : null,
+    evidence,
+  };
 }
 
 const BREADTH_STRONG_ADVANCE_PCT = 60;
@@ -662,7 +788,7 @@ function summarizeGamma(
   return summarizeGammaFromSnapshot(symbol, snapshot, view, options);
 }
 
-function eventGateFromMarketInput(
+export function eventGateFromMarketInput(
   snapshot: MarketInputSnapshot | null | undefined,
 ): EventGateSnapshot | null {
   if (!snapshot) return null;
@@ -671,6 +797,307 @@ function eventGateFromMarketInput(
   const candidate = field.value as EventGateSnapshot;
   if (candidate.kind !== "EventGate") return null;
   return candidate;
+}
+
+export function deriveCommandCenterRiskDecision(input: {
+  readonly driver: DominantDriver | null;
+  readonly spyGamma: BoundedGammaDeskView;
+  readonly qqqGamma: BoundedGammaDeskView;
+  readonly spyBreadth?: V2SpyBreadthSummary;
+  readonly marketQuotes?: readonly AlpacaMarketQuote[];
+  readonly equityBarsBySymbol?: ReadonlyMap<
+    string,
+    readonly { sessionDate: string; close: number }[]
+  >;
+  readonly now?: Date;
+  readonly marketInputSnapshot?: MarketInputSnapshot | null;
+  readonly targetSession: string;
+}): ReturnType<typeof deriveRiskDecisionV1> {
+  const now = input.now ?? new Date();
+  const gammaOptions = {
+    driver: input.driver,
+    now,
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+  };
+  const spyBreadth =
+    input.spyBreadth ??
+    summarizeSpyBreadthFromDurable(
+      {
+        snapshot: null,
+        sourceArtifact: null,
+        missingReason: "SPY breadth was not loaded.",
+      },
+      false,
+    );
+
+  const spyGammaSummary = summarizeGamma("SPY", input.spyGamma, gammaOptions);
+  const ctaProxy = summarizeCtaProxyFromInputs({
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    now,
+  });
+
+  return deriveRiskDecisionV1({
+    driver: input.driver,
+    spyBreadth,
+    spyGamma: spyGammaSummary,
+    ctaProxy,
+    eventGate: eventGateFromMarketInput(input.marketInputSnapshot),
+    targetSession: input.targetSession,
+  });
+}
+
+const SECTOR_ROTATION_UNAVAILABLE: V2SectorRotationSummary = {
+  status: "unavailable",
+  stale: false,
+  sessionDate: null,
+  sectors: [],
+  topLeadingImproving: [],
+  bottomWeakening: [],
+  missingReason: "Sector rotation daily bars not loaded.",
+};
+
+function closesEndingAtTargetSession(
+  bars: readonly { sessionDate: string; close: number }[],
+  targetSession: string,
+  count: number,
+): number[] {
+  const filtered = bars.filter((bar) => bar.sessionDate <= targetSession);
+  if (filtered.length < count) return [];
+  if (filtered.at(-1)?.sessionDate !== targetSession) return [];
+  return filtered.slice(-count).map((bar) => bar.close);
+}
+
+function sessionCloseReturnPct(
+  bars: readonly { sessionDate: string; close: number }[],
+  targetSession: string,
+  lookbackSessions: number,
+): number | null {
+  const closes = closesEndingAtTargetSession(
+    bars,
+    targetSession,
+    lookbackSessions + 1,
+  );
+  if (closes.length < lookbackSessions + 1) return null;
+  const start = closes[0];
+  const end = closes[closes.length - 1];
+  if (start === undefined || end === undefined) return null;
+  if (!Number.isFinite(start) || start <= 0 || !Number.isFinite(end)) return null;
+  return ((end / start) - 1) * 100;
+}
+
+/** Deterministic sector rotation classification (evaluated in priority order). */
+export function classifySectorRotationRow(
+  rs1d: number,
+  rs5d: number,
+  aboveMa20: boolean,
+  aboveMa50: boolean,
+): V2SectorRotationClass {
+  if (rs5d > 0 && aboveMa20 && aboveMa50) return "leading";
+  if (rs5d < 0 && !aboveMa20 && !aboveMa50) return "weakening";
+  if (rs1d > 0) return "improving";
+  return "neutral";
+}
+
+export function summarizeSectorRotation(input: {
+  readonly equityBarsBySymbol?: ReadonlyMap<
+    string,
+    readonly { sessionDate: string; close: number }[]
+  >;
+  readonly targetSession: string;
+  readonly barPanelLatestSession?: string | null;
+}): V2SectorRotationSummary {
+  const map = input.equityBarsBySymbol;
+  if (!map) {
+    return SECTOR_ROTATION_UNAVAILABLE;
+  }
+
+  const spyBars = map.get(SECTOR_ROTATION_BENCHMARK_SYMBOL);
+  if (!spyBars || spyBars.length === 0) {
+    return {
+      ...SECTOR_ROTATION_UNAVAILABLE,
+      missingReason: "SPY benchmark bars unavailable.",
+    };
+  }
+
+  const spy1d = sessionCloseReturnPct(spyBars, input.targetSession, 1);
+  const spy5d = sessionCloseReturnPct(spyBars, input.targetSession, 5);
+  const spy20d = sessionCloseReturnPct(spyBars, input.targetSession, 20);
+  if (spy1d === null || spy5d === null || spy20d === null) {
+    return {
+      ...SECTOR_ROTATION_UNAVAILABLE,
+      missingReason: `Insufficient SPY history for ${input.targetSession}.`,
+    };
+  }
+
+  const sectors: V2SectorRotationRow[] = [];
+  for (const symbol of SECTOR_ETF_SYMBOLS) {
+    const bars = map.get(symbol);
+    if (!bars || bars.length === 0) continue;
+
+    const filtered = bars.filter((bar) => bar.sessionDate <= input.targetSession);
+    if (filtered.at(-1)?.sessionDate !== input.targetSession) continue;
+
+    const close = filtered.at(-1)!.close;
+    const ma20 = computeCloseMovingAverage(filtered, 20);
+    const ma50 = computeCloseMovingAverage(filtered, 50);
+    if (ma20 === null || ma50 === null) continue;
+
+    const return1d = sessionCloseReturnPct(bars, input.targetSession, 1);
+    const return5d = sessionCloseReturnPct(bars, input.targetSession, 5);
+    const return20d = sessionCloseReturnPct(bars, input.targetSession, 20);
+    if (return1d === null || return5d === null || return20d === null) continue;
+
+    const rs1d = return1d - spy1d;
+    const rs5d = return5d - spy5d;
+    const rs20d = return20d - spy20d;
+    const aboveMa20 = close > ma20;
+    const aboveMa50 = close > ma50;
+
+    sectors.push({
+      symbol,
+      classification: classifySectorRotationRow(rs1d, rs5d, aboveMa20, aboveMa50),
+      return1d,
+      return5d,
+      return20d,
+      rs1d,
+      rs5d,
+      rs20d,
+      aboveMa20,
+      aboveMa50,
+    });
+  }
+
+  if (sectors.length === 0) {
+    return {
+      ...SECTOR_ROTATION_UNAVAILABLE,
+      missingReason: `No sector ETF bars aligned to ${input.targetSession}.`,
+    };
+  }
+
+  const latestSession =
+    input.barPanelLatestSession ??
+    spyBars.filter((bar) => bar.sessionDate <= input.targetSession).at(-1)?.sessionDate ??
+    null;
+  const stale =
+    latestSession !== null && latestSession !== input.targetSession;
+
+  const sortedByRs5d = [...sectors].sort((left, right) => right.rs5d - left.rs5d);
+  const topLeadingImproving = sortedByRs5d
+    .filter(
+      (row) =>
+        row.classification === "leading" || row.classification === "improving",
+    )
+    .slice(0, 3);
+  const bottomWeakening = [...sectors]
+    .filter((row) => row.classification === "weakening")
+    .sort((left, right) => left.rs5d - right.rs5d)
+    .slice(0, 3);
+
+  return {
+    status: "available",
+    stale,
+    sessionDate: input.targetSession,
+    sectors,
+    topLeadingImproving,
+    bottomWeakening,
+    missingReason: null,
+  };
+}
+
+function previewSectorRotationSummary(): V2SectorRotationSummary {
+  const rows: V2SectorRotationRow[] = [
+    {
+      symbol: "XLK",
+      classification: "leading",
+      return1d: 0.8,
+      return5d: 2.4,
+      return20d: 4.1,
+      rs1d: 0.5,
+      rs5d: 1.2,
+      rs20d: 2.0,
+      aboveMa20: true,
+      aboveMa50: true,
+    },
+    {
+      symbol: "XLI",
+      classification: "improving",
+      return1d: 0.6,
+      return5d: -0.4,
+      return20d: 1.0,
+      rs1d: 0.3,
+      rs5d: -0.8,
+      rs20d: -0.5,
+      aboveMa20: true,
+      aboveMa50: false,
+    },
+    {
+      symbol: "XLY",
+      classification: "improving",
+      return1d: 0.4,
+      return5d: -0.2,
+      return20d: 0.8,
+      rs1d: 0.1,
+      rs5d: -0.6,
+      rs20d: -0.3,
+      aboveMa20: false,
+      aboveMa50: false,
+    },
+    {
+      symbol: "XLP",
+      classification: "weakening",
+      return1d: -0.5,
+      return5d: -1.8,
+      return20d: -2.5,
+      rs1d: -0.8,
+      rs5d: -2.4,
+      rs20d: -3.1,
+      aboveMa20: false,
+      aboveMa50: false,
+    },
+    {
+      symbol: "XLU",
+      classification: "weakening",
+      return1d: -0.3,
+      return5d: -1.2,
+      return20d: -1.9,
+      rs1d: -0.6,
+      rs5d: -1.8,
+      rs20d: -2.4,
+      aboveMa20: false,
+      aboveMa50: false,
+    },
+    {
+      symbol: "XLRE",
+      classification: "weakening",
+      return1d: -0.2,
+      return5d: -1.0,
+      return20d: -1.5,
+      rs1d: -0.5,
+      rs5d: -1.6,
+      rs20d: -2.0,
+      aboveMa20: false,
+      aboveMa50: false,
+    },
+  ];
+
+  return {
+    status: "available",
+    stale: false,
+    sessionDate: "2026-07-30",
+    sectors: rows,
+    topLeadingImproving: rows
+      .filter(
+        (row) =>
+          row.classification === "leading" || row.classification === "improving",
+      )
+      .slice(0, 3),
+    bottomWeakening: rows
+      .filter((row) => row.classification === "weakening")
+      .slice(0, 3),
+    missingReason: null,
+  };
 }
 
 export function buildV2CommandCenterView(input: {
@@ -686,9 +1113,12 @@ export function buildV2CommandCenterView(input: {
   >;
   readonly now?: Date;
   readonly marketInputSnapshot?: MarketInputSnapshot | null;
+  readonly dataRoot?: string | null;
+  readonly barPanelLatestSession?: string | null;
 }): V2CommandCenterView {
   const preview = input.methodologyPreview === true;
   const now = input.now ?? new Date();
+  const macroSummary = summarizeMacroFromDriver(input.driver);
   const gammaOptions = {
     driver: input.driver,
     now,
@@ -714,6 +1144,11 @@ export function buildV2CommandCenterView(input: {
     now,
   });
   const targetSession = resolveLastCompletedMarketSessionDate(now);
+  const sectorRotationInput = {
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    targetSession,
+    barPanelLatestSession: input.barPanelLatestSession,
+  };
 
   if (preview) {
     return {
@@ -721,6 +1156,7 @@ export function buildV2CommandCenterView(input: {
       stance: "buy",
       riskScore: 42,
       riskChange: -6,
+      riskChangeReason: "Risk eased: breadth improved · CTA strengthened",
       opportunityScore: 58,
       exposure: { min: 65, max: 80 },
       allocation: { highBeta: 45, defense: 25, metals: 20, hedge: 10 },
@@ -733,17 +1169,24 @@ export function buildV2CommandCenterView(input: {
       spyBreadth,
       ctaProxy,
       gamma: [spyGammaSummary, qqqGammaSummary],
-      macroLabel: input.driver?.label ?? null,
+      macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
+      macroSummary,
       sessionDate: input.driver?.marketSessionDate ?? null,
+      sectorRotation: previewSectorRotationSummary(),
     };
   }
 
-  const decision = deriveRiskDecisionV1({
+  const sectorRotation = summarizeSectorRotation(sectorRotationInput);
+
+  const decision = deriveCommandCenterRiskDecision({
     driver: input.driver,
+    spyGamma: input.spyGamma,
+    qqqGamma: input.qqqGamma,
     spyBreadth,
-    spyGamma: spyGammaSummary,
-    ctaProxy,
-    eventGate: eventGateFromMarketInput(input.marketInputSnapshot),
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    now,
+    marketInputSnapshot: input.marketInputSnapshot,
     targetSession,
   });
 
@@ -761,11 +1204,24 @@ export function buildV2CommandCenterView(input: {
       ? decision.withheldFactors.map((factor) => `Risk model: ${factor}`)
       : [];
 
+  const publicationDate = resolveCurrentMarketSessionDate(now);
+  const dayOverDay =
+    decision.status === "ready"
+      ? resolveRiskDecisionDayOverDay({
+          dataRoot: input.dataRoot,
+          publicationDate,
+          decisionSessionDate: targetSession,
+          today: decision,
+          now,
+        })
+      : { riskChange: null, riskChangeReason: null };
+
   return {
     decisionStatus: decision.status === "ready" ? "ready" : "awaiting_inputs",
     stance: decision.stance,
     riskScore: decision.riskScore,
-    riskChange: null,
+    riskChange: dayOverDay.riskChange,
+    riskChangeReason: dayOverDay.riskChangeReason,
     opportunityScore: decision.opportunityScore,
     exposure: decision.exposure,
     allocation: decision.allocation,
@@ -774,7 +1230,9 @@ export function buildV2CommandCenterView(input: {
     spyBreadth,
     ctaProxy,
     gamma: [spyGammaSummary, qqqGammaSummary],
-    macroLabel: input.driver?.label ?? null,
-    sessionDate: input.driver?.marketSessionDate ?? targetSession,
+    macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
+    macroSummary,
+    sessionDate: publicationDate,
+    sectorRotation,
   };
 }

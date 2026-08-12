@@ -1,11 +1,19 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import fixtureDriver from "../fixtures/macro/dominant-driver.rates-led-easing.json";
 import type { DominantDriver } from "@/contracts";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import {
+  buildRiskChangeReason,
   deriveRiskDecisionV1,
+  loadRiskDecisionV1Daily,
+  persistRiskDecisionV1Daily,
+  resolveRiskDecisionDayOverDay,
   type RiskDecisionSpyBreadthInput,
   type RiskDecisionSpyGammaInput,
+  type RiskDecisionV1DailyRecord,
 } from "@/desk/risk-decision-v1";
 import type { CtaProxySummary } from "@/desk/format-gamma";
 
@@ -227,5 +235,92 @@ describe("deriveRiskDecisionV1", () => {
     expect(result.riskScore).toBeGreaterThanOrEqual(66);
     expect(result.allocation.highBeta).toBeLessThan(result.allocation.defense);
     expect(result.allocation.hedge).toBeGreaterThan(15);
+  });
+
+  it("builds a compact factor-change reason from contribution deltas", () => {
+    const reason = buildRiskChangeReason(
+      -4,
+      [
+        { id: "breadth", score: 25, effectiveWeight: 25 },
+        { id: "cta", score: 25, effectiveWeight: 15 },
+      ],
+      [
+        { id: "breadth", score: 50, effectiveWeight: 25 },
+        { id: "cta", score: 50, effectiveWeight: 15 },
+      ],
+    );
+    expect(reason).toBe("Risk eased: breadth improved · CTA strengthened");
+  });
+
+  it("persists daily output and compares to the prior published record", () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), "risk-v1-"));
+    const prior: RiskDecisionV1DailyRecord = {
+      schemaVersion: "0.1.0",
+      publicationDate: "2026-07-29",
+      marketSessionDate: "2026-07-29",
+      generatedAt: "2026-07-29T20:00:00.000Z",
+      riskScore: 55,
+      factorContributions: [
+        { id: "breadth", score: 50, effectiveWeight: 25 },
+        { id: "cta", score: 50, effectiveWeight: 15 },
+      ],
+    };
+    persistRiskDecisionV1Daily(dataRoot, prior);
+
+    const today = deriveRiskDecisionV1({
+      driver,
+      spyBreadth: strongBreadth(),
+      spyGamma: spyGammaInput(),
+      ctaProxy: buyingCta,
+      eventGate: clearEventGate,
+      targetSession: "2026-07-30",
+    });
+
+    const dayOverDay = resolveRiskDecisionDayOverDay({
+      dataRoot,
+      publicationDate: "2026-07-30",
+      decisionSessionDate: "2026-07-30",
+      today,
+      now: new Date("2026-07-30T20:00:00.000Z"),
+    });
+
+    expect(today.status).toBe("ready");
+    expect(today.riskScore).not.toBeNull();
+    if (today.riskScore === null) return;
+    expect(dayOverDay.riskChange).toBe(today.riskScore - 55);
+    expect(dayOverDay.riskChangeReason).toMatch(/Risk (eased|rose|unchanged):/);
+  });
+
+  it("does not overwrite an existing published daily record", () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), "risk-v1-"));
+    const prior: RiskDecisionV1DailyRecord = {
+      schemaVersion: "0.1.0",
+      publicationDate: "2026-08-11",
+      marketSessionDate: "2026-08-11",
+      generatedAt: "2026-08-11T20:00:00.000Z",
+      riskScore: 51,
+      factorContributions: [{ id: "breadth", score: 50, effectiveWeight: 25 }],
+    };
+    persistRiskDecisionV1Daily(dataRoot, prior);
+
+    const today = deriveRiskDecisionV1({
+      driver,
+      spyBreadth: strongBreadth(),
+      spyGamma: spyGammaInput(),
+      ctaProxy: buyingCta,
+      eventGate: clearEventGate,
+      targetSession: "2026-08-11",
+    });
+
+    persistRiskDecisionV1Daily(dataRoot, {
+      schemaVersion: "0.1.0",
+      publicationDate: "2026-08-11",
+      marketSessionDate: "2026-08-11",
+      generatedAt: "2026-08-12T20:00:00.000Z",
+      riskScore: 65,
+      factorContributions: today.factorContributions,
+    });
+
+    expect(loadRiskDecisionV1Daily(dataRoot, "2026-08-11")?.riskScore).toBe(51);
   });
 });

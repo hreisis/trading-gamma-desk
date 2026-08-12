@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  assignStructureAxisLanes,
   collectStructureAxisValues,
+  formatStructureAxisLevelRow,
+  formatStructureRodDisplayLabel,
+  isRegularSessionClosed,
   riskGaugeNeedleAngle,
   structureAxisPercent,
   structureAxisScale,
@@ -11,11 +13,17 @@ import { easternWallToUtc } from "@/catalyst/market-context/session";
 import type { DominantDriver } from "@/contracts";
 import {
   buildV2CommandCenterView,
+  classifySectorRotationRow,
   deriveBreadthActionableSignal,
   estimateRestOfDayRange,
   estimateWallTouchProbabilities,
   formatRestOfDayRangeLabel,
+  formatSectorEtfLabel,
+  SECTOR_ETF_SYMBOLS,
+  sectorRotationBarScale,
+  sectorRotationBarWidthPct,
   summarizeCtaProxy,
+  summarizeSectorRotation,
   summarizeVolMispricing,
   loadBoundedGammaDeskView,
   applyBoundedGammaSessionGate,
@@ -98,6 +106,7 @@ describe("GammaDesk V2 command center", () => {
     expect(view.missingInputs).toContain("Credit stress");
     expect(view.missingInputs).toContain("Breadth: Nasdaq / high-beta / semis");
     expect(view.spyBreadth.status).toBe("unavailable");
+    expect(view.sectorRotation.status).toBe("unavailable");
   });
 
   it("shows stale gamma walls and dealer flow from dated options snapshot", () => {
@@ -521,10 +530,12 @@ describe("structure axis scale", () => {
 
   it("collects spot, walls, flip, and rest-of-day bounds", () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
+    const targetSession = "2026-07-28";
     const view = buildV2CommandCenterView({
-      driver: null,
+      driver: readyMacroDriver(),
       spyGamma: spy,
       qqqGamma: unavailable("QQQ"),
+      now: easternWallToUtc(targetSession, 14, 0, 0),
     });
     const values = collectStructureAxisValues(view.gamma[0]);
     expect(values).toContain(741.63);
@@ -534,13 +545,102 @@ describe("structure axis scale", () => {
     expect(values.length).toBeGreaterThanOrEqual(5);
   });
 
-  it("stacks below-axis labels when wall markers are close", () => {
-    const lanes = assignStructureAxisLanes([
-      { id: "call", leftPct: 58 },
-      { id: "flip", leftPct: 64 },
-    ]);
-    expect(lanes.call).toBe(0);
-    expect(lanes.flip).toBe(1);
+  it("formats a fixed below-axis level row that does not depend on marker spacing", () => {
+    const spy = loadBoundedGammaDeskView({ forceFixture: true });
+    const view = buildV2CommandCenterView({
+      driver: null,
+      spyGamma: spy,
+      qqqGamma: unavailable("QQQ"),
+    });
+    const row = formatStructureAxisLevelRow(view.gamma[0], {
+      put: "PUT",
+      flip: "FLIP",
+      call: "CALL",
+    });
+    expect(row).toMatch(/PUT .+   \|   FLIP .+   \|   CALL .+/);
+  });
+});
+
+describe("structure axis closed session", () => {
+  const unavailableRod = {
+    status: "unavailable" as const,
+    lower: null,
+    upper: null,
+    confidencePct: null,
+  };
+
+  it("detects after regular session close", () => {
+    const afterClose = easternWallToUtc("2026-08-12", 17, 0, 0);
+    const duringSession = easternWallToUtc("2026-08-12", 14, 0, 0);
+    expect(isRegularSessionClosed(afterClose)).toBe(true);
+    expect(isRegularSessionClosed(duringSession)).toBe(false);
+  });
+
+  it("labels unavailable ROD as Market closed after the regular session", () => {
+    const afterClose = easternWallToUtc("2026-08-12", 17, 0, 0);
+    expect(formatStructureRodDisplayLabel(unavailableRod, "en", afterClose)).toBe(
+      "Market closed",
+    );
+    expect(formatStructureRodDisplayLabel(unavailableRod, "zh", afterClose)).toBe(
+      "市场已收盘",
+    );
+  });
+
+  it("keeps unavailable label when ROD is missing outside closed session", () => {
+    const duringSession = easternWallToUtc("2026-08-12", 14, 0, 0);
+    expect(formatStructureRodDisplayLabel(unavailableRod, "en", duringSession)).toBe(
+      "unavailable",
+    );
+  });
+});
+
+describe("sector rotation", () => {
+  it("classifies sectors with a simple deterministic rule", () => {
+    expect(classifySectorRotationRow(0.5, 1.0, true, true)).toBe("leading");
+    expect(classifySectorRotationRow(-0.5, -1.0, false, false)).toBe("weakening");
+    expect(classifySectorRotationRow(0.3, -0.5, true, false)).toBe("improving");
+    expect(classifySectorRotationRow(-0.2, 0.5, true, false)).toBe("neutral");
+  });
+
+  it("formats sector ETF labels with sector names", () => {
+    expect(formatSectorEtfLabel("XLE")).toBe("XLE · Energy");
+    expect(formatSectorEtfLabel("XLK")).toBe("XLK · Technology");
+  });
+
+  it("maps relative strength to diverging bar widths", () => {
+    expect(sectorRotationBarWidthPct(1.0, 2)).toBe(25);
+    expect(sectorRotationBarWidthPct(-2.0, 2)).toBe(50);
+    expect(sectorRotationBarScale([])).toBe(0.5);
+  });
+
+  it("summarizes leading and weakening sectors from Alpaca-style daily bars", () => {
+    const target = "2026-07-30";
+    const map = new Map<string, { sessionDate: string; close: number }[]>();
+    map.set("SPY", linearEquityBars(60, target, 200, 204));
+    for (const symbol of SECTOR_ETF_SYMBOLS) {
+      if (symbol === "XLK" || symbol === "XLI") {
+        map.set(symbol, linearEquityBars(60, target, 100, 115));
+      } else if (symbol === "XLP" || symbol === "XLU" || symbol === "XLRE") {
+        map.set(symbol, linearEquityBars(60, target, 100, 88));
+      } else {
+        map.set(symbol, linearEquityBars(60, target, 100, 102));
+      }
+    }
+
+    const summary = summarizeSectorRotation({
+      equityBarsBySymbol: map,
+      targetSession: target,
+      barPanelLatestSession: target,
+    });
+
+    expect(summary.status).toBe("available");
+    expect(summary.sessionDate).toBe(target);
+    expect(summary.stale).toBe(false);
+    expect(summary.topLeadingImproving.length).toBeGreaterThan(0);
+    expect(summary.bottomWeakening).toHaveLength(3);
+    expect(summary.bottomWeakening.every((row) => row.classification === "weakening")).toBe(
+      true,
+    );
   });
 });
 
