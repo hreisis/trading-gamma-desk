@@ -87,6 +87,7 @@ export function isDemoQueryParam(value: string | null | undefined): boolean {
 /**
  * Resolve whether this request should serve synthetic demo fixtures.
  * Production defaults to live/current — demo requires `/demo` or `?demo=1`.
+ * `GAMMADESK_PUBLIC_DEMO` alone does not enable demo for default routes.
  */
 export function resolvePublicDemoMode(input: {
   readonly env?: Record<string, string | undefined>;
@@ -98,7 +99,7 @@ export function resolvePublicDemoMode(input: {
   if (input.publicDemo === false) return false;
   if (input.demoPath) return true;
   if (isDemoQueryParam(input.demoQuery)) return true;
-  return isPublicDemoMode(input.env);
+  return false;
 }
 
 export function demoFlagFromRequest(request: Request): boolean {

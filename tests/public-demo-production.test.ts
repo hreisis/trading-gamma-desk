@@ -118,14 +118,15 @@ describe("public demo production build", () => {
     expect(html).toContain('class="v2-app"');
     expect(html).not.toContain('data-testid="banner-illustrative-demo"');
     expect(html).not.toContain('data-testid="demo-route-banner"');
-    expect(html).toContain("Live decision withheld");
 
     if (desk.status === "empty") {
+      expect(html).toContain("Live decision withheld");
       expect(html).toContain("No aligned macro snapshot");
       expect(desk.driver).toBeNull();
     } else {
       expect(desk.isLiveDriver).toBe(true);
       expect(html).toContain(desk.driver.label);
+      expect(html).toContain("Live decision from connected inputs");
     }
   });
 

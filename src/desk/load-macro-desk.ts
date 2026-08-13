@@ -5,6 +5,7 @@ import {
   type DominantDriver as DominantDriverType,
 } from "@/contracts";
 import { deskSourceLabel } from "./format";
+import { isPublicDemoMode } from "./public-demo";
 import {
   artifactSourceLabel,
   readJson,
@@ -43,6 +44,19 @@ export interface LoadMacroDeskOptions {
    */
   readonly publicDemoMode?: boolean;
   readonly artifactStore?: RuntimeJsonStore;
+}
+
+/** Live routes on public-demo hosts must not silently fall back to dev fixtures. */
+function allowsFixtureFallback(options: LoadMacroDeskOptions): boolean {
+  if (options.allowFixture === false) return false;
+  if (
+    isPublicDemoMode() &&
+    !options.publicDemoMode &&
+    !options.preferFixture
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function listDriverSessions(dir: string): string[] {
@@ -180,7 +194,7 @@ export function loadMacroDesk(
 ): MacroDeskView {
   const dataRoot = options.dataRoot ?? "data";
   const fixturePath = options.fixturePath ?? FIXTURE_DRIVER_PATH;
-  const allowFixture = options.allowFixture !== false;
+  const allowFixture = allowsFixtureFallback(options);
   const pipeline = options.publicDemoMode
     ? null
     : readPipelineStatus(dataRoot);
@@ -341,7 +355,7 @@ export async function loadMacroDeskAsync(
     .sort();
 
   if (sessions.length === 0) {
-    if (options.allowFixture !== false) {
+    if (allowsFixtureFallback(options)) {
       return fixtureView(options.fixturePath ?? FIXTURE_DRIVER_PATH, pipeline);
     }
     return emptyView(

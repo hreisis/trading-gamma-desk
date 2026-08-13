@@ -46,13 +46,13 @@ describe("isPublicDemoMode", () => {
 });
 
 describe("resolvePublicDemoMode", () => {
-  it("defaults to live unless demo path, query, or env", () => {
+  it("defaults to live unless demo path or query — not env alone", () => {
     expect(resolvePublicDemoMode({})).toBe(false);
     expect(resolvePublicDemoMode({ demoPath: true })).toBe(true);
     expect(resolvePublicDemoMode({ demoQuery: "1" })).toBe(true);
     expect(
       resolvePublicDemoMode({ env: { GAMMADESK_PUBLIC_DEMO: "1" } }),
-    ).toBe(true);
+    ).toBe(false);
     expect(resolvePublicDemoMode({ publicDemo: false, demoQuery: "1" })).toBe(
       false,
     );
