@@ -9,6 +9,9 @@ docs/BACKBONE.md
 # Local data cache and snapshots
 data/
 
+# Test scratch directories (mkdtemp)
+tmp-*/
+
 # Dependencies and build output
 node_modules/
 .next/
