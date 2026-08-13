@@ -5,6 +5,12 @@ import {
   type DominantDriver as DominantDriverType,
 } from "@/contracts";
 import { deskSourceLabel } from "./format";
+import {
+  artifactSourceLabel,
+  readJson,
+  resolveRuntimeJsonStore,
+  type RuntimeJsonStore,
+} from "./runtime-store";
 import { readPipelineStatus } from "./pipeline-status";
 import type {
   DeskError,
@@ -36,6 +42,7 @@ export interface LoadMacroDeskOptions {
    * may read `fixturePath` from disk (local/dev only).
    */
   readonly publicDemoMode?: boolean;
+  readonly artifactStore?: RuntimeJsonStore;
 }
 
 function listDriverSessions(dir: string): string[] {
@@ -284,6 +291,118 @@ export function loadMacroDesk(
           message: pipeline.error ?? "pipeline failed",
           stage: pipeline.stage,
           path: pipeline.lastGoodDriverPath ?? latestPath,
+        }
+      : null,
+  });
+}
+
+function sessionFromDriverPath(relativePath: string): string | null {
+  const match = /^drivers\/(\d{4}-\d{2}-\d{2})\.json$/.exec(relativePath);
+  return match?.[1] ?? null;
+}
+
+/**
+ * Load macro desk view from durable artifact store (filesystem or blob).
+ * Falls back to sync `loadMacroDesk` when the store is local filesystem at dataRoot.
+ */
+export async function loadMacroDeskAsync(
+  options: LoadMacroDeskOptions = {},
+): Promise<MacroDeskView> {
+  const artifactStore =
+    options.artifactStore ?? resolveRuntimeJsonStore(process.env);
+  const dataRoot = options.dataRoot ?? "data";
+
+  if (
+    artifactStore.mode === "filesystem" &&
+    join(artifactStore.rootLabel) === join(dataRoot)
+  ) {
+    return loadMacroDesk(options);
+  }
+
+  const pipeline = options.publicDemoMode
+    ? null
+    : readPipelineStatus(dataRoot);
+
+  if (options.publicDemoMode) {
+    return fixtureView(options.fixturePath ?? FIXTURE_DRIVER_PATH, null);
+  }
+
+  if (options.preferFixture) {
+    if (options.allowFixture === false) {
+      return emptyView(pipeline, "fixture requested but allowFixture is false");
+    }
+    return fixtureView(options.fixturePath ?? FIXTURE_DRIVER_PATH, pipeline);
+  }
+
+  const driverPaths = await artifactStore.list("drivers");
+  const sessions = driverPaths
+    .map(sessionFromDriverPath)
+    .filter((session): session is string => session !== null)
+    .sort();
+
+  if (sessions.length === 0) {
+    if (options.allowFixture !== false) {
+      return fixtureView(options.fixturePath ?? FIXTURE_DRIVER_PATH, pipeline);
+    }
+    return emptyView(
+      pipeline,
+      `no drivers under ${artifactStore.rootLabel}/drivers; run npm run daily`,
+    );
+  }
+
+  const latest = sessions[sessions.length - 1]!;
+  const driverRelativePath = `drivers/${latest}.json`;
+  const driverLabel = artifactSourceLabel(artifactStore, driverRelativePath);
+  const raw = await readJson(artifactStore, driverRelativePath);
+
+  if (raw === null) {
+    return emptyView(pipeline, `missing driver artifact at ${driverLabel}`);
+  }
+
+  const parsed = DominantDriver.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      status: "malformed",
+      source: null,
+      sourceLabel: null,
+      isDemo: false,
+      isPublicDemo: false,
+      isLiveDriver: false,
+      driver: null,
+      driverPath: driverLabel,
+      snapshotPresent: false,
+      snapshotPath: null,
+      sessionStale: false,
+      pipeline,
+      error: {
+        code: "malformed",
+        message: `live driver malformed at ${driverLabel}`,
+        path: driverLabel,
+      },
+    };
+  }
+
+  const snapshotRelativePath = `snapshots/${latest}.json`;
+  const snapshotPresent = await artifactStore.exists(snapshotRelativePath);
+  const snapshotPath = snapshotPresent
+    ? artifactSourceLabel(artifactStore, snapshotRelativePath)
+    : null;
+  const pipelineFailed = pipeline !== null && !pipeline.ok;
+
+  return readyView({
+    source: "local_driver",
+    driver: parsed.data,
+    driverPath: driverLabel,
+    snapshotPresent,
+    snapshotPath,
+    pipeline,
+    forceSessionStale: pipelineFailed,
+    error: pipelineFailed
+      ? {
+          code: "pipeline",
+          message: pipeline.error ?? "pipeline failed",
+          stage: pipeline.stage,
+          path: pipeline.lastGoodDriverPath ?? driverLabel,
         }
       : null,
   });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import type { FetchLike } from "@/ingest/http";
 import type {
+  V2AiStudyConfidence,
   V2AiStudyInterpretation,
   V2CommandCenterView,
   V2GammaSummary,
@@ -10,7 +11,6 @@ import { breadthSignalLabel, formatSectorEtfLabel } from "@/desk/v2-command-cent
 import {
   ctaProxySignalLabel,
   formatGexCompact,
-  formatIvHvSpreadVolPts,
   formatRestOfDayRangeLabel,
   volMispricingSignalLabel,
   type CtaProxyTrendSignal,
@@ -24,8 +24,8 @@ import {
 } from "./config";
 import { extractOutputText } from "./openai-utils";
 
-export const V2_COMMAND_AI_STUDY_PROMPT_VERSION = "0.1.0";
-export const V2_COMMAND_AI_STUDY_MAX_OUTPUT_TOKENS = 420;
+export const V2_COMMAND_AI_STUDY_PROMPT_VERSION = "0.2.0";
+export const V2_COMMAND_AI_STUDY_MAX_OUTPUT_TOKENS = 480;
 
 export interface V2AiStudyPayload {
   readonly promptVersion: string;
@@ -41,6 +41,7 @@ export interface V2AiStudyPayload {
     readonly label: string;
     readonly primaryRegime?: string;
     readonly riskDirection?: string | null;
+    readonly marketSessionDate?: string | null;
     readonly interpretation?: string | null;
     readonly evidence?: readonly string[];
   };
@@ -56,6 +57,7 @@ export interface V2AiStudyPayload {
     readonly percentAboveMa20: number | null;
     readonly percentAboveMa50: number | null;
     readonly stale: boolean;
+    readonly marketSessionDate?: string | null;
   };
   readonly ctaProxy?: {
     readonly signal: string;
@@ -83,43 +85,60 @@ export interface V2AiStudyPayload {
       readonly classification: string;
     }[];
   };
+  readonly dataQuality: {
+    readonly interpretationConfidence: V2AiStudyConfidence;
+    readonly limitations: readonly string[];
+    readonly missingTopics: readonly string[];
+  };
 }
 
-const V2AiStudyLlmOutputSchema = z.object({
-  market_setup: z.string().min(1).max(320),
-  key_upside_trigger: z.string().min(1).max(280),
-  key_downside_trigger: z.string().min(1).max(280),
-  main_supporting_signal: z.string().min(1).max(280),
-  main_conflicting_signal: z.string().min(1).max(280),
+export const V2AiStudyLlmOutputSchema = z.object({
+  regime: z.string().min(1).max(320),
+  base_case: z.string().min(1).max(320),
+  if_then: z.string().min(1).max(320),
+  invalidation: z.string().min(1).max(320),
+  tension: z.string().min(1).max(280),
 });
 
 export const V2_COMMAND_AI_STUDY_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: [
-    "market_setup",
-    "key_upside_trigger",
-    "key_downside_trigger",
-    "main_supporting_signal",
-    "main_conflicting_signal",
-  ],
+  required: ["regime", "base_case", "if_then", "invalidation", "tension"],
   properties: {
-    market_setup: { type: "string" },
-    key_upside_trigger: { type: "string" },
-    key_downside_trigger: { type: "string" },
-    main_supporting_signal: { type: "string" },
-    main_conflicting_signal: { type: "string" },
+    regime: { type: "string" },
+    base_case: { type: "string" },
+    if_then: { type: "string" },
+    invalidation: { type: "string" },
+    tension: { type: "string" },
   },
 } as const;
 
-export const V2_COMMAND_AI_STUDY_SYSTEM_PROMPT = `You are GammaDesk Command Center AI Study — a concise interpreter of existing deterministic model outputs.
+export const V2_COMMAND_AI_STUDY_SYSTEM_PROMPT = `You are GammaDesk Command Center AI Study — a constrained trading-research copilot over existing deterministic model outputs.
+
+Output five fields (1–2 short sentences each):
+- regime: current market regime from macro, gamma, breadth, CTA, vol, sector rotation, and risk stance — only topics present in the payload.
+- base_case: the most defensible setup from aligned signals; no probabilities or invented price targets.
+- if_then: 1–2 conditional paths using observable levels/signals from the payload — prefer falsifiable state transitions (not the current state).
+- invalidation: 1–2 concrete observable conditions that would invalidate or materially change the base case — never list conditions already true at current spot/signals.
+- tension: strongest disagreement between current signals (e.g. stabilizing dealer flow vs narrow participation).
+
+Gamma structure semantics (compare spyGamma.spot vs gammaFlip, callWall, putWall before writing if_then or invalidation):
+- Above gamma flip → more stabilizing / mean-reverting dealer-flow context; below gamma flip → amplification / trend / vol-expansion risk rises.
+- Sustained break and hold above call wall → upside chase / hedge pressure may rise — do NOT imply mean reversion.
+- Sustained break and hold below put wall → downside instability / support removal — do NOT treat as neutral.
+- Use transitions: "If spot crosses from above flip to below…", "If spot breaks and holds above call wall…", "If breadth improves from Mixed to Strong…", "If dealer flow shifts from stabilizing to amplifying…".
+- Do not use "loses flip" when spot is already below flip; do not use "below put wall" as invalidation when spot is already below put wall; do not use "reclaims flip" as invalidation when spot is already above flip.
 
 Rules:
-- Use ONLY fields in the user JSON payload. Do not invent prices, levels, probabilities, catalysts, or signals.
-- Do not recalculate risk, gamma, breadth, rotation, or any numeric model output.
-- If a topic is absent from the payload, say it is not available in connected inputs — do not guess.
+- Use ONLY fields in the user JSON payload. Do not invent prices, levels, probabilities, catalysts, sectors, or signals.
+- dataQuality.interpretationConfidence is pre-computed — do NOT output your own confidence score.
+- When dataQuality.limitations is non-empty, qualify stale or incomplete inputs in regime/base_case (never describe them as live/current).
+- When dataQuality.interpretationConfidence is "limited", keep language conditional; avoid strong directional claims.
+- Macro interpretation and evidence describe completed-session closes — never frame them as intraday moves unless payload explicitly marks live.
+- Do not recalculate or override Risk, Gamma, exposure, allocation, wall touch, ROD, breadth, CTA, or sector rotation.
+- If a topic is in dataQuality.missingTopics or absent from the payload, omit it — do not guess.
 - Gamma describes structure/amplification context, not a standalone buy/sell call.
-- Keep each answer to one or two short sentences. Total output must fit a compact card.
+- Use exact gamma levels (spot, putWall, callWall, gammaFlip) from the payload when referencing structure.
 - No trade advice, position sizing, or fabricated event detail.`;
 
 function gammaPayload(item: V2GammaSummary): Record<string, unknown> | null {
@@ -127,6 +146,9 @@ function gammaPayload(item: V2GammaSummary): Record<string, unknown> | null {
   const out: Record<string, unknown> = { symbol: item.symbol };
   if (item.regime) out.regime = item.regime;
   if (item.dealerFlowRegime) out.dealerFlow = item.dealerFlowRegime;
+  if (item.sessionDate) out.sessionDate = item.sessionDate;
+  if (item.dataLabel) out.dataLabel = item.dataLabel;
+  if (item.status === "incomplete") out.incomplete = true;
   if (item.spot !== null) out.spot = item.spot;
   if (item.putWall !== null) out.putWall = item.putWall;
   if (item.callWall !== null) out.callWall = item.callWall;
@@ -135,7 +157,7 @@ function gammaPayload(item: V2GammaSummary): Record<string, unknown> | null {
   if (item.restOfDayRange.status === "available") {
     out.restOfDayRange = formatRestOfDayRangeLabel(item.restOfDayRange);
   }
-  if (item.freshness === "stale" || item.freshness === "incomplete") {
+  if (item.freshness === "stale") {
     out.stale = true;
   }
   return out;
@@ -148,8 +170,283 @@ function macroPayload(view: V2CommandCenterView): V2AiStudyPayload["macro"] | un
     label: macro.label,
     ...(macro.primaryRegime ? { primaryRegime: macro.primaryRegime } : {}),
     ...(macro.riskDirection !== null ? { riskDirection: macro.riskDirection } : {}),
+    ...(macro.marketSessionDate
+      ? { marketSessionDate: macro.marketSessionDate }
+      : {}),
     ...(macro.interpretation ? { interpretation: macro.interpretation } : {}),
     ...(macro.evidence.length > 0 ? { evidence: macro.evidence } : {}),
+  };
+}
+
+function listMissingPayloadTopics(
+  payload: Omit<V2AiStudyPayload, "dataQuality">,
+): string[] {
+  const missing: string[] = [];
+  if (!payload.macro) missing.push("macro");
+  if (!payload.spyGamma) missing.push("spyGamma");
+  if (!payload.qqqGamma) missing.push("qqqGamma");
+  if (!payload.breadth) missing.push("breadth");
+  if (!payload.ctaProxy) missing.push("ctaProxy");
+  if (!payload.volMispricing) missing.push("volMispricing");
+  if (!payload.sectorRotation) missing.push("sectorRotation");
+  if (!payload.eventGate) missing.push("eventGate");
+  return missing;
+}
+
+/** Deterministic interpretation confidence from payload coverage and freshness only. */
+export function deriveV2AiStudyDataQuality(
+  view: V2CommandCenterView,
+  payload: Omit<V2AiStudyPayload, "dataQuality">,
+): V2AiStudyPayload["dataQuality"] {
+  const limitations: string[] = [];
+  const missingTopics = listMissingPayloadTopics(payload);
+  const spy = view.gamma[0];
+  const qqq = view.gamma[1];
+
+  if (spy.status === "incomplete" || spy.freshness === "incomplete") {
+    const label = spy.dataLabel ?? `session ${spy.sessionDate ?? "—"}`;
+    limitations.push(
+      `SPY gamma based on ${label} bounded options snapshot (incomplete chain)`,
+    );
+  } else if (spy.freshness === "stale" && spy.sessionDate) {
+    limitations.push(
+      `SPY gamma based on ${spy.dataLabel ?? spy.sessionDate} bounded options snapshot`,
+    );
+  }
+
+  if (qqq.status === "incomplete" || qqq.freshness === "incomplete") {
+    limitations.push(
+      `QQQ gamma chain incomplete (${qqq.dataLabel ?? qqq.sessionDate ?? "dated snapshot"})`,
+    );
+  }
+
+  if (view.spyBreadth.stale && view.spyBreadth.marketSessionDate) {
+    limitations.push(`Breadth is dated (${view.spyBreadth.marketSessionDate} session)`);
+  }
+
+  if (view.sectorRotation.stale && view.sectorRotation.sessionDate) {
+    limitations.push(
+      `Sector rotation dated (${view.sectorRotation.sessionDate} session)`,
+    );
+  }
+
+  let interpretationConfidence: V2AiStudyConfidence = "high";
+
+  if (view.decisionStatus !== "ready") {
+    interpretationConfidence = "limited";
+  } else if (
+    view.spyBreadth.stale ||
+    spy.freshness === "incomplete" ||
+    spy.freshness === "stale" ||
+    qqq.freshness === "incomplete" ||
+    qqq.freshness === "stale"
+  ) {
+    interpretationConfidence = "moderate";
+  }
+
+  if (missingTopics.length >= 3) {
+    interpretationConfidence =
+      interpretationConfidence === "high" ? "moderate" : interpretationConfidence;
+  }
+
+  if (
+    view.spyBreadth.stale &&
+    (spy.freshness === "incomplete" ||
+      spy.freshness === "stale" ||
+      qqq.freshness === "incomplete")
+  ) {
+    interpretationConfidence = "limited";
+  }
+
+  if (!payload.macro || !payload.breadth) {
+    interpretationConfidence = "limited";
+  }
+
+  if (view.missingInputs.length > 5) {
+    interpretationConfidence = "limited";
+  }
+
+  return {
+    interpretationConfidence,
+    limitations,
+    missingTopics,
+  };
+}
+
+const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
+
+function maskIsoDateNumerics(text: string): string {
+  return text.replace(ISO_DATE, (date) => date.replace(/\d/g, "D"));
+}
+
+function extractNumericTokens(text: string): string[] {
+  const out: string[] = [];
+  const masked = maskIsoDateNumerics(text);
+  const re =
+    /\$?-?\d{1,3}(?:,\d{3})*(?:\.\d+)?%?|\d+(?:\.\d+)?(?:\s*[-–to]+\s*\d+(?:\.\d+)?)?/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(masked)) !== null) {
+    const token = match[0]!.trim();
+    if (token) out.push(token);
+  }
+  return out;
+}
+
+function normalizeNumToken(token: string): string {
+  return token
+    .toLowerCase()
+    .replace(/,/g, "")
+    .replace(/\$/g, "")
+    .replace(/%/g, "")
+    .replace(/\s+/g, "")
+    .replace(/–/g, "-");
+}
+
+function collectPayloadAllowedNumbers(payload: V2AiStudyPayload): Set<number> {
+  const allowed = new Set<number>();
+  const add = (value: number | null | undefined) => {
+    if (value === null || value === undefined || !Number.isFinite(value)) return;
+    allowed.add(value);
+    allowed.add(Math.round(value * 10) / 10);
+    allowed.add(Math.round(value));
+  };
+
+  if (payload.decision) {
+    add(payload.decision.riskScore);
+    add(payload.decision.riskChange);
+    add(payload.decision.opportunityScore);
+    if (payload.decision.exposure) {
+      add(payload.decision.exposure.min);
+      add(payload.decision.exposure.max);
+    }
+  }
+
+  if (payload.breadth) {
+    add(payload.breadth.percentAboveMa20);
+    add(payload.breadth.percentAboveMa50);
+  }
+
+  if (payload.volMispricing) {
+    add(payload.volMispricing.ivMinusHvVolPts);
+  }
+
+  const addGamma = (gamma: Record<string, unknown> | undefined) => {
+    if (!gamma) return;
+    add(typeof gamma.spot === "number" ? gamma.spot : null);
+    add(typeof gamma.putWall === "number" ? gamma.putWall : null);
+    add(typeof gamma.callWall === "number" ? gamma.callWall : null);
+    add(typeof gamma.gammaFlip === "number" ? gamma.gammaFlip : null);
+  };
+  addGamma(payload.spyGamma);
+  addGamma(payload.qqqGamma);
+
+  if (payload.sectorRotation) {
+    for (const row of [
+      ...payload.sectorRotation.leadingImproving,
+      ...payload.sectorRotation.weakening,
+    ]) {
+      add(row.rs1d);
+      add(row.rs5d);
+    }
+  }
+
+  return allowed;
+}
+
+function isCloseToAllowed(value: number, allowed: Set<number>): boolean {
+  for (const candidate of allowed) {
+    if (Math.abs(candidate - value) <= 1.5) return true;
+  }
+  return false;
+}
+
+function collectAllowedSectorTokens(payload: V2AiStudyPayload): Set<string> {
+  const tokens = new Set<string>();
+  if (!payload.sectorRotation) return tokens;
+  for (const row of [
+    ...payload.sectorRotation.leadingImproving,
+    ...payload.sectorRotation.weakening,
+  ]) {
+    tokens.add(row.symbol);
+    tokens.add(row.label);
+    tokens.add(row.label.split(" · ")[0] ?? row.label);
+  }
+  return tokens;
+}
+
+/** Reject LLM output that cites price levels or sectors outside the payload. */
+export function validateV2AiStudyLlmGrounding(
+  parsed: z.infer<typeof V2AiStudyLlmOutputSchema>,
+  payload: V2AiStudyPayload,
+): { readonly ok: true } | { readonly ok: false; readonly reason: string } {
+  const allowedNumbers = collectPayloadAllowedNumbers(payload);
+  const allowedSectors = collectAllowedSectorTokens(payload);
+  const texts = [
+    parsed.regime,
+    parsed.base_case,
+    parsed.if_then,
+    parsed.invalidation,
+    parsed.tension,
+  ];
+  const fullText = texts.join(" ");
+
+  if (/\b(probability|likely|chance of|%\s*chance)\b/i.test(fullText)) {
+    return { ok: false, reason: "probability language not supported in payload" };
+  }
+
+  if (payload.dataQuality.interpretationConfidence === "limited") {
+    if (
+      /\b(will rally|will fall|will break|guaranteed|definitely|bullish breakout|bearish breakdown|imminent crash|sure to)\b/i.test(
+        fullText,
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "strong directional language not allowed when confidence is limited",
+      };
+    }
+  }
+
+  for (const token of extractNumericTokens(fullText)) {
+    const normalized = normalizeNumToken(token);
+    if (!normalized || /^\d{4}$/.test(normalized)) continue;
+    const value = Number(normalized.replace(/%$/, ""));
+    if (!Number.isFinite(value)) continue;
+    if (value >= 80 && value <= 2000 && !isCloseToAllowed(value, allowedNumbers)) {
+      return { ok: false, reason: `unsupported price or level ${token}` };
+    }
+  }
+
+  const sectorMatches = fullText.match(/\bXL[A-Z]{1,2}\b/g) ?? [];
+  for (const symbol of sectorMatches) {
+    if (!allowedSectors.has(symbol)) {
+      return { ok: false, reason: `unsupported sector symbol ${symbol}` };
+    }
+  }
+
+  if (payload.eventGate?.headline) {
+    const headline = payload.eventGate.headline;
+    if (
+      fullText.toLowerCase().includes("employment") &&
+      !headline.toLowerCase().includes("employment")
+    ) {
+      return { ok: false, reason: "catalyst not present in eventGate payload" };
+    }
+  } else if (/\b(employment|cpi|fomc|payrolls)\b/i.test(fullText)) {
+    return { ok: false, reason: "event catalyst cited without eventGate payload" };
+  }
+
+  return { ok: true };
+}
+
+function withInterpretationMeta(
+  interpretation: Omit<V2AiStudyInterpretation, "confidence" | "dataLimitations">,
+  dataQuality: V2AiStudyPayload["dataQuality"],
+): V2AiStudyInterpretation {
+  return {
+    ...interpretation,
+    confidence: dataQuality.interpretationConfidence,
+    dataLimitations: dataQuality.limitations,
   };
 }
 
@@ -187,6 +484,9 @@ export function buildV2AiStudyPayload(
             percentAboveMa20: view.spyBreadth.percentAboveMA20,
             percentAboveMa50: view.spyBreadth.percentAboveMA50,
             stale: view.spyBreadth.stale,
+            ...(view.spyBreadth.marketSessionDate
+              ? { marketSessionDate: view.spyBreadth.marketSessionDate }
+              : {}),
           },
         }
       : {}),
@@ -231,7 +531,15 @@ export function buildV2AiStudyPayload(
       : {}),
   };
 
-  return payload as V2AiStudyPayload;
+  const dataQuality = deriveV2AiStudyDataQuality(
+    view,
+    payload as Omit<V2AiStudyPayload, "dataQuality">,
+  );
+
+  return {
+    ...payload,
+    dataQuality,
+  } as V2AiStudyPayload;
 }
 
 /** Verifies AI Study payload mirrors the command center view (same source fields). */
@@ -361,6 +669,11 @@ export function verifyV2AiStudyPayloadAlignsWithView(
     push("macro.label", macro.label, payload.macro?.label);
     push("macro.primaryRegime", macro.primaryRegime, payload.macro?.primaryRegime);
     push("macro.riskDirection", macro.riskDirection, payload.macro?.riskDirection);
+    push(
+      "macro.marketSessionDate",
+      macro.marketSessionDate,
+      payload.macro?.marketSessionDate,
+    );
     push("macro.interpretation", macro.interpretation, payload.macro?.interpretation);
     push("macro.evidence", macro.evidence, payload.macro?.evidence);
   } else if (payload.macro) {
@@ -387,128 +700,552 @@ function formatRsPct(value: number): string {
   return `${rounded > 0 ? "+" : ""}${rounded}%`;
 }
 
+function gammaLevel(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** Spot proximity band for near-flip / near-wall structure (matches desk wall-touch tolerance). */
+export const SPY_GAMMA_NEAR_LEVEL_EPS = 0.5;
+
+export interface SpyGammaSpotPosition {
+  readonly spot: number | null;
+  readonly gammaFlip: number | null;
+  readonly callWall: number | null;
+  readonly putWall: number | null;
+  readonly aboveFlip: boolean;
+  readonly belowFlip: boolean;
+  readonly nearFlip: boolean;
+  readonly aboveCallWall: boolean;
+  readonly belowCallWall: boolean;
+  readonly nearCallWall: boolean;
+  readonly abovePutWall: boolean;
+  readonly belowPutWall: boolean;
+  readonly nearPutWall: boolean;
+  readonly dealerFlowStabilizing: boolean;
+  readonly dealerFlowAmplifying: boolean;
+}
+
+export function deriveSpyGammaSpotPosition(
+  spy: Record<string, unknown> | undefined,
+): SpyGammaSpotPosition {
+  const spot = gammaLevel(spy?.spot);
+  const gammaFlip = gammaLevel(spy?.gammaFlip);
+  const callWall = gammaLevel(spy?.callWall);
+  const putWall = gammaLevel(spy?.putWall);
+  const dealerFlow =
+    typeof spy?.dealerFlow === "string" ? spy.dealerFlow : "";
+  const regime = typeof spy?.regime === "string" ? spy.regime : "";
+  const dealerFlowStabilizing =
+    dealerFlow.includes("Stabilizing") || regime === "positive";
+  const dealerFlowAmplifying =
+    dealerFlow.includes("Amplifying") || regime === "negative";
+
+  const emptyPosition = {
+    spot,
+    gammaFlip,
+    callWall,
+    putWall,
+    aboveFlip: false,
+    belowFlip: false,
+    nearFlip: false,
+    aboveCallWall: false,
+    belowCallWall: false,
+    nearCallWall: false,
+    abovePutWall: false,
+    belowPutWall: false,
+    nearPutWall: false,
+    dealerFlowStabilizing,
+    dealerFlowAmplifying,
+  };
+
+  if (spot === null) {
+    return emptyPosition;
+  }
+
+  const nearFlip =
+    gammaFlip !== null && Math.abs(spot - gammaFlip) <= SPY_GAMMA_NEAR_LEVEL_EPS;
+  const nearCallWall =
+    callWall !== null && Math.abs(spot - callWall) <= SPY_GAMMA_NEAR_LEVEL_EPS;
+  const nearPutWall =
+    putWall !== null && Math.abs(spot - putWall) <= SPY_GAMMA_NEAR_LEVEL_EPS;
+
+  return {
+    spot,
+    gammaFlip,
+    callWall,
+    putWall,
+    nearFlip,
+    aboveFlip: gammaFlip !== null && spot >= gammaFlip,
+    belowFlip: gammaFlip !== null && spot < gammaFlip,
+    nearCallWall,
+    aboveCallWall: callWall !== null && spot > callWall,
+    belowCallWall: callWall !== null && spot < callWall,
+    nearPutWall,
+    abovePutWall: putWall !== null && spot > putWall,
+    belowPutWall: putWall !== null && spot < putWall,
+    dealerFlowStabilizing,
+    dealerFlowAmplifying,
+  };
+}
+
+function conditionalPrefix(limited: boolean): string {
+  return limited ? "may" : "can";
+}
+
+function buildGammaIfThenPathGroups(
+  position: SpyGammaSpotPosition,
+  limited: boolean,
+): {
+  readonly flipPaths: string[];
+  readonly putPaths: string[];
+  readonly callPaths: string[];
+} {
+  const may = conditionalPrefix(limited);
+  const flip = position.gammaFlip;
+  const callWall = position.callWall;
+  const putWall = position.putWall;
+  const flipPaths: string[] = [];
+  const putPaths: string[] = [];
+  const callPaths: string[] = [];
+
+  if (flip !== null) {
+    if (position.aboveFlip) {
+      flipPaths.push(
+        `If SPY spot crosses from above gamma flip ${flip} to below → amplification / vol expansion risk ${may} rise`,
+      );
+    } else if (position.belowFlip) {
+      flipPaths.push(
+        `If SPY spot reclaims and holds above gamma flip ${flip} → stabilizing / mean-reverting regime ${may} resume`,
+      );
+    }
+  }
+
+  if (putWall !== null) {
+    if (position.belowPutWall) {
+      putPaths.push(
+        `If SPY reclaims and holds above put wall ${putWall} → downside flush risk ${may} ease`,
+      );
+    } else if (position.abovePutWall || position.nearPutWall) {
+      putPaths.push(
+        `If SPY breaks and holds below put wall ${putWall} → downside instability / support removal ${may} increase`,
+      );
+    }
+  }
+
+  if (callWall !== null) {
+    if (position.belowCallWall || position.nearCallWall) {
+      callPaths.push(
+        `If SPY breaks and holds above call wall ${callWall} → upside chase / hedge pressure ${may} rise`,
+      );
+    } else if (position.aboveCallWall) {
+      callPaths.push(
+        `If SPY fails to hold above call wall ${callWall} → upside chase pressure ${may} ease toward the flip band`,
+      );
+    }
+  }
+
+  return { flipPaths, putPaths, callPaths };
+}
+
+function assembleGammaIfThenPaths(
+  position: SpyGammaSpotPosition,
+  limited: boolean,
+): string[] {
+  const { flipPaths, putPaths, callPaths } = buildGammaIfThenPathGroups(
+    position,
+    limited,
+  );
+  const paths: string[] = [...flipPaths];
+
+  if (position.aboveCallWall && callPaths.length > 0) {
+    paths.push(callPaths[0]!);
+  } else if (position.belowPutWall && putPaths.length > 0) {
+    paths.push(putPaths[0]!);
+  } else if (putPaths.length > 0) {
+    paths.push(putPaths[0]!);
+  } else if (callPaths.length > 0) {
+    paths.push(callPaths[0]!);
+  }
+
+  return paths.slice(0, 2);
+}
+
+function buildGammaInvalidationConditions(
+  position: SpyGammaSpotPosition,
+  limited: boolean,
+): string[] {
+  const conditions: string[] = [];
+  const may = conditionalPrefix(limited);
+  const flip = position.gammaFlip;
+  const callWall = position.callWall;
+  const putWall = position.putWall;
+
+  if (flip !== null && position.aboveFlip) {
+    conditions.push(
+      `SPY spot crosses from above gamma flip ${flip} to below and holds`,
+    );
+  }
+  if (callWall !== null && position.belowCallWall) {
+    conditions.push(
+      `SPY breaks and holds above call wall ${callWall} — chase / hedge pressure ${may} dominate mean-reversion base`,
+    );
+  }
+  if (putWall !== null && position.abovePutWall) {
+    conditions.push(
+      `SPY breaks and holds below put wall ${putWall} — support removal ${may} invalidate stabilization`,
+    );
+  }
+  if (position.dealerFlowStabilizing) {
+    conditions.push(
+      `dealer flow shifts from stabilizing to amplifying / trend-following`,
+    );
+  }
+
+  return conditions;
+}
+
+function buildBreadthTransitionPaths(
+  payload: V2AiStudyPayload,
+  limited: boolean,
+): string[] {
+  const breadth = payload.breadth;
+  if (!breadth?.signal || breadth.signal === "unavailable") return [];
+  const may = conditionalPrefix(limited);
+  const label = breadthSignalLabel(
+    breadth.signal as "strong" | "mixed" | "weak",
+    "available",
+  );
+  if (breadth.signal === "mixed") {
+    return [
+      `If breadth improves from ${label} to Strong → participation ${may} broaden`,
+      `If breadth weakens from ${label} to Weak → narrow participation ${may} persist`,
+    ];
+  }
+  if (breadth.signal === "weak") {
+    return [`If breadth improves from ${label} to Mixed or Strong → participation ${may} broaden`];
+  }
+  if (breadth.signal === "strong") {
+    return [`If breadth weakens from ${label} to Mixed or Weak → participation ${may} narrow`];
+  }
+  return [];
+}
+
+function buildBreadthInvalidationConditions(payload: V2AiStudyPayload): string[] {
+  const breadth = payload.breadth;
+  if (!breadth?.signal || breadth.signal === "unavailable") return [];
+  const label = breadthSignalLabel(
+    breadth.signal as "strong" | "mixed" | "weak",
+    "available",
+  );
+  if (breadth.signal === "mixed" || breadth.signal === "weak") {
+    return [`breadth weakens from ${label} to Weak with no breadth recovery`];
+  }
+  return [`breadth shifts from ${label} to Mixed or Weak`];
+}
+
+function buildRegimeFallback(payload: V2AiStudyPayload): string {
+  const parts: string[] = [];
+  const macro = payload.macro;
+  if (macro?.label) {
+    const sessionNote = macro.marketSessionDate
+      ? ` · ${macro.marketSessionDate} session`
+      : "";
+    const labelLower = macro.label.toLowerCase();
+    const riskDir =
+      macro.riskDirection &&
+      macro.riskDirection !== "mixed" &&
+      !labelLower.includes(macro.riskDirection)
+        ? ` (${macro.riskDirection} risk)`
+        : macro.riskDirection === "mixed" && !labelLower.includes("mixed")
+          ? " (risk mixed)"
+          : "";
+    parts.push(`${macro.label}${riskDir}${sessionNote}`);
+  }
+  const spy = payload.spyGamma;
+  if (spy?.regime && typeof spy.regime === "string") {
+    parts.push(`SPY ${spy.regime.replaceAll("_", " ")} gamma`);
+  }
+  if (spy?.dealerFlow && typeof spy.dealerFlow === "string") {
+    parts.push(spy.dealerFlow);
+  }
+  if (payload.breadth?.signal && payload.breadth.signal !== "unavailable") {
+    const stale =
+      payload.breadth.stale && payload.breadth.marketSessionDate
+        ? ` · dated ${payload.breadth.marketSessionDate}`
+        : "";
+    parts.push(
+      `SPY breadth ${breadthSignalLabel(
+        payload.breadth.signal as "strong" | "mixed" | "weak",
+        "available",
+      )}${stale}`,
+    );
+  }
+  if (payload.volMispricing?.spySignal) {
+    parts.push(
+      volMispricingSignalLabel(
+        payload.volMispricing.spySignal as "vol_expensive" | "vol_underpriced" | "balanced",
+      ),
+    );
+  }
+  if (payload.ctaProxy?.signal) {
+    parts.push(
+      `CTA proxy ${ctaProxySignalLabel(
+        payload.ctaProxy.signal as CtaProxyTrendSignal,
+        "available",
+      )}`,
+    );
+  }
+  const leader = payload.sectorRotation?.leadingImproving[0];
+  if (leader) {
+    parts.push(`${leader.label} leads 5D RS ${formatRsPct(leader.rs5d)}`);
+  }
+  if (payload.decision?.stance) {
+    parts.push(`stance ${payload.decision.stance}`);
+  }
+  if (payload.dataQuality.limitations.length > 0) {
+    parts.push(`data: ${payload.dataQuality.limitations[0]}`);
+  }
+  return parts.join("; ") || "Connected inputs are partial.";
+}
+
+function buildBaseCaseFallback(payload: V2AiStudyPayload): string {
+  const parts: string[] = [];
+  const limited = payload.dataQuality.interpretationConfidence === "limited";
+  const spy = payload.spyGamma;
+
+  if (payload.decision?.stance) {
+    let line = `Model stance ${payload.decision.stance}`;
+    if (payload.decision.riskScore !== null && payload.decision.riskScore !== undefined) {
+      line += ` · risk ${payload.decision.riskScore}`;
+    }
+    if (payload.decision.exposure) {
+      line += ` · exposure ${payload.decision.exposure.min}–${payload.decision.exposure.max}%`;
+    }
+    parts.push(line);
+  }
+
+  if (spy?.dealerFlow && typeof spy.dealerFlow === "string") {
+    const position = deriveSpyGammaSpotPosition(spy);
+    const flip = position.gammaFlip;
+    if (flip !== null && position.nearFlip) {
+      parts.push(`${spy.dealerFlow} with spot near gamma flip ${flip}`);
+    } else if (flip !== null && position.aboveFlip) {
+      parts.push(`${spy.dealerFlow} with spot above gamma flip ${flip}`);
+    } else if (flip !== null && position.belowFlip) {
+      parts.push(`${spy.dealerFlow} with spot below gamma flip ${flip}`);
+    } else {
+      parts.push(spy.dealerFlow);
+    }
+  } else if (spy?.regime && typeof spy.regime === "string") {
+    parts.push(`SPY ${spy.regime.replaceAll("_", " ")} gamma structure`);
+  }
+
+  if (payload.macro?.label) {
+    parts.push(`macro driver ${payload.macro.label}`);
+  }
+
+  if (limited) {
+    parts.push("interpretation stays conditional given coverage gaps");
+  }
+
+  return parts.join(". ") || "No defensible base case from connected inputs.";
+}
+
+function buildIfThenFallback(payload: V2AiStudyPayload): string {
+  const limited = payload.dataQuality.interpretationConfidence === "limited";
+  const spy = payload.spyGamma;
+  const position = deriveSpyGammaSpotPosition(spy);
+  const paths: string[] = [
+    ...assembleGammaIfThenPaths(position, limited),
+    ...buildBreadthTransitionPaths(payload, limited),
+  ];
+
+  if (
+    payload.eventGate?.state &&
+    payload.eventGate.state !== "clear" &&
+    paths.length < 2
+  ) {
+    const headline = payload.eventGate.headline ?? `event gate ${payload.eventGate.state}`;
+    const may = conditionalPrefix(limited);
+    paths.push(`If ${headline} shifts risk tone → macro mix ${may} change`);
+  }
+  const leader = payload.sectorRotation?.leadingImproving[0];
+  if (leader && paths.length < 2) {
+    paths.push(
+      `If ${leader.label} RS fades from ${formatRsPct(leader.rs5d)} → cyclical leadership may narrow`,
+    );
+  }
+
+  return (
+    paths.slice(0, 2).join(". ") ||
+    "No conditional paths from observable levels in connected inputs."
+  );
+}
+
+function buildInvalidationFallback(payload: V2AiStudyPayload): string {
+  const limited = payload.dataQuality.interpretationConfidence === "limited";
+  const spy = payload.spyGamma;
+  const position = deriveSpyGammaSpotPosition(spy);
+  const conditions: string[] = [
+    ...buildGammaInvalidationConditions(position, limited),
+    ...buildBreadthInvalidationConditions(payload),
+  ];
+
+  if (
+    payload.decision?.riskChange !== null &&
+    payload.decision?.riskChange !== undefined &&
+    payload.decision.riskChange > 0 &&
+    conditions.length < 2
+  ) {
+    conditions.push(
+      `portfolio risk rises further beyond prior +${payload.decision.riskChange}`,
+    );
+  }
+  const weak = payload.sectorRotation?.weakening[0];
+  if (weak && conditions.length < 2) {
+    conditions.push(
+      `${weak.label} RS improves from ${formatRsPct(weak.rs5d)} vs SPY — cyclical weakness ${conditionalPrefix(limited)} clear`,
+    );
+  }
+
+  return (
+    conditions.slice(0, 2).join("; ") ||
+    "No falsifiable invalidation conditions in connected inputs."
+  );
+}
+
+function buildTensionFallback(payload: V2AiStudyPayload): string {
+  const tensions: string[] = [];
+  const spy = payload.spyGamma;
+  const position = deriveSpyGammaSpotPosition(spy);
+
+  if (position.dealerFlowStabilizing && position.belowPutWall && position.putWall !== null) {
+    tensions.push(
+      `stabilizing flow with spot above flip vs spot below put wall ${position.putWall}`,
+    );
+  }
+  if (
+    position.dealerFlowStabilizing &&
+    position.aboveCallWall &&
+    position.callWall !== null
+  ) {
+    tensions.push(
+      `stabilizing / mean-reverting flow vs spot above call wall ${position.callWall} (chase zone)`,
+    );
+  }
+
+  if (
+    spy?.dealerFlow &&
+    typeof spy.dealerFlow === "string" &&
+    payload.breadth?.signal &&
+    payload.breadth.signal !== "unavailable"
+  ) {
+    const stale = payload.breadth.stale ? " (dated breadth)" : "";
+    tensions.push(
+      `${spy.dealerFlow} vs SPY breadth ${breadthSignalLabel(
+        payload.breadth.signal as "strong" | "mixed" | "weak",
+        "available",
+      )}${stale}`,
+    );
+  }
+
+  if (
+    payload.volMispricing?.spySignal === "vol_underpriced" &&
+    spy?.incomplete === true
+  ) {
+    tensions.push("vol underpriced vs incomplete gamma snapshot");
+  } else if (
+    payload.volMispricing?.spySignal === "vol_expensive" &&
+    spy?.regime === "positive"
+  ) {
+    tensions.push("vol expensive vs positive gamma stabilization");
+  }
+
+  if (
+    payload.decision?.riskChange !== null &&
+    payload.decision?.riskChange !== undefined &&
+    payload.decision.riskChange > 0 &&
+    spy?.regime === "positive"
+  ) {
+    tensions.push(`positive gamma vs portfolio risk +${payload.decision.riskChange}`);
+  }
+
+  if (payload.macro?.riskDirection === "mixed" && leaderImproves(payload)) {
+    tensions.push("mixed macro risk vs sector leadership");
+  }
+
+  const leader = payload.sectorRotation?.leadingImproving[0];
+  const weak = payload.sectorRotation?.weakening[0];
+  if (leader && weak && tensions.length < 2) {
+    tensions.push(
+      `${leader.label} leadership vs ${weak.label} weakening on 5D RS`,
+    );
+  }
+
+  return tensions[0] ?? "No major signal disagreement flagged in connected inputs.";
+}
+
+function leaderImproves(payload: V2AiStudyPayload): boolean {
+  return (payload.sectorRotation?.leadingImproving.length ?? 0) > 0;
+}
+
 export function buildV2AiStudyFallback(
   payload: V2AiStudyPayload,
 ): V2AiStudyInterpretation {
-  const setupParts: string[] = [];
-  if (payload.decision?.stance) {
-    setupParts.push(`Model stance: ${payload.decision.stance}.`);
-  }
-  if (payload.decision?.riskScore !== null && payload.decision?.riskScore !== undefined) {
-    setupParts.push(`Portfolio risk ${payload.decision.riskScore}.`);
-  }
-  if (payload.macro?.label) {
-    setupParts.push(`Macro driver: ${payload.macro.label}.`);
-  }
-  if (payload.macro?.interpretation) {
-    setupParts.push(payload.macro.interpretation);
-  } else if (payload.macro?.evidence && payload.macro.evidence.length > 0) {
-    setupParts.push(payload.macro.evidence.slice(0, 2).join(" "));
-  }
-  const spyGamma = payload.spyGamma;
-  if (spyGamma?.dealerFlow && typeof spyGamma.dealerFlow === "string") {
-    setupParts.push(`SPY dealer flow: ${spyGamma.dealerFlow}.`);
-  }
+  const dataQuality = payload.dataQuality;
 
-  let keyUpsideTrigger = "No clear upside trigger in connected inputs.";
-  const topLeader = payload.sectorRotation?.leadingImproving[0];
-  if (topLeader) {
-    keyUpsideTrigger = `${topLeader.label} leads on 5D RS ${formatRsPct(topLeader.rs5d)} vs SPY.`;
-  } else if (payload.breadth?.signal === "strong") {
-    keyUpsideTrigger = `SPY breadth signal ${payload.breadth.signal} supports broad participation.`;
-  } else if (payload.ctaProxy?.signal === "buying") {
-    keyUpsideTrigger = `CTA proxy ${ctaProxySignalLabel(payload.ctaProxy.signal as CtaProxyTrendSignal, "available")} aligns with trend support.`;
-  }
-
-  let keyDownsideTrigger = "No explicit downside trigger in connected inputs.";
-  if (payload.eventGate?.state && payload.eventGate.state !== "clear") {
-    keyDownsideTrigger =
-      payload.eventGate.headline ??
-      `Event gate ${payload.eventGate.state} — monitor catalyst window.`;
-  } else if (payload.sectorRotation?.weakening[0]) {
-    const weak = payload.sectorRotation.weakening[0];
-    keyDownsideTrigger = `${weak.label} weak on 5D RS ${formatRsPct(weak.rs5d)} vs SPY.`;
-  } else if (
-    payload.decision?.riskScore !== null &&
-    payload.decision?.riskScore !== undefined &&
-    payload.decision.riskScore >= 66
-  ) {
-    keyDownsideTrigger = `Elevated portfolio risk score ${payload.decision.riskScore}.`;
-  }
-
-  let mainSupportingSignal = "Limited aligned signals in connected inputs.";
-  if (payload.breadth?.signal && payload.breadth.signal !== "unavailable") {
-    const ma20 =
-      payload.breadth.percentAboveMa20 !== null
-        ? `${payload.breadth.percentAboveMa20}% > MA20`
-        : "breadth available";
-    mainSupportingSignal = `SPY breadth ${breadthSignalLabel(payload.breadth.signal as "strong" | "mixed" | "weak", "available")} (${ma20}).`;
-  } else if (payload.ctaProxy?.signal) {
-    mainSupportingSignal = `CTA proxy ${ctaProxySignalLabel(payload.ctaProxy.signal as CtaProxyTrendSignal, "available")}${payload.ctaProxy.context ? `: ${payload.ctaProxy.context}` : ""}`;
-  } else if (spyGamma?.regime && typeof spyGamma.regime === "string") {
-    mainSupportingSignal = `SPY gamma regime ${spyGamma.regime.replaceAll("_", " ")}.`;
-  }
-
-  let mainConflictingSignal = "No major conflicting signal flagged in connected inputs.";
-  if (payload.volMispricing?.spySignal === "vol_expensive") {
-    mainConflictingSignal = `Vol mispricing: ${volMispricingSignalLabel("vol_expensive")} (IV−HV ${formatIvHvSpreadVolPts(payload.volMispricing.ivMinusHvVolPts)}).`;
-  } else if (
-    payload.decision?.riskChange !== null &&
-    payload.decision?.riskChange !== undefined &&
-    payload.decision.riskChange > 0
-  ) {
-    mainConflictingSignal = `Portfolio risk rose ${payload.decision.riskChange} vs prior publication.`;
-  } else if (
-    spyGamma?.regime &&
-    typeof spyGamma.regime === "string" &&
-    spyGamma.regime.includes("negative")
-  ) {
-    mainConflictingSignal = `SPY ${spyGamma.regime.replaceAll("_", " ")} — downside moves may amplify.`;
-  }
-
-  return {
-    status: "fallback",
-    source: "deterministic",
-    marketSetup: setupParts.join(" ") || "Command Center inputs are partial.",
-    keyUpsideTrigger,
-    keyDownsideTrigger,
-    mainSupportingSignal,
-    mainConflictingSignal,
-    missingReason: null,
-  };
+  return withInterpretationMeta(
+    {
+      status: "fallback",
+      source: "deterministic",
+      regime: buildRegimeFallback(payload),
+      baseCase: buildBaseCaseFallback(payload),
+      ifThen: buildIfThenFallback(payload),
+      invalidation: buildInvalidationFallback(payload),
+      tension: buildTensionFallback(payload),
+      missingReason: null,
+    },
+    dataQuality,
+  );
 }
 
 export function previewV2AiStudyInterpretation(): V2AiStudyInterpretation {
   return {
     status: "preview",
     source: "preview",
-    marketSetup:
-      "Illustrative hold stance with moderate risk; macro and structure inputs are methodology preview only.",
-    keyUpsideTrigger:
-      "Illustrative XLK · Technology leadership on positive 5D relative strength vs SPY.",
-    keyDownsideTrigger:
-      "Illustrative defensive sector weakness; not live market data.",
-    mainSupportingSignal:
-      "Illustrative improving SPY breadth participation in the preview payload.",
-    mainConflictingSignal:
-      "Illustrative vol expensive signal — options rich vs realized vol in preview.",
+    confidence: "moderate",
+    dataLimitations: [],
+    regime:
+      "Illustrative growth-led macro (risk mixed) with positive SPY gamma and stabilizing dealer flow; breadth mixed in preview.",
+    baseCase:
+      "Illustrative hold stance with moderate risk; structure favors mean-reversion near flip — preview payload only.",
+    ifThen:
+      "If SPY loses illustrative gamma flip → vol expansion risk rises. If XLK leadership fades → cyclical bid may narrow.",
+    invalidation:
+      "SPY sustained below illustrative put wall; breadth shifts to strong participation.",
+    tension:
+      "Illustrative stabilizing dealer flow vs mixed breadth; vol expensive vs positive gamma in preview.",
     missingReason: null,
   };
 }
 
 function interpretationFromLlmOutput(
   parsed: z.infer<typeof V2AiStudyLlmOutputSchema>,
+  dataQuality: V2AiStudyPayload["dataQuality"],
 ): V2AiStudyInterpretation {
-  return {
-    status: "ready",
-    source: "openai",
-    marketSetup: parsed.market_setup.trim(),
-    keyUpsideTrigger: parsed.key_upside_trigger.trim(),
-    keyDownsideTrigger: parsed.key_downside_trigger.trim(),
-    mainSupportingSignal: parsed.main_supporting_signal.trim(),
-    mainConflictingSignal: parsed.main_conflicting_signal.trim(),
-    missingReason: null,
-  };
+  return withInterpretationMeta(
+    {
+      status: "ready",
+      source: "openai",
+      regime: parsed.regime.trim(),
+      baseCase: parsed.base_case.trim(),
+      ifThen: parsed.if_then.trim(),
+      invalidation: parsed.invalidation.trim(),
+      tension: parsed.tension.trim(),
+      missingReason: null,
+    },
+    dataQuality,
+  );
 }
 
 function conciseOpenAiErrorMessage(status: number, rawText: string): string {
@@ -565,6 +1302,7 @@ export async function generateV2CommandAiStudyInterpretation(input: {
   readonly apiUrl?: string;
   readonly env?: NodeJS.ProcessEnv;
 }): Promise<V2AiStudyInterpretation> {
+  const dataQuality = input.payload.dataQuality;
   const fallback = buildV2AiStudyFallback(input.payload);
   const env = input.env ?? process.env;
   const modelSource = describeAiStudyLlmModelSource(env);
@@ -635,7 +1373,12 @@ export async function generateV2CommandAiStudyInterpretation(input: {
         lastError = `Model output schema invalid: ${parsed.error.issues[0]?.message ?? "schema"}`;
         continue;
       }
-      return interpretationFromLlmOutput(parsed.data);
+      const grounding = validateV2AiStudyLlmGrounding(parsed.data, input.payload);
+      if (!grounding.ok) {
+        lastError = `Grounding failed: ${grounding.reason}`;
+        continue;
+      }
+      return interpretationFromLlmOutput(parsed.data, dataQuality);
     } catch (error: unknown) {
       if (error instanceof Error && error.name === "AbortError") {
         lastError = "OpenAI request timed out";

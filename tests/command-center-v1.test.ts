@@ -11,15 +11,15 @@ import {
   maybePersistCommandCenterV1Daily,
   persistCommandCenterV1Daily,
 } from "@/desk/command-center-v1";
-import { buildV2CommandCenterView } from "@/desk/v2-command-center";
+import { buildV2CommandCenterView, type V2CommandCenterView } from "@/desk/v2-command-center";
 import { loadBoundedGammaDeskView } from "@/desk";
 
 describe("command center v1 daily snapshot", () => {
-  it("persists immutable daily snapshots", () => {
+  it("persists immutable daily snapshots", async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "cc-v1-"));
     try {
       const spy = loadBoundedGammaDeskView({ forceFixture: true });
-      const view = buildV2CommandCenterView({
+      const view = await buildV2CommandCenterView({
         driver: null,
         spyGamma: spy,
         qqqGamma: unavailable("QQQ"),
@@ -55,13 +55,13 @@ describe("command center v1 snapshot timing", () => {
   const laterLoad = easternWallToUtc(sessionDate, 14, 30, 0);
   const afterClose = easternWallToUtc(sessionDate, 17, 0, 0);
 
-  it("first eligible regular-session load writes snapshot", () => {
+  it("first eligible regular-session load writes snapshot", async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "cc-v1-timing-"));
     try {
-      const view = readyView(openLoad, sessionDate, 47);
+      const view = await readyView(openLoad, sessionDate, 47);
       expect(isCommandCenterV1SnapshotEligibleNow(openLoad)).toBe(true);
       expect(
-        maybePersistCommandCenterV1Daily({
+        await maybePersistCommandCenterV1Daily({
           dataRoot,
           view,
           generatedAt: openLoad.toISOString(),
@@ -74,20 +74,20 @@ describe("command center v1 snapshot timing", () => {
     }
   });
 
-  it("later intraday load does not overwrite snapshot", () => {
+  it("later intraday load does not overwrite snapshot", async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "cc-v1-nooverwrite-"));
     try {
-      const firstView = readyView(openLoad, sessionDate, 47);
-      maybePersistCommandCenterV1Daily({
+      const firstView = await readyView(openLoad, sessionDate, 47);
+      await maybePersistCommandCenterV1Daily({
         dataRoot,
         view: firstView,
         generatedAt: openLoad.toISOString(),
         now: openLoad,
       });
 
-      const laterView = readyView(laterLoad, sessionDate, 62);
+      const laterView = await readyView(laterLoad, sessionDate, 62);
       expect(
-        maybePersistCommandCenterV1Daily({
+        await maybePersistCommandCenterV1Daily({
           dataRoot,
           view: laterView,
           generatedAt: laterLoad.toISOString(),
@@ -100,13 +100,13 @@ describe("command center v1 snapshot timing", () => {
     }
   });
 
-  it("after-close first load does not create snapshot", () => {
+  it("after-close first load does not create snapshot", async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "cc-v1-afterclose-"));
     try {
-      const view = readyView(afterClose, sessionDate, 47);
+      const view = await readyView(afterClose, sessionDate, 47);
       expect(isCommandCenterV1SnapshotEligibleNow(afterClose)).toBe(false);
       expect(
-        maybePersistCommandCenterV1Daily({
+        await maybePersistCommandCenterV1Daily({
           dataRoot,
           view,
           generatedAt: afterClose.toISOString(),
@@ -115,7 +115,7 @@ describe("command center v1 snapshot timing", () => {
       ).toBe(false);
       expect(loadCommandCenterV1Daily(dataRoot, sessionDate)).toBeNull();
 
-      const review = buildV2DailyReview({
+      const review = await buildV2DailyReview({
         now: afterClose,
         demo: false,
         dataRoot,
@@ -127,20 +127,20 @@ describe("command center v1 snapshot timing", () => {
     }
   });
 
-  it("force flag still overwrites snapshot for development", () => {
+  it("force flag still overwrites snapshot for development", async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "cc-v1-force-"));
     try {
-      const firstView = readyView(openLoad, sessionDate, 47);
-      maybePersistCommandCenterV1Daily({
+      const firstView = await readyView(openLoad, sessionDate, 47);
+      await maybePersistCommandCenterV1Daily({
         dataRoot,
         view: firstView,
         generatedAt: openLoad.toISOString(),
         now: openLoad,
       });
 
-      const forcedView = readyView(afterClose, sessionDate, 72);
+      const forcedView = await readyView(afterClose, sessionDate, 72);
       expect(
-        maybePersistCommandCenterV1Daily({
+        await maybePersistCommandCenterV1Daily({
           dataRoot,
           view: forcedView,
           generatedAt: afterClose.toISOString(),
@@ -156,9 +156,9 @@ describe("command center v1 snapshot timing", () => {
 });
 
 describe("v2 daily review", () => {
-  it("returns pending before regular session close", () => {
+  it("returns pending before regular session close", async () => {
     const duringSession = easternWallToUtc("2026-08-12", 14, 0, 0);
-    const review = buildV2DailyReview({
+    const review = await buildV2DailyReview({
       now: duringSession,
       demo: false,
       dataRoot: "data",
@@ -167,13 +167,13 @@ describe("v2 daily review", () => {
     expect(review.sessionDate).toBeTruthy();
   });
 
-  it("evaluates session outcomes after close from snapshot and Alpaca bars", () => {
+  it("evaluates session outcomes after close from snapshot and Alpaca bars", async () => {
     const dataRoot = mkdtempSync(join(tmpdir(), "cc-review-"));
     const sessionDate = "2026-08-12";
     const afterClose = easternWallToUtc(sessionDate, 17, 0, 0);
     try {
       const spy = loadBoundedGammaDeskView({ forceFixture: true });
-      const view = buildV2CommandCenterView({
+      const view = await buildV2CommandCenterView({
         driver: null,
         spyGamma: spy,
         qqqGamma: unavailable("QQQ"),
@@ -241,7 +241,7 @@ describe("v2 daily review", () => {
         ],
       ]);
 
-      const review = buildV2DailyReview({
+      const review = await buildV2DailyReview({
         now: afterClose,
         demo: false,
         dataRoot,
@@ -271,13 +271,13 @@ function unavailable(symbol: "SPY" | "QQQ") {
   };
 }
 
-function readyView(
+async function readyView(
   now: Date,
   sessionDate: string,
   riskScore: number,
-): ReturnType<typeof buildV2CommandCenterView> {
+): Promise<V2CommandCenterView> {
   const spy = loadBoundedGammaDeskView({ forceFixture: true });
-  const view = buildV2CommandCenterView({
+  const view = await buildV2CommandCenterView({
     driver: null,
     spyGamma: spy,
     qqqGamma: unavailable("QQQ"),

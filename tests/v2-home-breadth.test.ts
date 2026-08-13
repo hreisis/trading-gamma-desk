@@ -249,8 +249,8 @@ describe("deriveBreadthActionableSignal", () => {
 });
 
 describe("buildV2CommandCenterView breadth missing list", () => {
-  it("does not hardcode SPY breadth as a static missing input", () => {
-    const view = buildV2CommandCenterView({
+  it("does not hardcode SPY breadth as a static missing input", async () => {
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: loadBoundedGammaDeskView({ forceFixture: true }),
       qqqGamma: loadBoundedGammaDeskView({ symbol: "QQQ", publicDemo: true }),

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
+import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
 import { RegimeSignatureConfig } from "@/contracts";
 import { lookbackStart } from "./dates";
 import { fetchTreasuryYields } from "./treasury";
@@ -44,6 +45,14 @@ function loadSignature(path: string): RegimeSignatureConfig {
 }
 
 /**
+ * Macro ingest should not treat the in-progress UTC calendar day as a completed
+ * US equity session before the regular close.
+ */
+export function resolveMacroIngestEndDate(now = new Date()): string {
+  return resolveLastCompletedMarketSessionDate(now);
+}
+
+/**
  * Pull every M1 source, persist raw bars, assemble features + classification,
  * and write an immutable compute snapshot. Network IO is confined here; the
  * rest of the pipeline stays pure.
@@ -51,7 +60,7 @@ function loadSignature(path: string): RegimeSignatureConfig {
 export async function runMacroIngest(
   options: IngestRunOptions = {},
 ): Promise<IngestRunResult> {
-  const endDate = options.endDate ?? new Date().toISOString().slice(0, 10);
+  const endDate = options.endDate ?? resolveMacroIngestEndDate();
   const lookbackDays = options.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
   const startDate = lookbackStart(endDate, lookbackDays);
   const dataRoot = options.dataRoot ?? DEFAULT_DATA_ROOT;
@@ -97,7 +106,9 @@ export async function runMacroIngest(
   });
   barPaths.push(writeSpyBars(spy, dataRoot));
 
-  const snapshot = assembleSnapshot(seriesList, config);
+  const snapshot = assembleSnapshot(seriesList, config, {
+    marketSessionDate: endDate,
+  });
   const path = snapshotPath(dataRoot, snapshot.marketSessionDate);
   if (options.force && existsSync(path)) {
     rmSync(path);

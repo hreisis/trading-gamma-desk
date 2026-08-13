@@ -1,7 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { DailyBar } from "./breadth/bars/types";
 import { writeJsonAtomic } from "./atomic-write";
+import type { DailyBar } from "./breadth/bars/types";
+import {
+  artifactSourceLabel,
+  readJson,
+  writeJson,
+  type RuntimeJsonStore,
+} from "./runtime-store";
 import {
   formatGexCompact,
   remainingRegularSessionFraction,
@@ -11,6 +17,7 @@ import type {
   V2CommandCenterView,
   V2GammaSummary,
   V2SectorRotationRow,
+  V2AiStudyConfidence,
 } from "./v2-command-center";
 import { formatSectorEtfLabel } from "./v2-command-center";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
@@ -78,15 +85,44 @@ export interface CommandCenterV1DailySnapshot {
 
 export type V2DailyReviewStatus = "ready" | "pending" | "unavailable";
 
+export type V2DailyReviewSource = "openai" | "deterministic" | "unavailable";
+
+export type V2DailyReviewErrorSource = "data" | "model" | "regime" | "none";
+
 export interface V2DailyReview {
   readonly status: V2DailyReviewStatus;
+  readonly source: V2DailyReviewSource;
+  readonly confidence: V2AiStudyConfidence;
+  readonly dataLimitations: readonly string[];
   readonly sessionDate: string | null;
   readonly morningStance: string | null;
   readonly actualOutcome: string;
   readonly whatWorked: readonly string[];
   readonly whatFailed: readonly string[];
+  readonly errorSource: V2DailyReviewErrorSource;
+  readonly errorExplanation: string;
   readonly tomorrowWatch: readonly string[];
   readonly missingReason: string | null;
+}
+
+export interface V2DailyReviewSessionEval {
+  readonly summary: string;
+  readonly worked: string[];
+  readonly failed: string[];
+  readonly watch: string[];
+  readonly callWallTouched: boolean | null;
+  readonly putWallTouched: boolean | null;
+  readonly flipTouched: boolean | null;
+  readonly rodInside: boolean | null;
+  readonly direction: "up" | "down" | "flat" | null;
+}
+
+export interface V2DailyReviewInterpretationContext {
+  readonly morningSnapshot: CommandCenterV1DailySnapshot;
+  readonly spyBar: DailyBar;
+  readonly qqqBar: DailyBar | null;
+  readonly spyEval: V2DailyReviewSessionEval;
+  readonly qqqEval: V2DailyReviewSessionEval;
 }
 
 function gammaSnapshotFromSummary(item: V2GammaSummary): CommandCenterV1GammaSnapshot {
@@ -160,6 +196,10 @@ export function commandCenterV1LatestPath(dataRoot: string): string {
   return join(dataRoot, "command-center-v1", "latest.json");
 }
 
+export function commandCenterV1DailyRelativePath(sessionDate: string): string {
+  return `command-center-v1/${sessionDate}.json`;
+}
+
 export function loadCommandCenterV1Daily(
   dataRoot: string,
   sessionDate: string,
@@ -172,6 +212,27 @@ export function loadCommandCenterV1Daily(
       return null;
     }
     return raw;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadCommandCenterV1DailyAsync(
+  artifactStore: RuntimeJsonStore,
+  sessionDate: string,
+): Promise<CommandCenterV1DailySnapshot | null> {
+  const relativePath = commandCenterV1DailyRelativePath(sessionDate);
+  const raw = await readJson(artifactStore, relativePath);
+  if (raw === null) return null;
+  try {
+    const snapshot = raw as CommandCenterV1DailySnapshot;
+    if (
+      snapshot.sessionDate !== sessionDate ||
+      snapshot.schemaVersion !== COMMAND_CENTER_V1_SCHEMA_VERSION
+    ) {
+      return null;
+    }
+    return snapshot;
   } catch {
     return null;
   }
@@ -192,6 +253,29 @@ export function persistCommandCenterV1Daily(
   if (existsSync(path) && options.force !== true) return false;
   writeJsonAtomic(path, snapshot);
   writeJsonAtomic(commandCenterV1LatestPath(dataRoot), snapshot);
+  return true;
+}
+
+export async function persistCommandCenterV1DailyAsync(
+  artifactStore: RuntimeJsonStore,
+  snapshot: CommandCenterV1DailySnapshot,
+  options: { readonly force?: boolean } = {},
+): Promise<boolean> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshot.sessionDate)) return false;
+  const relativePath = commandCenterV1DailyRelativePath(snapshot.sessionDate);
+  if (
+    (await artifactStore.exists(relativePath)) &&
+    options.force !== true
+  ) {
+    return false;
+  }
+  const wrote = await writeJson(artifactStore, relativePath, snapshot, {
+    allowOverwrite: options.force === true,
+  });
+  if (!wrote && options.force !== true) return false;
+  await writeJson(artifactStore, "command-center-v1/latest.json", snapshot, {
+    allowOverwrite: true,
+  });
   return true;
 }
 
@@ -266,12 +350,7 @@ function evaluateSymbolSession(
   label: string,
   snapshot: CommandCenterV1GammaSnapshot,
   bar: DailyBar | null,
-): {
-  readonly summary: string;
-  readonly worked: string[];
-  readonly failed: string[];
-  readonly watch: string[];
-} {
+): V2DailyReviewSessionEval {
   const worked: string[] = [];
   const failed: string[] = [];
   const watch: string[] = [];
@@ -282,6 +361,11 @@ function evaluateSymbolSession(
       worked,
       failed,
       watch,
+      callWallTouched: null,
+      putWallTouched: null,
+      flipTouched: null,
+      rodInside: null,
+      direction: null,
     };
   }
 
@@ -296,6 +380,7 @@ function evaluateSymbolSession(
   const putTouched = levelTouched(bar.high, bar.low, snapshot.putWall);
   const flipTouched = levelTouched(bar.high, bar.low, snapshot.gammaFlip);
   const insideRod = rodInside(bar.close, snapshot.restOfDayRange);
+  const direction = sessionDirection(bar.close, bar.open);
 
   if (callTouched === true) {
     failed.push(`${label} call wall ${snapshot.callWall} was touched intraday`);
@@ -315,25 +400,59 @@ function evaluateSymbolSession(
     watch.push(`${label} close outside ROD — reassess range at the open`);
   }
 
-  return { summary, worked, failed, watch };
+  return {
+    summary,
+    worked,
+    failed,
+    watch,
+    callWallTouched: callTouched,
+    putWallTouched: putTouched,
+    flipTouched: flipTouched,
+    rodInside: insideRod,
+    direction,
+  };
 }
 
-export function buildV2DailyReview(input: {
+function emptyDailyReview(
+  status: V2DailyReviewStatus,
+  fields: Omit<
+    V2DailyReview,
+    "status" | "source" | "confidence" | "dataLimitations" | "errorSource" | "errorExplanation"
+  >,
+): V2DailyReview {
+  return {
+    status,
+    source: status === "unavailable" ? "unavailable" : "deterministic",
+    confidence: "limited",
+    dataLimitations: [],
+    errorSource: "none",
+    errorExplanation: "",
+    ...fields,
+  };
+}
+
+export async function buildDeterministicV2DailyReview(input: {
   readonly now: Date;
   readonly demo: boolean;
   readonly dataRoot: string | null | undefined;
+  readonly artifactStore?: RuntimeJsonStore;
   readonly equityBarsBySymbol?: ReadonlyMap<string, readonly DailyBar[]>;
-}): V2DailyReview {
+}): Promise<{
+  readonly review: V2DailyReview;
+  readonly context: V2DailyReviewInterpretationContext | null;
+}> {
   if (input.demo) {
     return {
-      status: "unavailable",
-      sessionDate: null,
-      morningStance: null,
-      actualOutcome: "Daily review is not computed on the public demo path.",
-      whatWorked: [],
-      whatFailed: [],
-      tomorrowWatch: [],
-      missingReason: "Methodology preview only",
+      review: emptyDailyReview("unavailable", {
+        sessionDate: null,
+        morningStance: null,
+        actualOutcome: "Daily review is not computed on the public demo path.",
+        whatWorked: [],
+        whatFailed: [],
+        tomorrowWatch: [],
+        missingReason: "Methodology preview only",
+      }),
+      context: null,
     };
   }
 
@@ -342,42 +461,54 @@ export function buildV2DailyReview(input: {
 
   if (remaining !== null && remaining > 0) {
     return {
-      status: "pending",
-      sessionDate: reviewSessionDate,
-      morningStance: null,
-      actualOutcome: "Review will run after the regular session close.",
-      whatWorked: [],
-      whatFailed: [],
-      tomorrowWatch: [],
-      missingReason: null,
+      review: emptyDailyReview("pending", {
+        sessionDate: reviewSessionDate,
+        morningStance: null,
+        actualOutcome: "Review will run after the regular session close.",
+        whatWorked: [],
+        whatFailed: [],
+        tomorrowWatch: [],
+        missingReason: null,
+      }),
+      context: null,
     };
   }
 
   const dataRoot = input.dataRoot;
   if (!dataRoot) {
     return {
-      status: "unavailable",
-      sessionDate: reviewSessionDate,
-      morningStance: null,
-      actualOutcome: "Daily review unavailable.",
-      whatWorked: [],
-      whatFailed: [],
-      tomorrowWatch: [],
-      missingReason: "Data root not configured.",
+      review: emptyDailyReview("unavailable", {
+        sessionDate: reviewSessionDate,
+        morningStance: null,
+        actualOutcome: "Daily review unavailable.",
+        whatWorked: [],
+        whatFailed: [],
+        tomorrowWatch: [],
+        missingReason: "Data root not configured.",
+      }),
+      context: null,
     };
   }
 
-  const snapshot = loadCommandCenterV1Daily(dataRoot, reviewSessionDate);
-  if (!snapshot) {
+  const snapshot = input.dataRoot
+    ? loadCommandCenterV1Daily(dataRoot, reviewSessionDate)
+    : null;
+  const snapshotFromStore = input.artifactStore
+    ? await loadCommandCenterV1DailyAsync(input.artifactStore, reviewSessionDate)
+    : null;
+  const resolvedSnapshot = snapshotFromStore ?? snapshot;
+  if (!resolvedSnapshot) {
     return {
-      status: "unavailable",
-      sessionDate: reviewSessionDate,
-      morningStance: null,
-      actualOutcome: "No published command center snapshot for this session.",
-      whatWorked: [],
-      whatFailed: [],
-      tomorrowWatch: [],
-      missingReason: `No intraday command center snapshot was published during the regular session on ${reviewSessionDate}.`,
+      review: emptyDailyReview("unavailable", {
+        sessionDate: reviewSessionDate,
+        morningStance: null,
+        actualOutcome: "No published command center snapshot for this session.",
+        whatWorked: [],
+        whatFailed: [],
+        tomorrowWatch: [],
+        missingReason: `No intraday command center snapshot was published during the regular session on ${reviewSessionDate}.`,
+      }),
+      context: null,
     };
   }
 
@@ -386,81 +517,83 @@ export function buildV2DailyReview(input: {
 
   if (!spyBar) {
     return {
-      status: "unavailable",
-      sessionDate: reviewSessionDate,
-      morningStance: buildMorningStance(snapshot),
-      actualOutcome: "Session outcome unavailable — SPY daily bar missing.",
-      whatWorked: [],
-      whatFailed: [],
-      tomorrowWatch: [],
-      missingReason: `Alpaca daily bar unavailable for SPY on ${reviewSessionDate}.`,
+      review: emptyDailyReview("unavailable", {
+        sessionDate: reviewSessionDate,
+        morningStance: buildMorningStance(resolvedSnapshot),
+        actualOutcome: "Session outcome unavailable — SPY daily bar missing.",
+        whatWorked: [],
+        whatFailed: [],
+        tomorrowWatch: [],
+        missingReason: `Alpaca daily bar unavailable for SPY on ${reviewSessionDate}.`,
+      }),
+      context: null,
     };
   }
 
-  const spyEval = evaluateSymbolSession("SPY", snapshot.spy, spyBar);
-  const qqqEval = evaluateSymbolSession("QQQ", snapshot.qqq, qqqBar);
+  const spyEval = evaluateSymbolSession("SPY", resolvedSnapshot.spy, spyBar);
+  const qqqEval = evaluateSymbolSession("QQQ", resolvedSnapshot.qqq, qqqBar);
   const worked = [...spyEval.worked, ...qqqEval.worked];
   const failed = [...spyEval.failed, ...qqqEval.failed];
   const watch = [...spyEval.watch, ...qqqEval.watch];
 
-  const spyDir = sessionDirection(spyBar.close, spyBar.open);
-  if (snapshot.stance === "buy" && spyDir === "up") {
+  const spyDir = spyEval.direction ?? sessionDirection(spyBar.close, spyBar.open);
+  if (resolvedSnapshot.stance === "buy" && spyDir === "up") {
     worked.push("Buy stance aligned with a positive SPY session");
-  } else if (snapshot.stance === "buy" && spyDir === "down") {
+  } else if (resolvedSnapshot.stance === "buy" && spyDir === "down") {
     failed.push("Buy stance conflicted with a negative SPY session");
-  } else if (snapshot.stance === "reduce" && spyDir === "down") {
+  } else if (resolvedSnapshot.stance === "reduce" && spyDir === "down") {
     worked.push("Reduce stance aligned with a weaker SPY session");
-  } else if (snapshot.stance === "reduce" && spyDir === "up") {
+  } else if (resolvedSnapshot.stance === "reduce" && spyDir === "up") {
     failed.push("Reduce stance conflicted with a positive SPY session");
   }
 
   if (
-    snapshot.breadth.signalStatus === "available" &&
-    snapshot.breadth.signal
+    resolvedSnapshot.breadth.signalStatus === "available" &&
+    resolvedSnapshot.breadth.signal
   ) {
-    if (snapshot.breadth.signal === "strong" && spyDir === "up") {
+    if (resolvedSnapshot.breadth.signal === "strong" && spyDir === "up") {
       worked.push("SPY breadth strength aligned with the session outcome");
-    } else if (snapshot.breadth.signal === "weak" && spyDir === "down") {
+    } else if (resolvedSnapshot.breadth.signal === "weak" && spyDir === "down") {
       worked.push("Weak breadth aligned with the weaker session outcome");
     } else if (
-      (snapshot.breadth.signal === "strong" && spyDir === "down") ||
-      (snapshot.breadth.signal === "weak" && spyDir === "up")
+      (resolvedSnapshot.breadth.signal === "strong" && spyDir === "down") ||
+      (resolvedSnapshot.breadth.signal === "weak" && spyDir === "up")
     ) {
       failed.push("Breadth signal conflicted with SPY session direction");
     }
   }
 
-  if (snapshot.ctaProxy.signal) {
-    if (snapshot.ctaProxy.signal === "buying" && spyDir === "up") {
+  if (resolvedSnapshot.ctaProxy.signal) {
+    if (resolvedSnapshot.ctaProxy.signal === "buying" && spyDir === "up") {
       worked.push("CTA proxy buying aligned with the SPY session");
-    } else if (snapshot.ctaProxy.signal === "selling" && spyDir === "down") {
+    } else if (resolvedSnapshot.ctaProxy.signal === "selling" && spyDir === "down") {
       worked.push("CTA proxy selling aligned with the SPY session");
     } else if (
-      (snapshot.ctaProxy.signal === "buying" && spyDir === "down") ||
-      (snapshot.ctaProxy.signal === "selling" && spyDir === "up")
+      (resolvedSnapshot.ctaProxy.signal === "buying" && spyDir === "down") ||
+      (resolvedSnapshot.ctaProxy.signal === "selling" && spyDir === "up")
     ) {
       failed.push("CTA proxy conflicted with SPY session direction");
     }
   }
 
-  if (snapshot.sectorRotation.leadingImproving.length > 0 && spyDir === "up") {
+  if (resolvedSnapshot.sectorRotation.leadingImproving.length > 0 && spyDir === "up") {
     worked.push(
-      `Leadership held in ${snapshot.sectorRotation.leadingImproving
+      `Leadership held in ${resolvedSnapshot.sectorRotation.leadingImproving
         .slice(0, 2)
         .map((row) => row.label)
         .join(", ")}`,
     );
   }
-  if (snapshot.sectorRotation.weakening.length > 0 && spyDir === "down") {
+  if (resolvedSnapshot.sectorRotation.weakening.length > 0 && spyDir === "down") {
     worked.push(
-      `Weakness showed in ${snapshot.sectorRotation.weakening
+      `Weakness showed in ${resolvedSnapshot.sectorRotation.weakening
         .slice(0, 2)
         .map((row) => row.label)
         .join(", ")}`,
     );
   }
 
-  if (snapshot.volMispricing.signal === "vol_expensive" && spyDir === "down") {
+  if (resolvedSnapshot.volMispricing.signal === "vol_expensive" && spyDir === "down") {
     worked.push("Vol expensive signal aligned with a softer session");
   }
 
@@ -473,32 +606,71 @@ export function buildV2DailyReview(input: {
           "Re-check SPY/QQQ structure levels and dealer flow at the open.",
         ];
 
-  return {
+  const review: V2DailyReview = {
     status: "ready",
+    source: "deterministic",
+    confidence: "moderate",
+    dataLimitations: [],
     sessionDate: reviewSessionDate,
-    morningStance: buildMorningStance(snapshot),
+    morningStance: buildMorningStance(resolvedSnapshot),
     actualOutcome,
     whatWorked: worked.slice(0, 4),
     whatFailed: failed.slice(0, 4),
+    errorSource: "none",
+    errorExplanation: "",
     tomorrowWatch,
     missingReason: null,
   };
+
+  return {
+    review,
+    context: {
+      morningSnapshot: resolvedSnapshot,
+      spyBar,
+      qqqBar,
+      spyEval,
+      qqqEval,
+    },
+  };
 }
 
-export function maybePersistCommandCenterV1Daily(input: {
+export async function buildV2DailyReview(input: {
+  readonly now: Date;
+  readonly demo: boolean;
   readonly dataRoot: string | null | undefined;
+  readonly artifactStore?: RuntimeJsonStore;
+  readonly equityBarsBySymbol?: ReadonlyMap<string, readonly DailyBar[]>;
+}): Promise<V2DailyReview> {
+  const { review } = await buildDeterministicV2DailyReview(input);
+  return review;
+}
+
+export async function maybePersistCommandCenterV1Daily(input: {
+  readonly dataRoot: string | null | undefined;
+  readonly artifactStore?: RuntimeJsonStore;
   readonly view: V2CommandCenterView;
   readonly generatedAt: string;
   readonly now?: Date;
   readonly force?: boolean;
-}): boolean {
+}): Promise<boolean> {
   const now = input.now ?? new Date(input.generatedAt);
   if (!input.force && !isCommandCenterV1SnapshotEligibleNow(now)) {
     return false;
   }
 
   const snapshot = buildCommandCenterV1SnapshotFromView(input.view, input.generatedAt);
-  if (!snapshot || !input.dataRoot) return false;
+  if (!snapshot) return false;
+
+  const artifactStore = input.artifactStore;
+  if (artifactStore) {
+    const persisted = await persistCommandCenterV1DailyAsync(artifactStore, snapshot, {
+      force: input.force === true,
+    });
+    if (persisted) return true;
+    if (!input.dataRoot) return false;
+  }
+
+  if (!input.dataRoot) return false;
   return persistCommandCenterV1Daily(input.dataRoot, snapshot, {
     force: input.force === true,
   });

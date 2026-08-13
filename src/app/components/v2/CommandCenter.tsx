@@ -38,11 +38,16 @@ const copy = {
     rs5d: "5D RS",
     study: "AI Study",
     studyNote: "AI interpretation of existing model outputs — not a separate signal engine.",
-    marketSetup: "Market setup",
-    keyUpside: "Key upside trigger",
-    keyDownside: "Key downside trigger",
-    mainSupporting: "Main supporting signal",
-    mainConflicting: "Main conflicting signal",
+    studyConfidence: "Interpretation confidence",
+    studyConfidenceHigh: "High",
+    studyConfidenceModerate: "Moderate",
+    studyConfidenceLimited: "Limited",
+    dataLimitations: "Data limitations",
+    regime: "Regime",
+    baseCase: "Base case",
+    ifThen: "If / then",
+    invalidation: "Invalidation",
+    tension: "Tension",
     deterministicFallback: "Deterministic fallback",
     review: "Daily Review",
     reviewNote: "End-of-day comparison of the published command center snapshot vs session outcomes.",
@@ -51,7 +56,9 @@ const copy = {
     actualOutcome: "Actual outcome",
     whatWorked: "What worked",
     whatFailed: "What failed",
+    errorSource: "Error source",
     tomorrowWatch: "Tomorrow watch",
+    reviewConfidence: "Critique confidence",
     reviewPending: "Pending",
     preview: "Illustrative methodology preview · synthetic decision values",
     liveReady: "Live decision from connected inputs · review evidence and missing fields",
@@ -126,11 +133,16 @@ const copy = {
     rs5d: "5日相对强度",
     study: "AI 研究",
     studyNote: "对现有模型输出的 AI 解读 · 非独立信号引擎。",
-    marketSetup: "市场背景",
-    keyUpside: "主要上行触发",
-    keyDownside: "主要下行触发",
-    mainSupporting: "主要支撑信号",
-    mainConflicting: "主要冲突/风险信号",
+    studyConfidence: "解读置信度",
+    studyConfidenceHigh: "高",
+    studyConfidenceModerate: "中",
+    studyConfidenceLimited: "低",
+    dataLimitations: "数据限制",
+    regime: "市场状态",
+    baseCase: "基准情景",
+    ifThen: "条件路径",
+    invalidation: "失效条件",
+    tension: "信号分歧",
     deterministicFallback: "确定性回退摘要",
     review: "每日复盘",
     reviewNote: "对已发布指挥中心快照与当日结果的对照复盘。",
@@ -139,7 +151,9 @@ const copy = {
     actualOutcome: "实际结果",
     whatWorked: "有效部分",
     whatFailed: "失效部分",
+    errorSource: "误差来源",
     tomorrowWatch: "明日关注",
+    reviewConfidence: "复盘置信度",
     reviewPending: "待生成",
     preview: "方法论预览 · 决策数值为明确标注的模拟数据",
     liveReady: "已接入输入的实时决策 · 请结合依据与缺失项审阅",
@@ -595,13 +609,40 @@ function DailyReviewSection({
           <p className="v2-eyebrow">06 / {t.review.toUpperCase()}</p>
           <p className="v2-daily-review-note">{t.reviewNote}</p>
         </div>
-        {review.status === "pending" ? (
-          <span className="v2-flow-badge is-stale" data-testid="v2-daily-review-pending">
-            {t.reviewPending}
-          </span>
-        ) : null}
+        <div className="v2-daily-review-meta" data-testid="v2-daily-review-meta">
+          {review.status === "ready" ? (
+            <>
+              <span>{t.reviewConfidence}</span>
+              <strong
+                className={`v2-daily-review-confidence is-${review.confidence}`}
+                data-testid="v2-daily-review-confidence"
+              >
+                {aiStudyConfidenceLabel(review.confidence, lang)}
+              </strong>
+              {review.source === "deterministic" ? (
+                <span
+                  className="v2-flow-badge is-stale"
+                  data-testid="v2-daily-review-fallback"
+                >
+                  {t.deterministicFallback}
+                </span>
+              ) : null}
+            </>
+          ) : null}
+          {review.status === "pending" ? (
+            <span className="v2-flow-badge is-stale" data-testid="v2-daily-review-pending">
+              {t.reviewPending}
+            </span>
+          ) : null}
+        </div>
       </div>
       <article className="v2-daily-review-card" data-testid="v2-daily-review-card">
+        {review.dataLimitations.length > 0 ? (
+          <p className="v2-daily-review-limitations" data-testid="v2-daily-review-limitations">
+            <span className="v2-daily-review-limitations-label">{t.dataLimitations}</span>
+            {review.dataLimitations.join(" · ")}
+          </p>
+        ) : null}
         {review.sessionDate ? (
           <p className="v2-daily-review-session" data-testid="v2-daily-review-session">
             {t.reviewSession}: <strong>{review.sessionDate}</strong>
@@ -646,6 +687,22 @@ function DailyReviewSection({
               )}
             </dd>
           </div>
+          {review.errorSource !== "none" || review.errorExplanation ? (
+            <div>
+              <dt>{t.errorSource}</dt>
+              <dd data-testid="v2-daily-review-error-source">
+                <strong>{review.errorSource}</strong>
+                {review.errorExplanation ? ` — ${review.errorExplanation}` : null}
+              </dd>
+            </div>
+          ) : review.errorExplanation ? (
+            <div>
+              <dt>{t.errorSource}</dt>
+              <dd data-testid="v2-daily-review-error-source">
+                none — {review.errorExplanation}
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt>{t.tomorrowWatch}</dt>
             <dd data-testid="v2-daily-review-watch">
@@ -671,6 +728,21 @@ function DailyReviewSection({
   );
 }
 
+function aiStudyConfidenceLabel(
+  confidence: V2AiStudyInterpretation["confidence"],
+  lang: V2Language,
+): string {
+  const t = copy[lang];
+  switch (confidence) {
+    case "high":
+      return t.studyConfidenceHigh;
+    case "moderate":
+      return t.studyConfidenceModerate;
+    case "limited":
+      return t.studyConfidenceLimited;
+  }
+}
+
 function AiStudySection({
   aiStudy,
   lang,
@@ -692,33 +764,48 @@ function AiStudySection({
           <p className="v2-eyebrow">05 / {t.study.toUpperCase()}</p>
           <p className="v2-ai-study-note">{t.studyNote}</p>
         </div>
-        {aiStudy.source === "deterministic" || aiStudy.status === "fallback" ? (
-          <span className="v2-flow-badge is-stale" data-testid="v2-ai-study-fallback">
-            {t.deterministicFallback}
-          </span>
-        ) : null}
+        <div className="v2-ai-study-meta" data-testid="v2-ai-study-meta">
+          <span>{t.studyConfidence}</span>
+          <strong
+            className={`v2-ai-study-confidence is-${aiStudy.confidence}`}
+            data-testid="v2-ai-study-confidence"
+          >
+            {aiStudyConfidenceLabel(aiStudy.confidence, lang)}
+          </strong>
+          {aiStudy.source === "deterministic" || aiStudy.status === "fallback" ? (
+            <span className="v2-flow-badge is-stale" data-testid="v2-ai-study-fallback">
+              {t.deterministicFallback}
+            </span>
+          ) : null}
+        </div>
       </div>
       <article className="v2-ai-study-card" data-testid="v2-ai-study-card">
+        {aiStudy.dataLimitations.length > 0 ? (
+          <p className="v2-ai-study-limitations" data-testid="v2-ai-study-limitations">
+            <span className="v2-ai-study-limitations-label">{t.dataLimitations}</span>
+            {aiStudy.dataLimitations.join(" · ")}
+          </p>
+        ) : null}
         <dl className="v2-ai-study-list">
           <div>
-            <dt>{t.marketSetup}</dt>
-            <dd data-testid="v2-ai-study-market-setup">{aiStudy.marketSetup}</dd>
+            <dt>{t.regime}</dt>
+            <dd data-testid="v2-ai-study-regime">{aiStudy.regime}</dd>
           </div>
           <div>
-            <dt>{t.keyUpside}</dt>
-            <dd data-testid="v2-ai-study-upside">{aiStudy.keyUpsideTrigger}</dd>
+            <dt>{t.baseCase}</dt>
+            <dd data-testid="v2-ai-study-base-case">{aiStudy.baseCase}</dd>
           </div>
           <div>
-            <dt>{t.keyDownside}</dt>
-            <dd data-testid="v2-ai-study-downside">{aiStudy.keyDownsideTrigger}</dd>
+            <dt>{t.ifThen}</dt>
+            <dd data-testid="v2-ai-study-if-then">{aiStudy.ifThen}</dd>
           </div>
           <div>
-            <dt>{t.mainSupporting}</dt>
-            <dd data-testid="v2-ai-study-supporting">{aiStudy.mainSupportingSignal}</dd>
+            <dt>{t.invalidation}</dt>
+            <dd data-testid="v2-ai-study-invalidation">{aiStudy.invalidation}</dd>
           </div>
           <div>
-            <dt>{t.mainConflicting}</dt>
-            <dd data-testid="v2-ai-study-conflicting">{aiStudy.mainConflictingSignal}</dd>
+            <dt>{t.tension}</dt>
+            <dd data-testid="v2-ai-study-tension">{aiStudy.tension}</dd>
           </div>
         </dl>
         {aiStudy.missingReason ? (

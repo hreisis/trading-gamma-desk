@@ -91,8 +91,8 @@ function strongSpyBreadthSummary() {
 }
 
 describe("GammaDesk V2 command center", () => {
-  it("withholds live stance, risk, exposure and allocation when inputs are missing", () => {
-    const view = buildV2CommandCenterView({
+  it("withholds live stance, risk, exposure and allocation when inputs are missing", async () => {
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: unavailable("SPY"),
       qqqGamma: unavailable("QQQ"),
@@ -109,12 +109,12 @@ describe("GammaDesk V2 command center", () => {
     expect(view.sectorRotation.status).toBe("unavailable");
   });
 
-  it("shows stale gamma walls and dealer flow from dated options snapshot", () => {
+  it("shows stale gamma walls and dealer flow from dated options snapshot", async () => {
     const spyGamma = applyBoundedGammaSessionGate(
       loadBoundedGammaDeskView({ forceFixture: true }),
       "2026-08-10",
     );
-    const view = buildV2CommandCenterView({
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma,
       qqqGamma: unavailable("QQQ"),
@@ -129,8 +129,8 @@ describe("GammaDesk V2 command center", () => {
     expect(view.gamma[0].callWallTouch.status).toBe("unavailable");
   });
 
-  it("labels illustrative decision values as methodology preview", () => {
-    const view = buildV2CommandCenterView({
+  it("labels illustrative decision values as methodology preview", async () => {
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: unavailable("SPY"),
       qqqGamma: unavailable("QQQ"),
@@ -148,10 +148,10 @@ describe("GammaDesk V2 command center", () => {
     });
   });
 
-  it("populates live stance, risk, exposure, and allocation when core inputs connect", () => {
+  it("populates live stance, risk, exposure, and allocation when core inputs connect", async () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
     const targetSession = "2026-07-28";
-    const view = buildV2CommandCenterView({
+    const view = await buildV2CommandCenterView({
       driver: readyMacroDriver(),
       spyGamma: spy,
       qqqGamma: unavailable("QQQ"),
@@ -256,6 +256,32 @@ describe("GammaDesk V2 command center", () => {
     }
   });
 
+  it("keeps structure spot on the options session close, not live quotes", async () => {
+    const spy = loadBoundedGammaDeskView({ forceFixture: true });
+    const snapshotSpot = spy.snapshot?.spot;
+    expect(snapshotSpot).not.toBeNull();
+
+    const view = await buildV2CommandCenterView({
+      driver: null,
+      spyGamma: spy,
+      qqqGamma: unavailable("QQQ"),
+      now: easternWallToUtc("2026-07-30", 14, 0, 0),
+      marketQuotes: [
+        {
+          symbol: "SPY",
+          latestPrice: snapshotSpot! + 25,
+          dailyChangePct: 0.5,
+          timestamp: "2026-07-30T12:00:00-04:00",
+          source: "synthetic_demo",
+          status: "available",
+        },
+      ],
+    });
+
+    expect(view.gamma[0].spot).toBe(snapshotSpot);
+    expect(view.gamma[0].restOfDayRange.status).toBe("available");
+  });
+
   it("keeps demo QQQ distinct from the SPY fixture", () => {
     const qqq = loadBoundedGammaDeskView({ symbol: "QQQ", publicDemo: true });
     expect(qqq.status).toBe("empty");
@@ -263,9 +289,9 @@ describe("GammaDesk V2 command center", () => {
     expect(qqq.isFixture).toBe(false);
   });
 
-  it("summarizes SPY fixture as incomplete and keeps unavailable QQQ distinct", () => {
+  it("summarizes SPY fixture as incomplete and keeps unavailable QQQ distinct", async () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
-    const view = buildV2CommandCenterView({
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: spy,
       qqqGamma: unavailable("QQQ"),
@@ -369,9 +395,9 @@ describe("GammaDesk V2 command center", () => {
     expect(range.status).toBe("unavailable");
   });
 
-  it("renders rest-of-day range from live spot when gamma levels are unavailable", () => {
+  it("renders rest-of-day range from live spot when gamma levels are unavailable", async () => {
     const now = easternWallToUtc("2026-08-11", 14, 0, 0);
-    const view = buildV2CommandCenterView({
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: unavailable("SPY"),
       qqqGamma: unavailable("QQQ"),
@@ -413,6 +439,40 @@ describe("GammaDesk V2 command center", () => {
     expect(summary.spreadVolPts).not.toBeNull();
     expect(summary.signal).toBe("vol_expensive");
     expect(summary.ivDataLabel).toBe("Options IV · Jul 30 close");
+  });
+
+  it("aligns HV20 to representative IV session when extra bars exist", () => {
+    const ivSession = "2026-07-25";
+    const baseline = Array.from({ length: 25 }, (_, index) => ({
+      sessionDate: `2026-07-${String(index + 1).padStart(2, "0")}`,
+      close: 100 + index * 0.25,
+    }));
+    const withSpike = [
+      ...baseline,
+      { sessionDate: "2026-08-01", close: 200 },
+    ];
+    const misaligned = summarizeVolMispricing({
+      representativeIv: {
+        status: "available",
+        value: 0.2,
+        sessionDate: ivSession,
+      },
+      hv20Bars: withSpike,
+      isFixture: false,
+    });
+    const aligned = summarizeVolMispricing({
+      representativeIv: {
+        status: "available",
+        value: 0.2,
+        sessionDate: ivSession,
+      },
+      hv20Bars: baseline,
+      isFixture: false,
+    });
+
+    expect(misaligned.status).toBe("available");
+    expect(aligned.status).toBe("available");
+    expect(misaligned.hv20Pct).toBe(aligned.hv20Pct);
   });
 
   it("classifies CTA proxy as buying when SPY and QQQ trend above MA20/MA50", () => {
@@ -485,8 +545,30 @@ describe("GammaDesk V2 command center", () => {
     expect(summary.signal).toBeNull();
   });
 
-  it("withholds CTA proxy in command center view when bars are not loaded", () => {
-    const view = buildV2CommandCenterView({
+  it("classifies CTA when bar cache includes a session after the completed target", () => {
+    const targetSession = "2026-08-10";
+    const spyBars = [
+      ...linearEquityBars(55, targetSession, 700, 780),
+      { sessionDate: "2026-08-11", close: 785 },
+    ];
+    const qqqBars = [
+      ...linearEquityBars(55, targetSession, 350, 390),
+      { sessionDate: "2026-08-11", close: 395 },
+    ];
+    const summary = summarizeCtaProxy({
+      spyBars,
+      qqqBars,
+      spyPrice: 785,
+      qqqPrice: 395,
+      targetSession,
+    });
+
+    expect(summary.status).toBe("available");
+    expect(summary.signal).toBe("buying");
+  });
+
+  it("withholds CTA proxy in command center view when bars are not loaded", async () => {
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: unavailable("SPY"),
       qqqGamma: unavailable("QQQ"),
@@ -528,10 +610,10 @@ describe("structure axis scale", () => {
     expect(structureAxisPercent(741.63, scale)).toBeLessThan(80);
   });
 
-  it("collects spot, walls, flip, and rest-of-day bounds", () => {
+  it("collects spot, walls, flip, and rest-of-day bounds", async () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
     const targetSession = "2026-07-28";
-    const view = buildV2CommandCenterView({
+    const view = await buildV2CommandCenterView({
       driver: readyMacroDriver(),
       spyGamma: spy,
       qqqGamma: unavailable("QQQ"),
@@ -545,9 +627,9 @@ describe("structure axis scale", () => {
     expect(values.length).toBeGreaterThanOrEqual(5);
   });
 
-  it("formats a fixed below-axis level row that does not depend on marker spacing", () => {
+  it("formats a fixed below-axis level row that does not depend on marker spacing", async () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
-    const view = buildV2CommandCenterView({
+    const view = await buildV2CommandCenterView({
       driver: null,
       spyGamma: spy,
       qqqGamma: unavailable("QQQ"),
@@ -641,6 +723,26 @@ describe("sector rotation", () => {
     expect(summary.bottomWeakening.every((row) => row.classification === "weakening")).toBe(
       true,
     );
+  });
+
+  it("does not mark sector rotation stale when panel latest session is ahead of target", () => {
+    const target = "2026-07-30";
+    const ahead = "2026-08-01";
+    const map = new Map<string, { sessionDate: string; close: number }[]>();
+    map.set("SPY", linearEquityBars(60, ahead, 200, 206));
+    for (const symbol of SECTOR_ETF_SYMBOLS) {
+      map.set(symbol, linearEquityBars(60, ahead, 100, 102));
+    }
+
+    const summary = summarizeSectorRotation({
+      equityBarsBySymbol: map,
+      targetSession: target,
+      barPanelLatestSession: ahead,
+    });
+
+    expect(summary.status).toBe("available");
+    expect(summary.sessionDate).toBe(target);
+    expect(summary.stale).toBe(false);
   });
 });
 

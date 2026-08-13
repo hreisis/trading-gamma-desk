@@ -6,6 +6,7 @@ import {
   type BoundedWallLevel,
 } from "@/contracts";
 import { writeJsonAtomic } from "@/desk/atomic-write";
+import { writeJson, type RuntimeJsonStore } from "@/desk/runtime-store";
 import type { FetchLike } from "@/ingest/http";
 import { computeEstimatedGammaStructure } from "../compute";
 import { extractRepresentativeIvFromChain } from "../aggregate";
@@ -15,6 +16,7 @@ import { fetchBoundedMarketDataAppChain } from "./fetch";
 import { MarketDataAppNormalizeError } from "./errors";
 import { normalizeMarketDataAppChain } from "./normalize";
 import {
+  boundedGammaArtifactRelativePath,
   boundedGammaLatestPath,
   DEFAULT_BOUNDED_GAMMA_DATA_ROOT,
 } from "./paths";
@@ -61,6 +63,7 @@ export interface RunBoundedGammaProviderInput {
   readonly generatedAt?: string;
   readonly fetchedAt?: string;
   readonly synthetic?: boolean;
+  readonly artifactStore?: RuntimeJsonStore;
 }
 
 const SCOPE_LIMITATION =
@@ -385,9 +388,16 @@ export async function runBoundedGammaProvider(
 
   const dataRoot = input.dataRoot ?? DEFAULT_BOUNDED_GAMMA_DATA_ROOT;
   const path = boundedGammaLatestPath(input.symbol, dataRoot);
+  const artifactRelativePath = boundedGammaArtifactRelativePath(input.symbol);
 
   if (input.write !== false) {
-    writeJsonAtomic(path, snapshot);
+    if (input.artifactStore) {
+      await writeJson(input.artifactStore, artifactRelativePath, snapshot, {
+        allowOverwrite: true,
+      });
+    } else {
+      writeJsonAtomic(path, snapshot);
+    }
   }
 
   return {

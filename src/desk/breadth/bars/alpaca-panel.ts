@@ -84,6 +84,24 @@ export async function loadAlpacaDailyBarPanel(input: {
   let pages = 0;
 
   if (!credentials) {
+    for (const symbol of uniqueSymbols) {
+      const cached = readSymbolBarCache(dataRoot, symbol);
+      if (cached && cached.bars.length > 0) {
+        seriesBySymbol.set(symbol, cached);
+      } else {
+        failedSymbols.push(symbol);
+      }
+    }
+
+    let latestSessionDate: string | null = null;
+    for (const series of seriesBySymbol.values()) {
+      const last = series.bars.at(-1)?.sessionDate ?? null;
+      if (last && (!latestSessionDate || last > latestSessionDate)) {
+        latestSessionDate = last;
+      }
+    }
+
+    const returnedSymbols = uniqueSymbols.length - failedSymbols.length;
     return {
       seriesBySymbol,
       provenance: {
@@ -92,12 +110,15 @@ export async function loadAlpacaDailyBarPanel(input: {
         isConsolidated: priceFeed === "sip",
         adjustment: "split",
         requestedSymbols: uniqueSymbols.length,
-        returnedSymbols: 0,
-        coverage: 0,
+        returnedSymbols,
+        coverage:
+          uniqueSymbols.length === 0
+            ? 0
+            : returnedSymbols / uniqueSymbols.length,
         pages: 0,
         fetchedAt,
-        latestSessionDate: null,
-        failedSymbols: uniqueSymbols,
+        latestSessionDate,
+        failedSymbols,
       },
     };
   }

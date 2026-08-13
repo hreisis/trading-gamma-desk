@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -14,7 +14,9 @@ import {
   loadBoundedGammaDeskView,
 } from "@/desk/load-bounded-gamma";
 import { loadBoundedGammaDeskViewAsync } from "@/desk/production-runtime";
+import { boundedGammaArtifactRelativePath } from "@/gamma/marketdata-app/paths";
 import { runBoundedGammaProvider } from "@/gamma/marketdata-app/run";
+import { writeJson } from "@/desk/runtime-store";
 
 vi.mock("@/gamma/marketdata-app/run", () => ({
   runBoundedGammaProvider: vi.fn(),
@@ -39,8 +41,28 @@ function snapshotWithSession(sessionDate: string, status = "available") {
   return base;
 }
 
+function gammaProviderRoot(deskRoot: string): string {
+  const gammaRoot = join(deskRoot, "gamma/providers/marketdata-app");
+  mkdirSync(gammaRoot, { recursive: true });
+  return gammaRoot;
+}
+
 function writeArtifact(root: string, symbol: string, body: unknown) {
   writeFileSync(join(root, `${symbol}-bounded-latest.json`), JSON.stringify(body));
+}
+
+async function writeArtifactToStore(
+  input: { artifactStore?: import("@/desk/runtime-store").RuntimeJsonStore },
+  symbol: string,
+  body: unknown,
+) {
+  if (!input.artifactStore) return;
+  await writeJson(
+    input.artifactStore,
+    boundedGammaArtifactRelativePath(symbol),
+    body,
+    { allowOverwrite: true },
+  );
 }
 
 describe("bounded gamma session freshness", () => {
@@ -86,17 +108,20 @@ describe("bounded gamma session freshness", () => {
   });
 
   it("refreshes on stale session then becomes ready when vendor catches up", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gamma-fresh-"));
+    const deskRoot = mkdtempSync(join(tmpdir(), "gamma-fresh-"));
+    const root = gammaProviderRoot(deskRoot);
     writeArtifact(root, "SPY", snapshotWithSession("2026-08-07"));
 
     mockedRun.mockImplementation(async (input) => {
+      const snap = snapshotWithSession("2026-08-10");
       writeFileSync(
         join(input.dataRoot!, "SPY-bounded-latest.json"),
-        JSON.stringify(snapshotWithSession("2026-08-10")),
+        JSON.stringify(snap),
       );
+      await writeArtifactToStore(input, "SPY", snap);
       return {
         ok: true,
-        snapshot: snapshotWithSession("2026-08-10") as never,
+        snapshot: snap as never,
         path: join(input.dataRoot!, "SPY-bounded-latest.json"),
         requestPath: "/options/chain/SPY",
       };
@@ -116,17 +141,20 @@ describe("bounded gamma session freshness", () => {
   });
 
   it("fail closed when refresh still returns stale vendor session", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gamma-stale-"));
+    const deskRoot = mkdtempSync(join(tmpdir(), "gamma-stale-"));
+    const root = gammaProviderRoot(deskRoot);
     writeArtifact(root, "SPY", snapshotWithSession("2026-08-07"));
 
     mockedRun.mockImplementation(async (input) => {
+      const snap = snapshotWithSession("2026-08-07");
       writeFileSync(
         join(input.dataRoot!, "SPY-bounded-latest.json"),
-        JSON.stringify(snapshotWithSession("2026-08-07")),
+        JSON.stringify(snap),
       );
+      await writeArtifactToStore(input, "SPY", snap);
       return {
         ok: true,
-        snapshot: snapshotWithSession("2026-08-07") as never,
+        snapshot: snap as never,
         path: join(input.dataRoot!, "SPY-bounded-latest.json"),
         requestPath: "/options/chain/SPY",
       };
@@ -146,7 +174,8 @@ describe("bounded gamma session freshness", () => {
   });
 
   it("keeps cached snapshot when bounded refresh fails", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gamma-cache-"));
+    const deskRoot = mkdtempSync(join(tmpdir(), "gamma-cache-"));
+    const root = gammaProviderRoot(deskRoot);
     writeArtifact(root, "SPY", snapshotWithSession("2026-08-07"));
 
     const view = await loadBoundedGammaDeskViewAsync({
@@ -163,7 +192,8 @@ describe("bounded gamma session freshness", () => {
   });
 
   it("handles SPY and QQQ independently", async () => {
-    const root = mkdtempSync(join(tmpdir(), "gamma-sym-"));
+    const deskRoot = mkdtempSync(join(tmpdir(), "gamma-sym-"));
+    const root = gammaProviderRoot(deskRoot);
     writeArtifact(root, "SPY", snapshotWithSession("2026-08-10"));
     writeArtifact(root, "QQQ", snapshotWithSession("2026-08-07"));
 

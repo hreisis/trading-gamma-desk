@@ -254,6 +254,19 @@ describe("assembleSnapshot", () => {
       end,
     );
   });
+
+  it("scores the ingest endDate session when bars print through that day", () => {
+    const snapshot = assembleSnapshot(allSeries(), config, {
+      marketSessionDate: end,
+    });
+
+    expect(snapshot.marketSessionDate).toBe(end);
+    expect(snapshot.isCompleteSession).toBe(true);
+    expect(snapshot.classification.primaryRegime).not.toBe("insufficient_data");
+    expect(
+      snapshot.features.filter((f) => f.zScore !== null).length,
+    ).toBeGreaterThanOrEqual(6);
+  });
 });
 
 describe("sessionDistance", () => {

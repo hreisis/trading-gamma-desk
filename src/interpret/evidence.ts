@@ -47,6 +47,11 @@ export function buildEvidence(snapshot: MacroSnapshot): Evidence[] {
         ? ", against the dominant pattern"
         : "";
 
+    const sourceDate =
+      snapshot.sourceDateByAsset[contribution.symbol] ??
+      snapshot.marketSessionDate;
+    const basisSuffix = ` · ${sourceDate} session close-to-close`;
+
     evidence.push({
       id: evidenceId(contribution.symbol),
       symbol: contribution.symbol,
@@ -55,7 +60,7 @@ export function buildEvidence(snapshot: MacroSnapshot): Evidence[] {
       statement: `${assetDisplayName(contribution.symbol)} ${formatChange(
         feature.currentChange,
         feature.unit,
-      )} (${formatZ(feature.zScore)})${against}`,
+      )} (${formatZ(feature.zScore)})${basisSuffix}${against}`,
       value: feature.currentChange,
       unit: feature.unit,
       zScore: feature.zScore,
@@ -72,6 +77,9 @@ export function buildEvidence(snapshot: MacroSnapshot): Evidence[] {
       const feature = features.get(symbol);
       if (!feature || feature.currentChange === null) continue;
       const def = ASSET_REGISTRY[symbol];
+      const sourceDate =
+        snapshot.sourceDateByAsset[symbol] ?? snapshot.marketSessionDate;
+      const basisSuffix = ` · ${sourceDate} session close-to-close`;
       evidence.push({
         id: evidenceId(symbol),
         symbol,
@@ -80,7 +88,7 @@ export function buildEvidence(snapshot: MacroSnapshot): Evidence[] {
         statement: `${assetDisplayName(symbol)} ${formatChange(
           feature.currentChange,
           feature.unit,
-        )} (${formatZ(feature.zScore)})`,
+        )} (${formatZ(feature.zScore)})${basisSuffix}`,
         value: feature.currentChange,
         unit: feature.unit,
         zScore: feature.zScore,

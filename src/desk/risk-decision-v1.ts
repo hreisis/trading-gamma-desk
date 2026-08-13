@@ -4,10 +4,21 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
 import { writeJsonAtomic } from "./atomic-write";
+import {
+  artifactSourceLabel,
+  readJson,
+  writeJson,
+  type RuntimeJsonStore,
+} from "./runtime-store";
 import type {
   CtaProxySummary,
   VolMispricingSummary,
 } from "./format-gamma";
+import type { V2SectorRotationSummary } from "./v2-command-center";
+import {
+  computeLeadershipConcentrationPenalty,
+  formatLeadershipConcentrationEvidence,
+} from "./risk-leadership-concentration";
 
 export const RISK_DECISION_V1_VERSION = "0.1.0";
 
@@ -35,6 +46,10 @@ export interface RiskFactorContributionSnapshot {
 
 export interface RiskDecisionV1Result {
   readonly status: "ready" | "withheld";
+  /** Weighted factor score before leadership concentration adjustment. */
+  readonly baseRiskScore: number | null;
+  readonly concentrationPenalty: number | null;
+  readonly concentrationReason: string | null;
   readonly riskScore: number | null;
   readonly stance: RiskDecisionStance | null;
   readonly exposure: { readonly min: number; readonly max: number } | null;
@@ -74,6 +89,13 @@ interface RiskFactorContribution {
 }
 
 const MIN_EFFECTIVE_WEIGHT = 45;
+/** Immutable daily publication requires moderate-or-better coverage (not limited). */
+const MIN_PUBLISHABLE_EFFECTIVE_WEIGHT = 55;
+
+/** Minimum effective weight to show a live structural risk score. */
+export const RISK_DECISION_V1_MIN_EFFECTIVE_WEIGHT = MIN_EFFECTIVE_WEIGHT;
+/** Minimum effective weight to publish an immutable daily record. */
+export const RISK_DECISION_V1_MIN_PUBLISHABLE_WEIGHT = MIN_PUBLISHABLE_EFFECTIVE_WEIGHT;
 
 const STALE_WEIGHT_MULTIPLIER = 0.5;
 const PARTIAL_WEIGHT_MULTIPLIER = 0.75;
@@ -250,14 +272,24 @@ function aggregateRiskScore(factors: readonly RiskFactorContribution[]): number 
   return roundRisk(weighted / totalWeight);
 }
 
-function buildEvidence(
-  riskScore: number,
+function buildEvidenceWithConcentration(
+  adjustedRiskScore: number,
   coverage: RiskDecisionV1Coverage,
   factors: readonly RiskFactorContribution[],
+  concentrationPenalty: number,
+  concentrationReason: string | null,
 ): readonly string[] {
   const lines: string[] = [
-    `Structural risk ${riskScore}/100 · ${coverage.confidence} input coverage (${coverage.effectiveWeight}% of model weight used).`,
+    `Structural risk ${adjustedRiskScore}/100 · ${coverage.confidence} input coverage (${coverage.effectiveWeight}% of model weight used).`,
   ];
+
+  const concentrationLine = formatLeadershipConcentrationEvidence(
+    concentrationPenalty,
+    concentrationReason,
+  );
+  if (concentrationLine !== null) {
+    lines.push(concentrationLine);
+  }
 
   const sorted = [...factors].sort((left, right) => right.score - left.score);
   for (const factor of sorted.slice(0, 4)) {
@@ -397,6 +429,85 @@ export function riskDecisionV1LatestPath(dataRoot: string): string {
   return join(dataRoot, "risk-decision-v1", "latest.json");
 }
 
+export function riskDecisionV1DailyRelativePath(publicationDate: string): string {
+  return `risk-decision-v1/${publicationDate}.json`;
+}
+
+export function effectiveWeightFromFactorContributions(
+  contributions: readonly RiskFactorContributionSnapshot[],
+): number {
+  return contributions.reduce((sum, row) => sum + row.effectiveWeight, 0);
+}
+
+/** True when a stored daily record meets immutable publication coverage rules. */
+export function isRiskDecisionV1DailyRecordPublishable(
+  record: RiskDecisionV1DailyRecord,
+): boolean {
+  if (typeof record.riskScore !== "number" || !Number.isFinite(record.riskScore)) {
+    return false;
+  }
+  if (!Array.isArray(record.factorContributions) || record.factorContributions.length === 0) {
+    return false;
+  }
+  const effectiveWeight = roundRisk(
+    effectiveWeightFromFactorContributions(record.factorContributions),
+  );
+  return (
+    effectiveWeight >= MIN_EFFECTIVE_WEIGHT &&
+    confidenceFromWeight(effectiveWeight) !== "limited"
+  );
+}
+
+/** True when a live derivation is ready and has enough coverage to publish. */
+export function isRiskDecisionV1Publishable(result: RiskDecisionV1Result): boolean {
+  if (result.status !== "ready") return false;
+  if (result.riskScore === null) return false;
+  if (result.factorContributions.length === 0) return false;
+  if (!result.coverage) return false;
+  return (
+    result.coverage.effectiveWeight >= MIN_EFFECTIVE_WEIGHT &&
+    result.coverage.confidence !== "limited"
+  );
+}
+
+function buildRiskDecisionV1DailyRecordFromResult(input: {
+  readonly publicationDate: string;
+  readonly decisionSessionDate: string;
+  readonly today: RiskDecisionV1Result;
+  readonly now?: Date;
+}): RiskDecisionV1DailyRecord | null {
+  if (!isRiskDecisionV1Publishable(input.today)) return null;
+  const riskScore = input.today.riskScore;
+  if (riskScore === null) return null;
+  return {
+    schemaVersion: RISK_DECISION_V1_VERSION,
+    publicationDate: input.publicationDate,
+    marketSessionDate: input.decisionSessionDate,
+    generatedAt: input.now?.toISOString() ?? new Date().toISOString(),
+    riskScore,
+    factorContributions: input.today.factorContributions,
+  };
+}
+
+function parseRiskDecisionV1DailyRecord(
+  raw: unknown,
+  publicationDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const record = raw as RiskDecisionV1DailyRecord;
+  const recordPublicationDate = record.publicationDate ?? record.marketSessionDate;
+  if (
+    recordPublicationDate !== publicationDate ||
+    typeof record.riskScore !== "number" ||
+    !Array.isArray(record.factorContributions)
+  ) {
+    return null;
+  }
+  return {
+    ...record,
+    publicationDate: recordPublicationDate,
+  };
+}
+
 export function loadRiskDecisionV1Daily(
   dataRoot: string,
   publicationDate: string,
@@ -405,21 +516,20 @@ export function loadRiskDecisionV1Daily(
   if (!existsSync(path)) return null;
   try {
     const raw = JSON.parse(readFileSync(path, "utf8")) as RiskDecisionV1DailyRecord;
-    const recordPublicationDate = raw.publicationDate ?? raw.marketSessionDate;
-    if (
-      recordPublicationDate !== publicationDate ||
-      typeof raw.riskScore !== "number" ||
-      !Array.isArray(raw.factorContributions)
-    ) {
-      return null;
-    }
-    return {
-      ...raw,
-      publicationDate: recordPublicationDate,
-    };
+    return parseRiskDecisionV1DailyRecord(raw, publicationDate);
   } catch {
     return null;
   }
+}
+
+export async function loadRiskDecisionV1DailyAsync(
+  artifactStore: RuntimeJsonStore,
+  publicationDate: string,
+): Promise<RiskDecisionV1DailyRecord | null> {
+  const relativePath = riskDecisionV1DailyRelativePath(publicationDate);
+  const raw = await readJson(artifactStore, relativePath);
+  if (raw === null) return null;
+  return parseRiskDecisionV1DailyRecord(raw, publicationDate);
 }
 
 export function listRiskDecisionV1DailyRecords(
@@ -443,12 +553,48 @@ export function listRiskDecisionV1DailyRecords(
   );
 }
 
+export async function listRiskDecisionV1DailyRecordsAsync(
+  artifactStore: RuntimeJsonStore,
+): Promise<readonly RiskDecisionV1DailyRecord[]> {
+  const paths = await artifactStore.list("risk-decision-v1");
+  const records: RiskDecisionV1DailyRecord[] = [];
+  for (const relativePath of paths) {
+    if (!relativePath.endsWith(".json") || relativePath.endsWith("/latest.json")) {
+      continue;
+    }
+    const publicationDate = relativePath.slice("risk-decision-v1/".length, -5);
+    const record = await loadRiskDecisionV1DailyAsync(artifactStore, publicationDate);
+    if (record) records.push(record);
+  }
+  return records.sort((left, right) =>
+    riskDecisionPublicationDate(left).localeCompare(
+      riskDecisionPublicationDate(right),
+    ),
+  );
+}
+
 export function loadPriorPublishedRiskDecision(
   dataRoot: string,
   publicationDate: string,
 ): RiskDecisionV1DailyRecord | null {
   const prior = listRiskDecisionV1DailyRecords(dataRoot).filter(
-    (record) => riskDecisionPublicationDate(record) < publicationDate,
+    (record) =>
+      riskDecisionPublicationDate(record) < publicationDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return prior.at(-1) ?? null;
+}
+
+export async function loadPriorPublishedRiskDecisionAsync(
+  artifactStore: RuntimeJsonStore,
+  publicationDate: string,
+): Promise<RiskDecisionV1DailyRecord | null> {
+  const prior = (
+    await listRiskDecisionV1DailyRecordsAsync(artifactStore)
+  ).filter(
+    (record) =>
+      riskDecisionPublicationDate(record) < publicationDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
   );
   return prior.at(-1) ?? null;
 }
@@ -472,39 +618,171 @@ export function persistRiskDecisionV1Daily(
   return true;
 }
 
+/**
+ * Publish an immutable daily Risk record when coverage rules pass.
+ * Replaces a non-publishable partial record for the same publication date.
+ * Never overwrites a valid published record.
+ */
+export function publishRiskDecisionV1Daily(
+  dataRoot: string,
+  record: RiskDecisionV1DailyRecord,
+  options?: { readonly force?: boolean },
+): boolean {
+  const publicationDate = riskDecisionPublicationDate(record);
+  if (!isValidRiskPublicationDate(publicationDate)) return false;
+  if (!isRiskDecisionV1DailyRecordPublishable(record)) return false;
+
+  const existing = loadRiskDecisionV1Daily(dataRoot, publicationDate);
+  if (existing && isRiskDecisionV1DailyRecordPublishable(existing)) {
+    if (options?.force !== true) return false;
+  }
+
+  const normalized: RiskDecisionV1DailyRecord = {
+    ...record,
+    publicationDate,
+  };
+  writeJsonAtomic(riskDecisionV1DailyPath(dataRoot, publicationDate), normalized);
+  writeJsonAtomic(riskDecisionV1LatestPath(dataRoot), normalized);
+  return true;
+}
+
+export async function persistRiskDecisionV1DailyAsync(
+  artifactStore: RuntimeJsonStore,
+  record: RiskDecisionV1DailyRecord,
+): Promise<boolean> {
+  const publicationDate = riskDecisionPublicationDate(record);
+  if (!isValidRiskPublicationDate(publicationDate)) return false;
+
+  const relativePath = riskDecisionV1DailyRelativePath(publicationDate);
+  if (await artifactStore.exists(relativePath)) return false;
+
+  const normalized: RiskDecisionV1DailyRecord = {
+    ...record,
+    publicationDate,
+  };
+  const wroteDaily = await writeJson(artifactStore, relativePath, normalized);
+  if (!wroteDaily) return false;
+  await writeJson(artifactStore, "risk-decision-v1/latest.json", normalized, {
+    allowOverwrite: true,
+  });
+  return true;
+}
+
+/**
+ * Publish an immutable daily Risk record to the artifact store when coverage rules pass.
+ * Replaces a non-publishable partial record for the same publication date.
+ * Never overwrites a valid published record.
+ */
+export async function publishRiskDecisionV1DailyAsync(
+  artifactStore: RuntimeJsonStore,
+  record: RiskDecisionV1DailyRecord,
+  options?: { readonly force?: boolean },
+): Promise<boolean> {
+  const publicationDate = riskDecisionPublicationDate(record);
+  if (!isValidRiskPublicationDate(publicationDate)) return false;
+  if (!isRiskDecisionV1DailyRecordPublishable(record)) return false;
+
+  const existing = await loadRiskDecisionV1DailyAsync(artifactStore, publicationDate);
+  if (existing && isRiskDecisionV1DailyRecordPublishable(existing)) {
+    if (options?.force !== true) return false;
+  }
+
+  const normalized: RiskDecisionV1DailyRecord = {
+    ...record,
+    publicationDate,
+  };
+  const relativePath = riskDecisionV1DailyRelativePath(publicationDate);
+  const wroteDaily = await writeJson(artifactStore, relativePath, normalized, {
+    allowOverwrite: true,
+  });
+  if (!wroteDaily) return false;
+  await writeJson(artifactStore, "risk-decision-v1/latest.json", normalized, {
+    allowOverwrite: true,
+  });
+  return true;
+}
+
 export function resolveRiskDecisionDayOverDay(input: {
   readonly dataRoot: string | null | undefined;
   readonly publicationDate: string;
   readonly decisionSessionDate: string;
   readonly today: RiskDecisionV1Result;
   readonly now?: Date;
+  readonly force?: boolean;
 }): RiskDecisionDayOverDay {
+  const previous =
+    input.dataRoot !== null && input.dataRoot !== undefined
+      ? loadPriorPublishedRiskDecision(input.dataRoot, input.publicationDate)
+      : null;
+
+  const record = buildRiskDecisionV1DailyRecordFromResult({
+    publicationDate: input.publicationDate,
+    decisionSessionDate: input.decisionSessionDate,
+    today: input.today,
+    now: input.now,
+  });
+  if (record && input.dataRoot) {
+    publishRiskDecisionV1Daily(input.dataRoot, record, {
+      force: input.force === true,
+    });
+  }
+
   if (
     input.today.status !== "ready" ||
     input.today.riskScore === null ||
-    input.today.factorContributions.length === 0
+    input.today.factorContributions.length === 0 ||
+    !previous
   ) {
     return { riskChange: null, riskChangeReason: null };
   }
 
-  const dataRoot = input.dataRoot;
-  if (!dataRoot) {
-    return { riskChange: null, riskChangeReason: null };
+  const riskChange = input.today.riskScore - previous.riskScore;
+  const riskChangeReason = buildRiskChangeReason(
+    riskChange,
+    input.today.factorContributions,
+    previous.factorContributions,
+  );
+
+  return { riskChange, riskChangeReason };
+}
+
+export async function resolveRiskDecisionDayOverDayAsync(input: {
+  readonly artifactStore: RuntimeJsonStore;
+  readonly dataRoot: string | null | undefined;
+  readonly publicationDate: string;
+  readonly decisionSessionDate: string;
+  readonly today: RiskDecisionV1Result;
+  readonly now?: Date;
+  readonly force?: boolean;
+}): Promise<RiskDecisionDayOverDay> {
+  const previous = await loadPriorPublishedRiskDecisionAsync(
+    input.artifactStore,
+    input.publicationDate,
+  );
+
+  const record = buildRiskDecisionV1DailyRecordFromResult({
+    publicationDate: input.publicationDate,
+    decisionSessionDate: input.decisionSessionDate,
+    today: input.today,
+    now: input.now,
+  });
+  if (record) {
+    await publishRiskDecisionV1DailyAsync(input.artifactStore, record, {
+      force: input.force === true,
+    });
+    if (input.dataRoot) {
+      publishRiskDecisionV1Daily(input.dataRoot, record, {
+        force: input.force === true,
+      });
+    }
   }
 
-  const previous = loadPriorPublishedRiskDecision(dataRoot, input.publicationDate);
-
-  const generatedAt = input.now?.toISOString() ?? new Date().toISOString();
-  persistRiskDecisionV1Daily(dataRoot, {
-    schemaVersion: RISK_DECISION_V1_VERSION,
-    publicationDate: input.publicationDate,
-    marketSessionDate: input.decisionSessionDate,
-    generatedAt,
-    riskScore: input.today.riskScore,
-    factorContributions: input.today.factorContributions,
-  });
-
-  if (!previous) {
+  if (
+    input.today.status !== "ready" ||
+    input.today.riskScore === null ||
+    input.today.factorContributions.length === 0 ||
+    !previous
+  ) {
     return { riskChange: null, riskChangeReason: null };
   }
 
@@ -523,6 +801,11 @@ export interface RiskDecisionSpyBreadthInput {
   readonly breadthSignal: "strong" | "mixed" | "weak" | null;
   readonly breadthContextLine: string | null;
   readonly stale: boolean;
+  readonly advancingPct?: number | null;
+  readonly percentAboveMA20?: number | null;
+  readonly percentAboveMA50?: number | null;
+  readonly new20DayClosingHigh?: number | null;
+  readonly new20DayClosingLow?: number | null;
 }
 
 export interface RiskDecisionSpyGammaInput {
@@ -539,6 +822,7 @@ export interface DeriveRiskDecisionV1Input {
   readonly spyGamma: RiskDecisionSpyGammaInput;
   readonly ctaProxy: CtaProxySummary;
   readonly eventGate: EventGateSnapshot | null;
+  readonly sectorRotation?: V2SectorRotationSummary | null;
   readonly targetSession: string;
 }
 
@@ -742,6 +1026,9 @@ export function deriveRiskDecisionV1(
     const usedIds = factors.map((row) => row.id);
     return {
       status: "withheld",
+      baseRiskScore: null,
+      concentrationPenalty: null,
+      concentrationReason: null,
       riskScore: null,
       stance: null,
       exposure: null,
@@ -756,7 +1043,23 @@ export function deriveRiskDecisionV1(
     };
   }
 
-  const riskScore = aggregateRiskScore(factors);
+  const baseRiskScore = aggregateRiskScore(factors);
+  const concentration = computeLeadershipConcentrationPenalty({
+    breadth: {
+      breadthSignalStatus: input.spyBreadth.breadthSignalStatus,
+      advancingPct: input.spyBreadth.advancingPct ?? null,
+      percentAboveMA20: input.spyBreadth.percentAboveMA20 ?? null,
+      percentAboveMA50: input.spyBreadth.percentAboveMA50 ?? null,
+      new20DayClosingHigh: input.spyBreadth.new20DayClosingHigh ?? null,
+      new20DayClosingLow: input.spyBreadth.new20DayClosingLow ?? null,
+    },
+    sectorRotation: input.sectorRotation,
+  });
+  const concentrationPenalty = concentration.penalty;
+  const concentrationReason = concentration.reason;
+  const riskScore = roundRisk(
+    clamp(baseRiskScore + concentrationPenalty, 0, 100),
+  );
   const factorContributions = snapshotContributions(factors);
   const coverage: RiskDecisionV1Coverage = {
     effectiveWeight,
@@ -766,12 +1069,21 @@ export function deriveRiskDecisionV1(
 
   return {
     status: "ready",
+    baseRiskScore,
+    concentrationPenalty,
+    concentrationReason,
     riskScore,
     stance: stanceFromRisk(riskScore),
     exposure: exposureBand(riskScore),
     allocation: allocationFromRisk(riskScore),
     opportunityScore: roundRisk(100 - riskScore),
-    evidence: buildEvidence(riskScore, coverage, factors),
+    evidence: buildEvidenceWithConcentration(
+      riskScore,
+      coverage,
+      factors,
+      concentrationPenalty,
+      concentrationReason,
+    ),
     coverage,
     withheldReason: null,
     withheldFactors: [],

@@ -48,6 +48,10 @@ export interface LoadBoundedGammaOptions {
   /** Override target session for hermetic tests. */
   readonly targetSession?: string;
   readonly now?: Date;
+  /** Durable artifact prefetched by async loader (blob or filesystem store). */
+  readonly prefetchedSnapshot?: unknown;
+  readonly prefetchedSourceLabel?: string | null;
+  readonly artifactStore?: import("./runtime-store").RuntimeJsonStore;
 }
 
 function normalizeLegacyBoundedSnapshot(raw: unknown): unknown {
@@ -242,6 +246,18 @@ export function loadBoundedGammaDeskView(
       ),
       targetSession,
       { skipSessionGate: true },
+    );
+  }
+
+  if (options.prefetchedSnapshot !== undefined) {
+    return applyBoundedGammaSessionGate(
+      parseSnapshot(
+        options.prefetchedSnapshot,
+        options.prefetchedSourceLabel ?? "runtime artifact store",
+        false,
+      ),
+      targetSession,
+      { skipSessionGate },
     );
   }
 

@@ -21,6 +21,8 @@ export interface LoadAlpacaMarketPanelOptions {
   readonly config?: AlpacaClientConfig;
   readonly fetchImpl?: FetchLike;
   readonly publicDemo?: boolean;
+  /** When set, replaces the env watchlist for this load only. */
+  readonly symbols?: readonly string[];
 }
 
 function healthFromState(input: {
@@ -129,7 +131,9 @@ export async function loadAlpacaMarketPanel(
   const now = options.now ?? new Date();
   const fetchedAt = now.toISOString();
   const isPublicDemo = options.publicDemo ?? isPublicDemoMode(env);
-  const watchlist = resolveAlpacaWatchlist(env);
+  const watchlist: string[] = options.symbols
+    ? [...options.symbols]
+    : resolveAlpacaWatchlist(env);
 
   if (isPublicDemo) {
     return loadSyntheticAlpacaMarketPanel({ fetchedAt, watchlist });

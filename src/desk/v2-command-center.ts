@@ -3,18 +3,27 @@ import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
 import {
   type MarketInputSnapshot,
 } from "@/contracts/market-input-snapshot";
+import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
+import {
+  buildMacroDisplayInterpretation,
+  patchMacroEvidenceForDisplay,
+} from "./macro-display-returns";
 import type { BoundedGammaDeskView } from "./load-bounded-gamma";
 import type { BoundedGammaFreshnessLabel } from "./bounded-gamma-freshness";
 import { wallStrikeWhenAvailable } from "./bounded-gamma-freshness";
 import type { DurableBreadthReadOutcome } from "./breadth/read-durable-breadth";
 import type { BoundedGammaProviderSnapshot } from "@/contracts";
-import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
 import {
   resolveCurrentMarketSessionDate,
   resolveLastCompletedMarketSessionDate,
 } from "@/ai-study/session";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
-import { deriveRiskDecisionV1, resolveRiskDecisionDayOverDay } from "./risk-decision-v1";
+import {
+  deriveRiskDecisionV1,
+  resolveRiskDecisionDayOverDay,
+  resolveRiskDecisionDayOverDayAsync,
+} from "./risk-decision-v1";
+import type { RuntimeJsonStore } from "./runtime-store";
 import {
   dealerFlowContextLines,
   dealerFlowRegimeLabel,
@@ -170,6 +179,7 @@ export interface V2MacroSummary {
   readonly label: string;
   readonly primaryRegime: string;
   readonly riskDirection: string | null;
+  readonly marketSessionDate: string | null;
   readonly interpretation: string | null;
   readonly evidence: readonly string[];
 }
@@ -201,14 +211,18 @@ export interface V2CommandCenterView {
   readonly sectorRotation: V2SectorRotationSummary;
 }
 
+export type V2AiStudyConfidence = "high" | "moderate" | "limited";
+
 export interface V2AiStudyInterpretation {
   readonly status: "ready" | "fallback" | "preview" | "unavailable";
   readonly source: "openai" | "deterministic" | "preview" | "unavailable";
-  readonly marketSetup: string;
-  readonly keyUpsideTrigger: string;
-  readonly keyDownsideTrigger: string;
-  readonly mainSupportingSignal: string;
-  readonly mainConflictingSignal: string;
+  readonly confidence: V2AiStudyConfidence;
+  readonly dataLimitations: readonly string[];
+  readonly regime: string;
+  readonly baseCase: string;
+  readonly ifThen: string;
+  readonly invalidation: string;
+  readonly tension: string;
   readonly missingReason: string | null;
 }
 
@@ -259,10 +273,23 @@ function deriveEvidenceFromDriver(
 
 export function summarizeMacroFromDriver(
   driver: DominantDriver | null,
+  options?: {
+    readonly marketQuotes?: readonly AlpacaMarketQuote[];
+    readonly now?: Date;
+  },
 ): V2MacroSummary | null {
   if (!driver) return null;
-  const interpretation = driver.interpretation.text.trim();
-  const evidence = driver.evidence
+  const now = options?.now ?? new Date();
+  const patchedEvidence = patchMacroEvidenceForDisplay(driver, {
+    marketQuotes: options?.marketQuotes,
+    now,
+  });
+  const interpretation = buildMacroDisplayInterpretation(
+    driver,
+    patchedEvidence,
+    now,
+  );
+  const evidence = patchedEvidence
     .map((item) => item.statement.trim())
     .filter((line) => line.length > 0)
     .slice(0, 4);
@@ -270,6 +297,7 @@ export function summarizeMacroFromDriver(
     label: driver.label,
     primaryRegime: driver.primaryRegime,
     riskDirection: driver.riskDirection,
+    marketSessionDate: driver.marketSessionDate,
     interpretation: interpretation.length > 0 ? interpretation : null,
     evidence,
   };
@@ -605,11 +633,6 @@ function summarizeGammaFromSnapshot(
     view.freshness ??
     (snapshot.status === "incomplete" ? "incomplete" : "fresh");
   const showFlow = deskStatus === "ready" || deskStatus === "incomplete";
-  const displaySpot = resolveLiveEquitySpot(
-    symbol,
-    options.marketQuotes,
-    snapshot.spot,
-  );
 
   const base = {
     symbol,
@@ -617,7 +640,7 @@ function summarizeGammaFromSnapshot(
     freshness,
     sessionDate: snapshot.sessionDate,
     expiration: snapshot.expiration,
-    spot: displaySpot,
+    spot: snapshot.spot,
     putWall: showFlow ? wallStrikeWhenAvailable(snapshot.boundedPutWall) : null,
     callWall: showFlow ? wallStrikeWhenAvailable(snapshot.boundedCallWall) : null,
     regime: showFlow ? snapshot.gammaRegime : null,
@@ -804,6 +827,7 @@ export function deriveCommandCenterRiskDecision(input: {
   readonly spyGamma: BoundedGammaDeskView;
   readonly qqqGamma: BoundedGammaDeskView;
   readonly spyBreadth?: V2SpyBreadthSummary;
+  readonly sectorRotation?: V2SectorRotationSummary | null;
   readonly marketQuotes?: readonly AlpacaMarketQuote[];
   readonly equityBarsBySymbol?: ReadonlyMap<
     string,
@@ -844,6 +868,7 @@ export function deriveCommandCenterRiskDecision(input: {
     spyGamma: spyGammaSummary,
     ctaProxy,
     eventGate: eventGateFromMarketInput(input.marketInputSnapshot),
+    sectorRotation: input.sectorRotation,
     targetSession: input.targetSession,
   });
 }
@@ -976,10 +1001,17 @@ export function summarizeSectorRotation(input: {
     };
   }
 
-  const latestSession =
-    input.barPanelLatestSession ??
-    spyBars.filter((bar) => bar.sessionDate <= input.targetSession).at(-1)?.sessionDate ??
-    null;
+  const spyAlignedLast =
+    spyBars.filter((bar) => bar.sessionDate <= input.targetSession).at(-1)
+      ?.sessionDate ?? null;
+  const panelLatest = input.barPanelLatestSession;
+  const effectivePanelLatest =
+    panelLatest !== null &&
+    panelLatest !== undefined &&
+    panelLatest <= input.targetSession
+      ? panelLatest
+      : null;
+  const latestSession = effectivePanelLatest ?? spyAlignedLast;
   const stale =
     latestSession !== null && latestSession !== input.targetSession;
 
@@ -1100,7 +1132,7 @@ function previewSectorRotationSummary(): V2SectorRotationSummary {
   };
 }
 
-export function buildV2CommandCenterView(input: {
+export async function buildV2CommandCenterView(input: {
   readonly driver: DominantDriver | null;
   readonly spyGamma: BoundedGammaDeskView;
   readonly qqqGamma: BoundedGammaDeskView;
@@ -1115,10 +1147,15 @@ export function buildV2CommandCenterView(input: {
   readonly marketInputSnapshot?: MarketInputSnapshot | null;
   readonly dataRoot?: string | null;
   readonly barPanelLatestSession?: string | null;
-}): V2CommandCenterView {
+  readonly artifactStore?: RuntimeJsonStore;
+  readonly forceRiskDecisionDaily?: boolean;
+}): Promise<V2CommandCenterView> {
   const preview = input.methodologyPreview === true;
   const now = input.now ?? new Date();
-  const macroSummary = summarizeMacroFromDriver(input.driver);
+  const macroSummary = summarizeMacroFromDriver(input.driver, {
+    marketQuotes: input.marketQuotes,
+    now,
+  });
   const gammaOptions = {
     driver: input.driver,
     now,
@@ -1183,6 +1220,7 @@ export function buildV2CommandCenterView(input: {
     spyGamma: input.spyGamma,
     qqqGamma: input.qqqGamma,
     spyBreadth,
+    sectorRotation,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
     now,
@@ -1207,13 +1245,24 @@ export function buildV2CommandCenterView(input: {
   const publicationDate = resolveCurrentMarketSessionDate(now);
   const dayOverDay =
     decision.status === "ready"
-      ? resolveRiskDecisionDayOverDay({
-          dataRoot: input.dataRoot,
-          publicationDate,
-          decisionSessionDate: targetSession,
-          today: decision,
-          now,
-        })
+      ? input.artifactStore
+        ? await resolveRiskDecisionDayOverDayAsync({
+            artifactStore: input.artifactStore,
+            dataRoot: input.dataRoot,
+            publicationDate,
+            decisionSessionDate: targetSession,
+            today: decision,
+            now,
+            force: input.forceRiskDecisionDaily === true,
+          })
+        : resolveRiskDecisionDayOverDay({
+            dataRoot: input.dataRoot,
+            publicationDate,
+            decisionSessionDate: targetSession,
+            today: decision,
+            now,
+            force: input.forceRiskDecisionDaily === true,
+          })
       : { riskChange: null, riskChangeReason: null };
 
   return {

@@ -2,8 +2,11 @@ import { runMacroIngest, DEFAULT_DATA_ROOT } from "@/ingest";
 import { writePipelineError } from "@/desk/pipeline-status";
 import {
   interpretAndWriteDriver,
+  interpretAndWriteDriverAsync,
   type InterpretWriteResult,
 } from "./interpret-and-write";
+import type { RuntimeJsonStore } from "@/desk/runtime-store";
+import { writeJson } from "@/desk/runtime-store";
 import type { IngestRunResult } from "@/ingest";
 
 export interface DailyRunResult {
@@ -20,6 +23,7 @@ export async function runDailyPipeline(options: {
   readonly dataRoot?: string;
   readonly force?: boolean;
   readonly token?: string;
+  readonly artifactStore?: RuntimeJsonStore;
 } = {}): Promise<DailyRunResult> {
   const dataRoot = options.dataRoot ?? DEFAULT_DATA_ROOT;
 
@@ -40,12 +44,28 @@ export async function runDailyPipeline(options: {
     throw error instanceof Error ? error : new Error(message);
   }
 
+  if (options.artifactStore) {
+    await writeJson(
+      options.artifactStore,
+      `snapshots/${ingest.snapshot.marketSessionDate}.json`,
+      ingest.snapshot,
+      { allowOverwrite: true },
+    );
+  }
+
   try {
-    const interpret = interpretAndWriteDriver({
-      dataRoot,
-      session: ingest.snapshot.marketSessionDate,
-      updatePipelineStatus: true,
-    });
+    const interpret = options.artifactStore
+      ? await interpretAndWriteDriverAsync({
+          dataRoot,
+          session: ingest.snapshot.marketSessionDate,
+          updatePipelineStatus: true,
+          artifactStore: options.artifactStore,
+        })
+      : interpretAndWriteDriver({
+          dataRoot,
+          session: ingest.snapshot.marketSessionDate,
+          updatePipelineStatus: true,
+        });
     return { ingest, interpret };
   } catch (error: unknown) {
     // interpretAndWriteDriver already wrote pipeline error; rethrow.

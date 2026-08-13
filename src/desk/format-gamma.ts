@@ -568,7 +568,18 @@ export function summarizeVolMispricing(input: {
       ? ivField.value
       : null;
 
-  const hv20Pct = computeHv20AnnualizedPct(input.hv20Bars);
+  let hv20Bars = input.hv20Bars;
+  if (ivField?.sessionDate && input.hv20Bars?.length) {
+    const aligned = equityBarsThroughSession(input.hv20Bars, ivField.sessionDate);
+    if (
+      aligned.length >= 21 &&
+      aligned.at(-1)?.sessionDate === ivField.sessionDate
+    ) {
+      hv20Bars = aligned;
+    }
+  }
+
+  const hv20Pct = computeHv20AnnualizedPct(hv20Bars);
 
   if (ivDecimal === null || hv20Pct === null) {
     return {
@@ -631,14 +642,17 @@ export function computeCloseMovingAverage(
   return sum / period;
 }
 
-function latestBarSessionDate(
-  bars: readonly { readonly sessionDate: string; readonly close: number }[],
-): string | null {
-  if (bars.length === 0) return null;
-  const sorted = [...bars].sort((left, right) =>
-    left.sessionDate.localeCompare(right.sessionDate),
-  );
-  return sorted.at(-1)?.sessionDate ?? null;
+export function equityBarsThroughSession(
+  bars:
+    | readonly { readonly sessionDate: string; readonly close: number }[]
+    | null
+    | undefined,
+  targetSession: string,
+): readonly { readonly sessionDate: string; readonly close: number }[] {
+  if (!bars?.length) return [];
+  return [...bars]
+    .filter((bar) => bar.sessionDate <= targetSession)
+    .sort((left, right) => left.sessionDate.localeCompare(right.sessionDate));
 }
 
 function classifySymbolCtaTrend(
@@ -706,15 +720,15 @@ export function summarizeCtaProxy(input: {
   readonly qqqPrice: number | null;
   readonly targetSession: string;
 }): CtaProxySummary {
-  const spyBars = input.spyBars;
-  const qqqBars = input.qqqBars;
+  const spyBars = equityBarsThroughSession(input.spyBars, input.targetSession);
+  const qqqBars = equityBarsThroughSession(input.qqqBars, input.targetSession);
 
-  if (!spyBars?.length || !qqqBars?.length) {
+  if (spyBars.length === 0 || qqqBars.length === 0) {
     return CTA_PROXY_UNAVAILABLE;
   }
 
-  const spyLastSession = latestBarSessionDate(spyBars);
-  const qqqLastSession = latestBarSessionDate(qqqBars);
+  const spyLastSession = spyBars.at(-1)?.sessionDate ?? null;
+  const qqqLastSession = qqqBars.at(-1)?.sessionDate ?? null;
   if (
     spyLastSession !== input.targetSession ||
     qqqLastSession !== input.targetSession

@@ -7,15 +7,26 @@ import { fetchOfficialResults } from "@/catalyst/results/fetch-results";
 import { resolveMarketDataApiToken } from "@/gamma/marketdata-app/config";
 import { resolveBoundedGammaExpiration } from "@/gamma/marketdata-app/resolve-expiration";
 import { runBoundedGammaProvider } from "@/gamma/marketdata-app/run";
-import { boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
+import { boundedGammaArtifactRelativePath, boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
+import {
+  artifactSourceLabel,
+  createFilesystemRuntimeJsonStore,
+  readJson,
+  resolveEphemeralDataRoot,
+  resolveRuntimeJsonStore,
+  type RuntimeJsonStore,
+} from "./runtime-store";
 import {
   isBoundedGammaSessionStale,
   resolveBoundedGammaTargetSession,
 } from "./bounded-gamma-freshness";
-import { resolveCurrentMarketSessionDate } from "@/ai-study/session";
+import {
+  resolveCurrentMarketSessionDate,
+  resolveLastCompletedMarketSessionDate,
+} from "@/ai-study/session";
 import { runDailyPipeline } from "@/pipeline/run-daily";
-import { loadMacroDesk } from "./load-macro-desk";
-import { loadSessionDriver } from "./load-session-driver";
+import { loadMacroDesk, loadMacroDeskAsync } from "./load-macro-desk";
+import { loadSessionDriver, loadSessionDriverAsync } from "./load-session-driver";
 import {
   loadBoundedGammaDeskView,
   type BoundedGammaDeskView,
@@ -35,32 +46,36 @@ export function isServerlessHost(env: NodeJS.ProcessEnv = process.env): boolean 
   return Boolean((env.VERCEL ?? "").trim());
 }
 
+export function deskDataRootFromGammaProviderRoot(gammaProviderRoot: string): string {
+  return join(gammaProviderRoot, "..", "..", "..");
+}
+
+function resolveGammaArtifactStore(
+  options: Pick<LoadBoundedGammaOptions, "dataRoot" | "artifactStore">,
+  env: NodeJS.ProcessEnv,
+): RuntimeJsonStore {
+  if (options.artifactStore) return options.artifactStore;
+  if (options.dataRoot) {
+    return createFilesystemRuntimeJsonStore({
+      dataRoot: deskDataRootFromGammaProviderRoot(options.dataRoot),
+    });
+  }
+  return resolveRuntimeJsonStore(env);
+}
+
 /**
- * Local dev uses gitignored `data/`. Vercel uses writable `/tmp` when local
- * `data/` is absent (true serverless cold start). If `data/` exists locally,
- * prefer it even when VERCEL is set in env — avoids missing cached artifacts.
+ * Ephemeral scratch for non-durable caches (bars, catalyst, pipeline status).
+ * Durable desk artifacts use `resolveRuntimeJsonStore()`.
  */
 export function resolveRuntimeDataRoot(env: NodeJS.ProcessEnv = process.env): string {
-  const localRoot = join(process.cwd(), "data");
-  if (!isServerlessHost(env) || existsSync(localRoot)) {
-    return localRoot;
-  }
-  return join("/tmp", "gammadesk-data");
+  return resolveEphemeralDataRoot(env);
 }
 
-function ensureDir(path: string): void {
-  mkdirSync(path, { recursive: true });
-}
-
-function macroDriversDir(dataRoot: string): string {
-  return join(dataRoot, "drivers");
-}
-
-function hasMacroDriverForSession(
-  dataRoot: string,
+async function hasMacroDriverForSessionAsync(
+  artifactStore: RuntimeJsonStore,
   sessionDate: string,
-): boolean {
-  const loaded = loadSessionDriver(sessionDate, dataRoot);
+): Promise<boolean> {
+  const loaded = await loadSessionDriverAsync(sessionDate, artifactStore);
   if (!loaded.driver) return false;
   if (
     loaded.issues.some(
@@ -80,13 +95,15 @@ const macroRefreshByRoot = new Map<string, Promise<{ ok: boolean; error?: string
 export async function ensureMacroDriverArtifact(options: {
   readonly dataRoot?: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly artifactStore?: RuntimeJsonStore;
 } = {}): Promise<{ readonly refreshed: boolean; readonly ok: boolean; readonly error?: string }> {
   const env = options.env ?? process.env;
   const dataRoot = options.dataRoot ?? resolveRuntimeDataRoot(env);
-  ensureDir(macroDriversDir(dataRoot));
-  const sessionDate = resolveCurrentMarketSessionDate();
+  const artifactStore = options.artifactStore ?? resolveRuntimeJsonStore(env);
+  ensureDir(join(dataRoot, "drivers"));
+  const sessionDate = resolveLastCompletedMarketSessionDate();
 
-  if (hasMacroDriverForSession(dataRoot, sessionDate)) {
+  if (await hasMacroDriverForSessionAsync(artifactStore, sessionDate)) {
     return { refreshed: false, ok: true };
   }
 
@@ -99,24 +116,34 @@ export async function ensureMacroDriverArtifact(options: {
     };
   }
 
-  let pending = macroRefreshByRoot.get(dataRoot);
+  const refreshKey = `${artifactStore.rootLabel}:${sessionDate}`;
+  let pending = macroRefreshByRoot.get(refreshKey);
   if (!pending) {
     pending = (async () => {
       try {
-        await runDailyPipeline({ dataRoot, token });
-        return { ok: hasMacroDriverForSession(dataRoot, sessionDate) };
+        await runDailyPipeline({
+          dataRoot,
+          token,
+          artifactStore,
+          force: true,
+        });
+        return { ok: await hasMacroDriverForSessionAsync(artifactStore, sessionDate) };
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         return { ok: false, error: message };
       } finally {
-        macroRefreshByRoot.delete(dataRoot);
+        macroRefreshByRoot.delete(refreshKey);
       }
     })();
-    macroRefreshByRoot.set(dataRoot, pending);
+    macroRefreshByRoot.set(refreshKey, pending);
   }
 
   const result = await pending;
   return { refreshed: true, ...result };
+}
+
+function ensureDir(path: string): void {
+  mkdirSync(path, { recursive: true });
 }
 
 export async function resolveDeskRequestAsync(
@@ -129,10 +156,11 @@ export async function resolveDeskRequestAsync(
   }
 
   const dataRoot = options.dataRoot ?? resolveRuntimeDataRoot(env);
-  const sync = resolveDeskRequest({
+  const artifactStore = resolveRuntimeJsonStore(env);
+  const sync = await loadMacroDeskAsync({
     ...options,
     dataRoot,
-    publicDemo: false,
+    artifactStore,
   });
 
   const currentSession = resolveCurrentMarketSessionDate();
@@ -148,7 +176,7 @@ export async function resolveDeskRequestAsync(
     return sync;
   }
 
-  const refresh = await ensureMacroDriverArtifact({ dataRoot, env });
+  const refresh = await ensureMacroDriverArtifact({ dataRoot, env, artifactStore });
   if (!refresh.ok) {
     return {
       ...sync,
@@ -161,10 +189,10 @@ export async function resolveDeskRequestAsync(
     };
   }
 
-  return resolveDeskRequest({
+  return loadMacroDeskAsync({
     ...options,
     dataRoot,
-    publicDemo: false,
+    artifactStore,
   });
 }
 
@@ -290,9 +318,10 @@ async function ensureBoundedGammaSnapshot(options: {
   readonly symbol: string;
   readonly dataRoot: string;
   readonly env: NodeJS.ProcessEnv;
+  readonly artifactStore: RuntimeJsonStore;
 }): Promise<{ readonly ok: boolean; readonly error?: string }> {
-  const path = boundedGammaLatestPath(options.symbol, options.dataRoot);
-  const key = `${options.dataRoot}:${options.symbol}:${path}`;
+  const artifactRelativePath = boundedGammaArtifactRelativePath(options.symbol);
+  const key = `${options.artifactStore.rootLabel}:${options.symbol}:${artifactRelativePath}`;
 
   const token = resolveMarketDataApiToken(options.env);
   if (!token) {
@@ -325,6 +354,7 @@ async function ensureBoundedGammaSnapshot(options: {
         dataRoot: options.dataRoot,
         token,
         env: options.env,
+        artifactStore: options.artifactStore,
       });
       if (!result.ok) {
         throw new Error(result.error);
@@ -349,18 +379,25 @@ export async function loadBoundedGammaDeskViewAsync(
 ): Promise<BoundedGammaDeskView> {
   const env = options.env ?? process.env;
   const symbol = (options.symbol ?? "SPY").toUpperCase();
+  const artifactStore = resolveGammaArtifactStore(options, env);
   const dataRoot =
     options.dataRoot ??
     join(resolveRuntimeDataRoot(env), "gamma", "providers", "marketdata-app");
   const targetSession =
     options.targetSession ??
     resolveBoundedGammaTargetSession(options.now ?? new Date());
+  const artifactRelativePath = boundedGammaArtifactRelativePath(symbol);
+  const prefetched = await readJson(artifactStore, artifactRelativePath);
 
   const sync = loadBoundedGammaDeskView({
     ...options,
     dataRoot,
     publicDemo: options.publicDemo ?? false,
     targetSession,
+    prefetchedSnapshot: prefetched ?? undefined,
+    prefetchedSourceLabel: prefetched
+      ? artifactSourceLabel(artifactStore, artifactRelativePath)
+      : undefined,
   });
 
   if (
@@ -371,13 +408,24 @@ export async function loadBoundedGammaDeskViewAsync(
     return sync;
   }
 
-  const refresh = await ensureBoundedGammaSnapshot({ symbol, dataRoot, env });
+  const refresh = await ensureBoundedGammaSnapshot({
+    symbol,
+    dataRoot,
+    env,
+    artifactStore,
+  });
 
+  const refreshedRaw = await readJson(artifactStore, artifactRelativePath);
   const reloaded = loadBoundedGammaDeskView({
     ...options,
     dataRoot,
     publicDemo: false,
     targetSession,
+    prefetchedSnapshot: refreshedRaw ?? prefetched ?? undefined,
+    prefetchedSourceLabel:
+      refreshedRaw || prefetched
+        ? artifactSourceLabel(artifactStore, artifactRelativePath)
+        : undefined,
   });
 
   if (!refresh.ok) {

@@ -29,9 +29,12 @@ import {
   resolveDeskRequestAsync,
 } from "./production-runtime";
 import { loadAlpacaMarketPanel } from "@/alpaca";
+import { mergeMacroAlpacaWatchlist } from "@/desk/macro-display-returns";
+import { resolveAlpacaWatchlist } from "@/alpaca/config";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
 import type { DailyBar } from "@/desk/breadth/bars/types";
 import { resolveRuntimeDataRoot } from "@/desk/production-runtime";
+import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
 import {
   buildMarketInputSnapshot,
@@ -39,10 +42,12 @@ import {
 import { loadCatalystFeedAsync } from "./production-runtime";
 import { ensureDurableSpyBreadthForMarketInput } from "./breadth/read-durable-breadth";
 import {
+  buildDeterministicV2DailyReview,
   buildV2DailyReview,
   maybePersistCommandCenterV1Daily,
   type V2DailyReview,
 } from "./command-center-v1";
+import { generateV2DailyReviewInterpretation } from "@/ai-study/v2-daily-review-interpret";
 
 export interface LoadV2HomePageInput {
   readonly demo: boolean;
@@ -101,8 +106,9 @@ export async function loadV2HomePage(
   const now = new Date();
   const targetMarketSessionDate = resolveLastCompletedMarketSessionDate(now);
   const dataRoot = resolveRuntimeDataRoot(process.env);
-  const gammaDataRoot = join(dataRoot, "gamma", "providers", "marketdata-app");
   const runtimeEnv = process.env;
+  const artifactStore = resolveRuntimeJsonStore(runtimeEnv);
+  const gammaDataRoot = join(dataRoot, "gamma", "providers", "marketdata-app");
 
   const macro = input.demo
     ? resolveDeskRequest({ demoPath: true, publicDemo: true })
@@ -148,6 +154,7 @@ export async function loadV2HomePage(
       publicDemo: input.demo,
       now,
       env: runtimeEnv,
+      symbols: mergeMacroAlpacaWatchlist(resolveAlpacaWatchlist(runtimeEnv)),
     }).catch(() => null),
     loadAlpacaDailyBarPanel({
       symbols: [...new Set(["QQQ", ...sectorRotationBarSymbols()])],
@@ -187,7 +194,7 @@ export async function loadV2HomePage(
     },
   });
 
-  const baseView = buildV2CommandCenterView({
+  const baseView = await buildV2CommandCenterView({
     driver: macro.driver,
     spyGamma,
     qqqGamma,
@@ -198,12 +205,17 @@ export async function loadV2HomePage(
     now,
     marketInputSnapshot,
     dataRoot,
+    artifactStore: input.demo ? undefined : artifactStore,
     barPanelLatestSession: equityBars?.provenance.latestSessionDate ?? null,
+    forceRiskDecisionDaily:
+      runtimeEnv.GAMMADESK_FORCE_RISK_DECISION_DAILY === "1" ||
+      runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
   });
 
   if (!input.demo) {
-    maybePersistCommandCenterV1Daily({
+    await maybePersistCommandCenterV1Daily({
       dataRoot,
+      artifactStore,
       view: baseView,
       generatedAt: now.toISOString(),
       now,
@@ -211,20 +223,34 @@ export async function loadV2HomePage(
     });
   }
 
-  const dailyReview = buildV2DailyReview({
-    now,
-    demo: input.demo,
-    dataRoot,
-    equityBarsBySymbol,
-  });
-
-  const eventGate = eventGateFromMarketInput(marketInputSnapshot);
-  const payload = buildV2AiStudyPayload(baseView, eventGate);
   const llmEnv: NodeJS.ProcessEnv = {
     ...runtimeEnv,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     AI_STUDY_LLM_MODEL: process.env.AI_STUDY_LLM_MODEL,
   };
+
+  const { review: deterministicReview, context: dailyReviewContext } =
+    await buildDeterministicV2DailyReview({
+      now,
+      demo: input.demo,
+      dataRoot,
+      artifactStore: input.demo ? undefined : artifactStore,
+      equityBarsBySymbol,
+    });
+
+  const dailyReview =
+    input.demo || deterministicReview.status !== "ready" || !dailyReviewContext
+      ? deterministicReview
+      : await generateV2DailyReviewInterpretation({
+          review: deterministicReview,
+          context: dailyReviewContext,
+          view: baseView,
+          config: loadAiStudyLlmConfig(llmEnv),
+          env: llmEnv,
+        });
+
+  const eventGate = eventGateFromMarketInput(marketInputSnapshot);
+  const payload = buildV2AiStudyPayload(baseView, eventGate);
   const aiStudy = input.demo
     ? previewV2AiStudyInterpretation()
     : await generateV2CommandAiStudyInterpretation({

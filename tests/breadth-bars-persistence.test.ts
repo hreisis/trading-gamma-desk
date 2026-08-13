@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EtfUniverseArtifact } from "@/contracts/etf-universe-artifact";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
 import * as barCacheModule from "@/desk/breadth/bars/cache";
+import { writeSymbolBarCache } from "@/desk/breadth/bars/cache";
 import * as breadthComputeModule from "@/desk/breadth/compute/breadth";
 import { produceDailySpyBreadth } from "@/desk/breadth/produce-daily-spy-breadth";
 import { breadthProducerHttpStatus } from "@/desk/breadth/producer-http";
@@ -63,6 +64,36 @@ afterEach(() => {
 });
 
 describe("loadAlpacaDailyBarPanel filesystem persistence", () => {
+  it("loads cached bars when Alpaca credentials are absent", async () => {
+    const dataRoot = mkdtempSync(join(process.cwd(), "tmp-bars-"));
+    writeSymbolBarCache(dataRoot, {
+      symbol: "SPY",
+      bars: [
+        {
+          sessionDate: "2026-08-12",
+          open: 640,
+          high: 641,
+          low: 639,
+          close: 640.5,
+          volume: 1000,
+        },
+      ],
+      updatedAt: "2026-08-12T00:00:00.000Z",
+    });
+
+    const panel = await loadAlpacaDailyBarPanel({
+      symbols: ["SPY", "QQQ"],
+      env: { NODE_ENV: "development" } as NodeJS.ProcessEnv,
+      dataRoot,
+    });
+
+    expect(panel.provenance.returnedSymbols).toBe(1);
+    expect(panel.provenance.failedSymbols).toEqual(["QQQ"]);
+    expect(panel.seriesBySymbol.get("SPY")?.bars.at(-1)?.sessionDate).toBe(
+      "2026-08-12",
+    );
+  });
+
   it("does not write bar cache on Vercel after a successful Alpaca fetch", async () => {
     const writeSpy = vi.spyOn(barCacheModule, "writeSymbolBarCache");
 

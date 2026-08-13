@@ -5,6 +5,12 @@ import type { MacroSnapshot } from "@/ingest";
 import { interpretSnapshot } from "@/interpret";
 import { writeJsonAtomic } from "@/desk/atomic-write";
 import {
+  artifactSourceLabel,
+  readJson,
+  writeJson,
+  type RuntimeJsonStore,
+} from "@/desk/runtime-store";
+import {
   writePipelineError,
   writePipelineOk,
 } from "@/desk/pipeline-status";
@@ -88,6 +94,94 @@ export function interpretAndWriteDriver(options: {
     }
 
     return { driver, driverPath, session };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (updateStatus) {
+      writePipelineError({
+        dataRoot: root,
+        stage: "interpret",
+        error: message,
+        attemptedSession: session,
+      });
+    }
+    throw error instanceof Error ? error : new Error(message);
+  }
+}
+
+/**
+ * Interpret macro snapshot and persist driver to durable artifact store.
+ * Ephemeral pipeline status still writes to dataRoot filesystem.
+ */
+export async function interpretAndWriteDriverAsync(options: {
+  readonly dataRoot?: string;
+  readonly session?: string;
+  readonly updatePipelineStatus?: boolean;
+  readonly artifactStore?: RuntimeJsonStore;
+}): Promise<InterpretWriteResult> {
+  const root = options.dataRoot ?? "data";
+  const updateStatus = options.updatePipelineStatus !== false;
+  const session =
+    options.session && /^\d{4}-\d{2}-\d{2}$/.test(options.session)
+      ? options.session
+      : latestSnapshotSession(root);
+
+  const snapshotRelativePath = `snapshots/${session}.json`;
+  const snapshotPath = join(root, "snapshots", `${session}.json`);
+
+  let snapshotRaw: unknown | null = null;
+  if (options.artifactStore) {
+    snapshotRaw = await readJson(options.artifactStore, snapshotRelativePath);
+  }
+  if (snapshotRaw === null && existsSync(snapshotPath)) {
+    snapshotRaw = JSON.parse(readFileSync(snapshotPath, "utf8")) as unknown;
+  }
+
+  if (snapshotRaw === null) {
+    const message = `missing snapshot ${snapshotPath}`;
+    if (updateStatus) {
+      writePipelineError({
+        dataRoot: root,
+        stage: "interpret",
+        error: message,
+        attemptedSession: session,
+      });
+    }
+    throw new Error(message);
+  }
+
+  try {
+    const snapshot = snapshotRaw as MacroSnapshot;
+    if (snapshot.kind !== "MacroComputeSnapshot") {
+      throw new Error(
+        `expected MacroComputeSnapshot at ${snapshotPath}, got ${String(snapshot.kind)}`,
+      );
+    }
+
+    const driver = interpretSnapshot(snapshot);
+    const driverRelativePath = `drivers/${session}.json`;
+    const driverPath = join(root, "drivers", `${session}.json`);
+
+    if (options.artifactStore) {
+      await writeJson(options.artifactStore, driverRelativePath, driver, {
+        allowOverwrite: true,
+      });
+    }
+    writeJsonAtomic(driverPath, driver);
+
+    const driverLabel = options.artifactStore
+      ? artifactSourceLabel(options.artifactStore, driverRelativePath)
+      : driverPath;
+
+    if (updateStatus) {
+      writePipelineOk({
+        dataRoot: root,
+        stage: "interpret",
+        session,
+        driverPath: driverLabel,
+      });
+    }
+
+    return { driver, driverPath: driverLabel, session };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     if (updateStatus) {
