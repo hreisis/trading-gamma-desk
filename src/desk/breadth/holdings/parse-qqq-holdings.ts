@@ -18,7 +18,7 @@ export interface InvescoQqqHoldingRow {
   readonly units?: number;
   readonly percentageOfTotalNetAssets?: number;
   readonly securityTypeCode?: string;
-  readonly cusip?: string;
+  readonly cusip?: string | null;
 }
 
 export interface InvescoQqqHoldingsPayload {
