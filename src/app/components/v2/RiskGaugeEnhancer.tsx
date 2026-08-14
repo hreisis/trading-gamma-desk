@@ -15,7 +15,9 @@ function applyRiskNeedle() {
   }
 
   const bounded = Math.max(0, Math.min(100, score));
-  const angle = -90 + bounded * 1.8;
+  // Gauge spans left (0) -> top (50) -> right (100).
+  // CSS needle points right at 0deg, so map score into -180deg -> 0deg.
+  const angle = -180 + bounded * 1.8;
   gauge.style.setProperty("--risk-angle", `${angle}deg`);
   gauge.dataset.pointer = "on";
 }
