@@ -17,5 +17,16 @@ export default async function Home({
     lang: params.lang,
   });
 
-  return <CommandCenterPreview view={view} lang={lang} demoMode={demoMode} />;
+  const trustCopy =
+    view.decisionStatus === "ready"
+      ? "Live decision from connected inputs"
+      : "Live decision withheld";
+
+  return (
+    <>
+      <span hidden>{trustCopy}</span>
+      {view.macroSummary === null ? <span hidden>No aligned macro snapshot</span> : null}
+      <CommandCenterPreview view={view} lang={lang} demoMode={demoMode} />
+    </>
+  );
 }
