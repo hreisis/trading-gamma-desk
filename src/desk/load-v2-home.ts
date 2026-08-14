@@ -33,6 +33,8 @@ import { mergeMacroAlpacaWatchlist } from "@/desk/macro-display-returns";
 import { resolveAlpacaWatchlist } from "@/alpaca/config";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
 import type { DailyBar } from "@/desk/breadth/bars/types";
+import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
+import type { EventGateSnapshot } from "@/contracts/event-gate";
 import { resolveRuntimeDataRoot } from "@/desk/production-runtime";
 import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
@@ -51,6 +53,13 @@ import {
   type V2DailyReview,
 } from "./command-center-v1";
 import { generateV2DailyReviewInterpretation } from "@/ai-study/v2-daily-review-interpret";
+import {
+  buildTechnologyInternalSummary,
+  buildTechLeadersLaggardsSummary,
+  technologyUiBarSymbols,
+  type V2TechnologyInternalSummary,
+  type V2TechLeadersLaggardsSummary,
+} from "./v2-ui-projection";
 
 export interface LoadV2HomePageInput {
   readonly demo: boolean;
@@ -61,6 +70,10 @@ export interface LoadV2HomePageInput {
 export type V2CommandCenterPageView = V2CommandCenterView & {
   readonly aiStudy: V2AiStudyInterpretation;
   readonly dailyReview: V2DailyReview;
+  readonly eventGate: EventGateSnapshot | null;
+  readonly marketQuotes: readonly AlpacaMarketQuote[];
+  readonly technologyInternal: V2TechnologyInternalSummary;
+  readonly techLeadersLaggards: V2TechLeadersLaggardsSummary;
 };
 
 export interface V2HomePageModel {
@@ -180,7 +193,13 @@ export async function loadV2HomePage(
       symbols: mergeMacroAlpacaWatchlist(resolveAlpacaWatchlist(runtimeEnv)),
     }).catch(() => null),
     loadAlpacaDailyBarPanel({
-      symbols: [...new Set(["QQQ", ...sectorRotationBarSymbols()])],
+      symbols: [
+        ...new Set([
+          "QQQ",
+          ...sectorRotationBarSymbols(),
+          ...technologyUiBarSymbols(),
+        ]),
+      ],
       env: runtimeEnv,
       dataRoot,
     }).catch(() => null),
@@ -200,6 +219,9 @@ export async function loadV2HomePage(
       equityBarsBySymbol.set(symbol, series.bars);
     }
   }
+
+  const technologyInternal = buildTechnologyInternalSummary(equityBarsBySymbol);
+  const techLeadersLaggards = buildTechLeadersLaggardsSummary(equityBarsBySymbol);
 
   const marketInputSnapshot = buildMarketInputSnapshot({
     targetMarketSessionDate,
@@ -283,7 +305,15 @@ export async function loadV2HomePage(
         env: llmEnv,
       });
 
-  const view: V2CommandCenterPageView = { ...baseView, aiStudy, dailyReview };
+  const view: V2CommandCenterPageView = {
+    ...baseView,
+    aiStudy,
+    dailyReview,
+    eventGate,
+    marketQuotes: marketPanel?.quotes ?? [],
+    technologyInternal,
+    techLeadersLaggards,
+  };
 
   return { view, lang, demoMode: input.demo };
 }
