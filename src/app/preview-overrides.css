@@ -65,6 +65,30 @@
 .pv-app .pv-confidence > div,
 .pv-app .pv-review > div { font-size: 12px; line-height: 1.55; }
 
+/* Left-bottom language switch replaces Settings. */
+.pv-app .pv-language-switch {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9aa9c1;
+  white-space: nowrap;
+}
+.pv-app .pv-language-switch a {
+  color: #8292ad;
+  text-decoration: none;
+  transition: color .15s ease;
+}
+.pv-app .pv-language-switch a:hover,
+.pv-app .pv-language-switch a.active {
+  color: #004fff;
+}
+.pv-app .pv-language-switch span { color: #c6d0df; }
+
 /* AI is a primary product surface: give it more desktop width. */
 .pv-app .pv-main {
   grid-template-columns: minmax(760px, 1fr) minmax(360px, 27vw);
@@ -138,6 +162,8 @@
 @media (max-width: 1180px) {
   .pv-app { grid-template-columns: 72px 1fr; }
   .pv-app .pv-nav span { display: none; }
+  .pv-app .pv-language-switch span { display: inline; }
+  .pv-app .pv-language-switch { flex-direction: column; gap: 2px; }
   .pv-app .pv-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pv-app .pv-bottom-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pv-app .pv-tickers span:nth-child(n+6) { display: none; }
