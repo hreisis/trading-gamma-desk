@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/desk/public-demo";
+import { RiskGaugeEnhancer } from "@/app/components/v2/RiskGaugeEnhancer";
 import "./globals.css";
 import "./preview-overrides.css";
 
@@ -37,7 +38,10 @@ export default function RootLayout({
       className={`${sans.variable} ${mono.variable}`}
       style={{ background: "#fff" }}
     >
-      <body style={{ background: "#fff" }}>{children}</body>
+      <body style={{ background: "#fff" }}>
+        {children}
+        <RiskGaugeEnhancer />
+      </body>
     </html>
   );
 }
