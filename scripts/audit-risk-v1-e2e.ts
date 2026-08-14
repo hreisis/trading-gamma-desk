@@ -22,17 +22,23 @@ import {
 import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
 import {
   buildV2CommandCenterView,
-  deriveCommandCenterRiskDecision,
   eventGateFromMarketInput,
   sectorRotationBarSymbols,
   summarizeSpyBreadthFromDurable,
 } from "@/desk/v2-command-center";
 import {
+  deriveRiskDecisionV1,
   loadPriorPublishedRiskDecision,
   loadRiskDecisionV1Daily,
   riskDecisionPublicationDate,
   type RiskFactorContributionSnapshot,
+  type RiskDecisionSpyGammaInput,
 } from "@/desk/risk-decision-v1";
+import type { BoundedGammaDeskView } from "@/desk/load-bounded-gamma";
+import {
+  summarizeVolMispricing,
+  dealerFlowRegimeLabel,
+} from "@/desk/format-gamma";
 
 interface FactorRow {
   readonly factor: string;
@@ -53,6 +59,44 @@ function fmt(v: unknown): string {
 
 function contribution(score: number, effWt: number): number {
   return score * effWt;
+}
+
+function buildSpyGammaRiskInput(
+  view: BoundedGammaDeskView,
+  equityBarsBySymbol: ReadonlyMap<
+    string,
+    readonly { sessionDate: string; close: number }[]
+  >,
+): RiskDecisionSpyGammaInput {
+  const snapshot = view.snapshot ?? view.withheldSnapshot;
+  const deskStatus: RiskDecisionSpyGammaInput["status"] =
+    snapshot === null
+      ? "unavailable"
+      : snapshot.status === "incomplete"
+        ? "incomplete"
+        : snapshot.status === "unavailable"
+          ? "unavailable"
+          : "ready";
+  const freshness =
+    view.freshness ??
+    (snapshot?.status === "incomplete" ? "incomplete" : "fresh");
+  const showFlow = deskStatus === "ready" || deskStatus === "incomplete";
+  const volMispricing = summarizeVolMispricing({
+    representativeIv: snapshot?.representativeIv,
+    hv20Bars: equityBarsBySymbol.get("SPY"),
+    isFixture: view.isFixture,
+  });
+  return {
+    status: deskStatus,
+    freshness,
+    regime: showFlow ? snapshot?.gammaRegime ?? null : null,
+    dealerFlowRegime: showFlow
+      ? snapshot?.gammaRegime
+        ? dealerFlowRegimeLabel(snapshot.gammaRegime)
+        : null
+      : null,
+    volMispricing,
+  };
 }
 
 async function main(): Promise<void> {
@@ -151,21 +195,18 @@ async function main(): Promise<void> {
     barPanelLatestSession: equityBars?.provenance.latestSessionDate ?? null,
   });
 
-  const decision = deriveCommandCenterRiskDecision({
+  const eventGate = eventGateFromMarketInput(marketInputSnapshot);
+  const decision = deriveRiskDecisionV1({
     driver: macro.driver,
-    spyGamma,
-    qqqGamma,
     spyBreadth,
+    spyGamma: buildSpyGammaRiskInput(spyGamma, equityBarsBySymbol),
+    ctaProxy: view.ctaProxy,
+    eventGate,
     sectorRotation: view.sectorRotation,
-    marketQuotes: marketPanel?.quotes,
-    equityBarsBySymbol,
-    now,
-    marketInputSnapshot,
     targetSession,
   });
 
   const spySummary = view.gamma[0];
-  const eventGate = eventGateFromMarketInput(marketInputSnapshot);
 
   const rows: FactorRow[] = [];
 

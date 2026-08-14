@@ -8,7 +8,6 @@ export * from "./bars/types";
 export * from "./bars/cache";
 export * from "./bars/alpaca-panel";
 export * from "./compute/breadth";
-export * from "./load-spy-breadth";
 export * from "./holdings/parse-qqq-holdings";
 export * from "./universe/load-qqq-universe";
 export * from "./produce-daily-qqq-breadth";

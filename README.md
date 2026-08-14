@@ -181,7 +181,7 @@ npm run catalyst:update -- --max-events 2
 | `/api/alpaca/market` | Watchlist quotes JSON for the Market panel |
 | `/api/ai-study` | AI Study briefing JSON |
 
-Demo walkthrough: [docs/demo/macro-desk.md](docs/demo/macro-desk.md).
+Public demo: `/demo` (V2 Command Center with synthetic fixtures).
 
 ---
 

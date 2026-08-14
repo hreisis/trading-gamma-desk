@@ -847,7 +847,7 @@ Does **not** compute Risk, Exposure, Allocation, or stance. Each `inputs[]` row 
 
 ### BreadthInternals (V2-3B3)
 
-Session-level SPY ETF-holdings breadth. Zod: `src/contracts/breadth-internals.ts`. Builder: `loadSpyBreadthInternals` → `computeSpyBreadthInternals`. **Current schema version: `0.2.0`** (legacy stored artifacts may remain at `0.1.0`).
+Session-level SPY ETF-holdings breadth. Zod: `src/contracts/breadth-internals.ts`. Builder: `produceDailySpyBreadth` / `computeSpyBreadthInternals` (durable store read via `read-durable-breadth`). **Current schema version: `0.2.0`** (legacy stored artifacts may remain at `0.1.0`).
 
 | Field | Rule |
 | --- | --- |

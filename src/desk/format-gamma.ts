@@ -380,11 +380,177 @@ const REST_OF_DAY_UNAVAILABLE: RestOfDayRange = {
 };
 
 /** Two-sided normal z for a 90% rest-of-session range. */
-const REST_OF_DAY_Z_90 = 1.6448536269514722;
+export const GAMMA_CONE_Z_90 = 1.6448536269514722;
 
-function roundRestOfDayBound(value: number): number {
+/** Two-sided normal z for a 50% (core) probability range. */
+export const GAMMA_CONE_Z_50 = 0.67448975;
+
+/** @deprecated Use GAMMA_CONE_Z_90 */
+const REST_OF_DAY_Z_90 = GAMMA_CONE_Z_90;
+
+export const ANNUAL_TRADING_DAYS = 252;
+
+export interface GammaConeRangeBand {
+  readonly lower: number;
+  readonly upper: number;
+  readonly confidencePct: number;
+}
+
+export interface RestOfDayConeBands {
+  readonly status: "available" | "unavailable";
+  readonly remainingSessionFraction: number | null;
+  readonly sigmaPoints: number | null;
+  readonly coreRange50: GammaConeRangeBand | null;
+  readonly expectedRange90: GammaConeRangeBand | null;
+}
+
+function roundConeBound(value: number): number {
   if (value >= 100) return Math.round(value);
   return Math.round(value * 10) / 10;
+}
+
+/** Annualized IV decimal → daily volatility fraction (σ_daily = IV / √252). */
+export function annualIvDecimalToDailyVolPct(ivDecimal: number): number {
+  if (!Number.isFinite(ivDecimal) || ivDecimal <= 0) return 0;
+  return ivDecimal / Math.sqrt(ANNUAL_TRADING_DAYS);
+}
+
+/** Full-session sigma in price points: Spot × IV / √252. */
+export function fullSessionSigmaPoints(spot: number, ivDecimal: number): number {
+  if (!Number.isFinite(spot) || spot <= 0) return 0;
+  const dailyVol = annualIvDecimalToDailyVolPct(ivDecimal);
+  if (dailyVol <= 0) return 0;
+  return spot * dailyVol;
+}
+
+/** Remaining-session sigma: Spot × dailyIV × √(remaining session fraction). */
+export function restOfDaySigmaPoints(
+  spot: number,
+  ivDecimal: number,
+  remainingSessionFraction: number,
+): number {
+  if (remainingSessionFraction <= 0) return 0;
+  const dailyVol = annualIvDecimalToDailyVolPct(ivDecimal);
+  if (dailyVol <= 0) return 0;
+  return sessionSigmaMove(spot, dailyVol, remainingSessionFraction);
+}
+
+export function statisticalRangeBand(
+  spot: number,
+  sigmaPoints: number,
+  z: number,
+  confidencePct: number,
+): GammaConeRangeBand | null {
+  if (!Number.isFinite(spot) || spot <= 0 || sigmaPoints <= 0) return null;
+  const margin = z * sigmaPoints;
+  return {
+    lower: roundConeBound(spot - margin),
+    upper: roundConeBound(spot + margin),
+    confidencePct,
+  };
+}
+
+export function fullSessionConeBands(
+  spot: number,
+  ivDecimal: number,
+): {
+  readonly sigmaPoints: number;
+  readonly coreRange50: GammaConeRangeBand;
+  readonly expectedRange90: GammaConeRangeBand;
+} | null {
+  const sigmaPoints = fullSessionSigmaPoints(spot, ivDecimal);
+  const coreRange50 = statisticalRangeBand(spot, sigmaPoints, GAMMA_CONE_Z_50, 50);
+  const expectedRange90 = statisticalRangeBand(
+    spot,
+    sigmaPoints,
+    GAMMA_CONE_Z_90,
+    90,
+  );
+  if (!coreRange50 || !expectedRange90) return null;
+  return { sigmaPoints, coreRange50, expectedRange90 };
+}
+
+/**
+ * Rest-of-session 50% and 90% bands from symbol IV and remaining session time.
+ * Uses √(remaining session fraction) — not the full-session σ.
+ */
+export function computeRestOfDayConeBands(input: {
+  readonly spot: number | null;
+  readonly ivDecimal: number | null;
+  readonly now: Date;
+}): RestOfDayConeBands {
+  const unavailable: RestOfDayConeBands = {
+    status: "unavailable",
+    remainingSessionFraction: null,
+    sigmaPoints: null,
+    coreRange50: null,
+    expectedRange90: null,
+  };
+
+  if (
+    input.spot === null ||
+    !Number.isFinite(input.spot) ||
+    input.spot <= 0 ||
+    input.ivDecimal === null ||
+    !Number.isFinite(input.ivDecimal) ||
+    input.ivDecimal <= 0
+  ) {
+    return unavailable;
+  }
+
+  const remaining = remainingRegularSessionFraction(input.now);
+  if (remaining === null || remaining <= 0) {
+    return {
+      ...unavailable,
+      remainingSessionFraction: remaining,
+    };
+  }
+
+  const sigmaPoints = restOfDaySigmaPoints(
+    input.spot,
+    input.ivDecimal,
+    remaining,
+  );
+  if (sigmaPoints <= 0) {
+    return {
+      status: "unavailable",
+      remainingSessionFraction: remaining,
+      sigmaPoints: null,
+      coreRange50: null,
+      expectedRange90: null,
+    };
+  }
+
+  const coreRange50 = statisticalRangeBand(
+    input.spot,
+    sigmaPoints,
+    GAMMA_CONE_Z_50,
+    50,
+  );
+  const expectedRange90 = statisticalRangeBand(
+    input.spot,
+    sigmaPoints,
+    GAMMA_CONE_Z_90,
+    90,
+  );
+
+  if (!coreRange50 || !expectedRange90) {
+    return {
+      status: "unavailable",
+      remainingSessionFraction: remaining,
+      sigmaPoints: null,
+      coreRange50: null,
+      expectedRange90: null,
+    };
+  }
+
+  return {
+    status: "available",
+    remainingSessionFraction: remaining,
+    sigmaPoints,
+    coreRange50,
+    expectedRange90,
+  };
 }
 
 /**
@@ -396,30 +562,27 @@ export function estimateRestOfDayRange(input: {
   readonly dailyVolPct: number;
   readonly now: Date;
 }): RestOfDayRange {
-  if (input.spot === null || !Number.isFinite(input.spot) || input.spot <= 0) {
+  const bands = computeRestOfDayConeBands({
+    spot: input.spot,
+    ivDecimal:
+      input.dailyVolPct > 0
+        ? input.dailyVolPct * Math.sqrt(ANNUAL_TRADING_DAYS)
+        : null,
+    now: input.now,
+  });
+
+  if (
+    bands.status !== "available" ||
+    bands.expectedRange90 === null ||
+    bands.expectedRange90.confidencePct !== 90
+  ) {
     return REST_OF_DAY_UNAVAILABLE;
   }
 
-  const remaining = remainingRegularSessionFraction(input.now);
-  if (remaining === null || remaining <= 0) {
-    return REST_OF_DAY_UNAVAILABLE;
-  }
-
-  const dailyVol = input.dailyVolPct;
-  if (!Number.isFinite(dailyVol) || dailyVol <= 0) {
-    return REST_OF_DAY_UNAVAILABLE;
-  }
-
-  const sigmaMove = sessionSigmaMove(input.spot, dailyVol, remaining);
-  if (sigmaMove <= 0) {
-    return REST_OF_DAY_UNAVAILABLE;
-  }
-
-  const margin = REST_OF_DAY_Z_90 * sigmaMove;
   return {
     status: "available",
-    lower: roundRestOfDayBound(input.spot - margin),
-    upper: roundRestOfDayBound(input.spot + margin),
+    lower: bands.expectedRange90.lower,
+    upper: bands.expectedRange90.upper,
     confidencePct: 90,
   };
 }

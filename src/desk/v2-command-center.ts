@@ -32,6 +32,7 @@ import {
   type RiskDivergenceTrend,
 } from "./risk-decision-v1-1";
 import type { RuntimeJsonStore } from "./runtime-store";
+import { buildGammaCone, type GammaConeResult } from "./gamma-cone";
 import {
   dealerFlowContextLines,
   dealerFlowRegimeLabel,
@@ -214,6 +215,7 @@ export interface V2CommandCenterView {
   readonly spyBreadth: V2SpyBreadthSummary;
   readonly ctaProxy: CtaProxySummary;
   readonly gamma: readonly [V2GammaSummary, V2GammaSummary];
+  readonly gammaCone: readonly [GammaConeResult, GammaConeResult];
   readonly macroLabel: string | null;
   readonly macroSummary: V2MacroSummary | null;
   readonly sessionDate: string | null;
@@ -863,57 +865,6 @@ export function eventGateFromMarketInput(
   return candidate;
 }
 
-export function deriveCommandCenterRiskDecision(input: {
-  readonly driver: DominantDriver | null;
-  readonly spyGamma: BoundedGammaDeskView;
-  readonly qqqGamma: BoundedGammaDeskView;
-  readonly spyBreadth?: V2SpyBreadthSummary;
-  readonly sectorRotation?: V2SectorRotationSummary | null;
-  readonly marketQuotes?: readonly AlpacaMarketQuote[];
-  readonly equityBarsBySymbol?: ReadonlyMap<
-    string,
-    readonly { sessionDate: string; close: number }[]
-  >;
-  readonly now?: Date;
-  readonly marketInputSnapshot?: MarketInputSnapshot | null;
-  readonly targetSession: string;
-}): ReturnType<typeof deriveRiskDecisionV1> {
-  const now = input.now ?? new Date();
-  const gammaOptions = {
-    driver: input.driver,
-    now,
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-  };
-  const spyBreadth =
-    input.spyBreadth ??
-    summarizeSpyBreadthFromDurable(
-      {
-        snapshot: null,
-        sourceArtifact: null,
-        missingReason: "SPY breadth was not loaded.",
-      },
-      false,
-    );
-
-  const spyGammaSummary = summarizeGamma("SPY", input.spyGamma, gammaOptions);
-  const ctaProxy = summarizeCtaProxyFromInputs({
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-    now,
-  });
-
-  return deriveRiskDecisionV1({
-    driver: input.driver,
-    spyBreadth,
-    spyGamma: spyGammaSummary,
-    ctaProxy,
-    eventGate: eventGateFromMarketInput(input.marketInputSnapshot),
-    sectorRotation: input.sectorRotation,
-    targetSession: input.targetSession,
-  });
-}
-
 const SECTOR_ROTATION_UNAVAILABLE: V2SectorRotationSummary = {
   status: "unavailable",
   stale: false,
@@ -1244,6 +1195,20 @@ export async function buildV2CommandCenterView(input: {
       },
       false,
     );
+  const spyGammaCone = buildGammaCone({
+    symbol: "SPY",
+    view: input.spyGamma,
+    now,
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+  });
+  const qqqGammaCone = buildGammaCone({
+    symbol: "QQQ",
+    view: input.qqqGamma,
+    now,
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+  });
   const targetSession = resolveLastCompletedMarketSessionDate(now);
   const sectorRotationInput = {
     equityBarsBySymbol: input.equityBarsBySymbol,
@@ -1281,6 +1246,7 @@ export async function buildV2CommandCenterView(input: {
       qqqBreadth,
       ctaProxy,
       gamma: [spyGammaSummary, qqqGammaSummary],
+      gammaCone: [spyGammaCone, qqqGammaCone],
       macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
       macroSummary,
       sessionDate: input.driver?.marketSessionDate ?? null,
@@ -1379,6 +1345,7 @@ export async function buildV2CommandCenterView(input: {
     qqqBreadth,
     ctaProxy,
     gamma: [spyGammaSummary, qqqGammaSummary],
+    gammaCone: [spyGammaCone, qqqGammaCone],
     macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
     macroSummary,
     sessionDate: publicationDate,

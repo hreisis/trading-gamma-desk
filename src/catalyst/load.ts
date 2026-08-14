@@ -123,6 +123,13 @@ export const SYNTHETIC_MARKET_CONTEXT_FIXTURE_NAME =
 export const SYNTHETIC_AI_MARKET_REACTIONS_FIXTURE_NAME =
   "fixtures/catalyst/synthetic-ai-market-reactions.json";
 
+/**
+ * Frozen reference clock for bundled synthetic catalyst fixtures.
+ * Public demo must not use wall-clock `now` — synthetic events age out of the
+ * 30-day feed window and layered reactions/AI narratives disappear.
+ */
+export const CATALYST_SYNTHETIC_DEMO_REFERENCE_AT = "2026-07-29T18:00:00.000Z";
+
 function syntheticOfficialAiBriefs(): OfficialAiBrief[] {
   const briefs = (syntheticAiBriefs as { briefs?: unknown[] }).briefs;
   if (!Array.isArray(briefs)) return [];
@@ -455,9 +462,14 @@ export function loadCatalystFeed(
   } = {},
 ): CatalystFeedResponse {
   const publicDemo = options.publicDemo ?? isPublicDemoMode();
-  const now = options.now ?? new Date();
+  const syntheticPath = publicDemo || options.forceSynthetic === true;
+  const now =
+    options.now ??
+    (syntheticPath
+      ? new Date(CATALYST_SYNTHETIC_DEMO_REFERENCE_AT)
+      : new Date());
 
-  if (publicDemo || options.forceSynthetic) {
+  if (syntheticPath) {
     return loadSyntheticFeed(query, { publicDemo, now });
   }
 

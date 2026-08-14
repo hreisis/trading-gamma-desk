@@ -21,14 +21,16 @@ import {
 } from "@/desk/production-runtime";
 import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
 import {
-  deriveCommandCenterRiskDecision,
   eventGateFromMarketInput,
   summarizeSectorRotation,
   summarizeSpyBreadthFromDurable,
   sectorRotationBarSymbols,
   type V2SpyBreadthSummary,
 } from "@/desk/v2-command-center";
-import type { RiskDecisionSpyGammaInput } from "@/desk/risk-decision-v1";
+import {
+  deriveRiskDecisionV1,
+  type RiskDecisionSpyGammaInput,
+} from "@/desk/risk-decision-v1";
 import type { DominantDriver } from "@/contracts";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import type { CtaProxySummary } from "@/desk/format-gamma";
@@ -484,18 +486,6 @@ async function main() {
     },
   });
 
-  const decision = deriveCommandCenterRiskDecision({
-    driver: macro.driver,
-    spyGamma,
-    qqqGamma,
-    spyBreadth,
-    marketQuotes: marketPanel?.quotes,
-    equityBarsBySymbol,
-    now,
-    marketInputSnapshot,
-    targetSession,
-  });
-
   const sectorRotation = summarizeSectorRotation({
     equityBarsBySymbol,
     targetSession,
@@ -509,6 +499,16 @@ async function main() {
     qqqBars: equityBarsBySymbol.get("QQQ"),
     spyPrice: liveEquityPrice("SPY", marketPanel?.quotes),
     qqqPrice: liveEquityPrice("QQQ", marketPanel?.quotes),
+    targetSession,
+  });
+
+  const decision = deriveRiskDecisionV1({
+    driver: macro.driver,
+    spyBreadth,
+    spyGamma: spyGammaInput,
+    ctaProxy,
+    eventGate,
+    sectorRotation,
     targetSession,
   });
 
