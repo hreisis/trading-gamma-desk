@@ -10,8 +10,8 @@ export const BREADTH_SNAPSHOT_POINTER_SCHEMA_VERSION = "0.1.0" as const;
 export const BreadthSnapshotPointer = z.object({
   kind: z.literal("BreadthSnapshotPointer"),
   schemaVersion: z.literal(BREADTH_SNAPSHOT_POINTER_SCHEMA_VERSION),
-  universeId: z.literal("spy_etf_holdings"),
-  fundSymbol: z.literal("SPY"),
+  universeId: z.enum(["spy_etf_holdings", "qqq_etf_holdings"]),
+  fundSymbol: z.enum(["SPY", "QQQ"]),
   marketSessionDate: IsoDate,
   /** Store-relative path to the immutable snapshot JSON (no leading slash). */
   snapshotPath: z.string().min(1),

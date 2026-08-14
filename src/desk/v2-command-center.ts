@@ -1179,6 +1179,7 @@ export async function buildV2CommandCenterView(input: {
   readonly qqqGamma: BoundedGammaDeskView;
   readonly methodologyPreview?: boolean;
   readonly spyBreadth?: V2SpyBreadthSummary;
+  readonly qqqBreadth?: V2SpyBreadthSummary;
   readonly marketQuotes?: readonly AlpacaMarketQuote[];
   readonly equityBarsBySymbol?: ReadonlyMap<
     string,
@@ -1233,7 +1234,16 @@ export async function buildV2CommandCenterView(input: {
     equityBarsBySymbol: input.equityBarsBySymbol,
     now,
   });
-  const qqqBreadth = unavailableQqqBreadthSummary();
+  const qqqBreadth =
+    input.qqqBreadth ??
+    summarizeSpyBreadthFromDurable(
+      {
+        snapshot: null,
+        sourceArtifact: null,
+        missingReason: unavailableQqqBreadthSummary().missingReason,
+      },
+      false,
+    );
   const targetSession = resolveLastCompletedMarketSessionDate(now);
   const sectorRotationInput = {
     equityBarsBySymbol: input.equityBarsBySymbol,

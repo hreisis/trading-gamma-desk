@@ -1,4 +1,5 @@
 import { isServerlessHost } from "@/desk/production-runtime";
+import { breadthConfigForFund } from "../config";
 import {
   createBlobBreadthSnapshotStore,
   createFilesystemBreadthSnapshotStore,
@@ -21,8 +22,10 @@ export function resolveBreadthSnapshotStoreFromEnv(
     readonly fetchImpl?: typeof fetch;
     readonly dataRoot?: string;
     readonly blobPrefix?: string;
+    readonly fundSymbol?: "SPY" | "QQQ";
   },
 ): BreadthStoreResolution {
+  const config = breadthConfigForFund(options?.fundSymbol ?? "SPY");
   const token = readBreadthBlobToken(env);
   if (token) {
     return {
@@ -32,6 +35,8 @@ export function resolveBreadthSnapshotStoreFromEnv(
           token,
         }),
         prefix: options?.blobPrefix ?? "breadth",
+        universeId: config.universeId,
+        fundSymbol: config.fundSymbol,
       }),
     };
   }
@@ -49,6 +54,8 @@ export function resolveBreadthSnapshotStoreFromEnv(
     ok: true,
     store: createFilesystemBreadthSnapshotStore({
       dataRoot: options?.dataRoot ?? "data",
+      universeId: config.universeId,
+      fundSymbol: config.fundSymbol,
     }),
   };
 }

@@ -72,7 +72,7 @@ describe("loadDurableSpyBreadthForMarketInput", () => {
     });
 
     expect(result.snapshot).toBeNull();
-    expect(result.missingReason).toMatch(/No durable breadth latest pointer/);
+    expect(result.missingReason).toMatch(/No durable SPY breadth latest pointer/);
   });
 
   it("rejects malformed latest pointer JSON", async () => {

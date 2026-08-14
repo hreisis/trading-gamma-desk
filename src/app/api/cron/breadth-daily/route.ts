@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyCronSecret } from "@/desk/cron/verify-cron-secret";
 import { produceDailySpyBreadth } from "@/desk/breadth/produce-daily-spy-breadth";
+import { produceDailyQqqBreadth } from "@/desk/breadth/produce-daily-qqq-breadth";
 import {
   breadthProducerHttpStatus,
   logBreadthProducerResult,
@@ -29,12 +30,41 @@ export async function GET(request: Request) {
     );
   }
 
-  const result = await produceDailySpyBreadth({
+  const spyResult = await produceDailySpyBreadth({
     store: storeResolution.store,
     env: process.env,
   });
 
-  logBreadthProducerResult(result);
+  logBreadthProducerResult(spyResult);
+
+  const qqqStoreResolution = resolveBreadthSnapshotStoreFromEnv(process.env, {
+    fundSymbol: "QQQ",
+  });
+  const qqqResult = qqqStoreResolution.ok
+    ? await produceDailyQqqBreadth({
+        store: qqqStoreResolution.store,
+        env: process.env,
+      })
+    : {
+        status: "failed" as const,
+        reason: "storage_unavailable",
+        marketSessionDate:
+          spyResult.status !== "failed" ? spyResult.marketSessionDate : null,
+        detail: qqqStoreResolution.message,
+      };
+
+  logBreadthProducerResult(qqqResult);
+
+  const result =
+    spyResult.status === "failed" || qqqResult.status === "failed"
+      ? spyResult.status === "failed"
+        ? spyResult
+        : qqqResult
+      : spyResult.status === "skipped" || qqqResult.status === "skipped"
+        ? spyResult.status === "skipped"
+          ? spyResult
+          : qqqResult
+        : spyResult;
 
   const status = breadthProducerHttpStatus(result);
 

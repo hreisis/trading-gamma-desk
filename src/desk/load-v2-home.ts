@@ -40,7 +40,10 @@ import {
   buildMarketInputSnapshot,
 } from "./build-market-input-snapshot";
 import { loadCatalystFeedAsync } from "./production-runtime";
-import { ensureDurableSpyBreadthForMarketInput } from "./breadth/read-durable-breadth";
+import {
+  ensureDurableSpyBreadthForMarketInput,
+  ensureDurableQqqBreadthForMarketInput,
+} from "./breadth/read-durable-breadth";
 import {
   buildDeterministicV2DailyReview,
   buildV2DailyReview,
@@ -126,7 +129,7 @@ export async function loadV2HomePage(
     env: runtimeEnv,
   };
 
-  const [spyGamma, qqqGamma, breadthLoad, marketPanel, equityBars, catalystFeed] =
+  const [spyGamma, qqqGamma, spyBreadthLoad, qqqBreadthLoad, marketPanel, equityBars, catalystFeed] =
     await Promise.all([
     loadGamma("SPY", gammaOptions, input.demo, gammaRuntime),
     loadGamma("QQQ", gammaOptions, input.demo, gammaRuntime),
@@ -148,6 +151,26 @@ export async function loadV2HomePage(
             snapshot: null,
             sourceArtifact: null,
             missingReason: `Durable breadth read failed: ${detail}`,
+          };
+        }),
+    input.demo
+      ? Promise.resolve({
+          snapshot: null,
+          sourceArtifact: null,
+          missingReason: "QQQ breadth is not computed on the public demo path.",
+        })
+      : ensureDurableQqqBreadthForMarketInput({
+          targetMarketSessionDate,
+          publicDemo: false,
+          dataRoot,
+          env: runtimeEnv,
+        }).catch((error: unknown) => {
+          const detail =
+            error instanceof Error ? error.message : String(error);
+          return {
+            snapshot: null,
+            sourceArtifact: null,
+            missingReason: `Durable QQQ breadth read failed: ${detail}`,
           };
         }),
     loadAlpacaMarketPanel({
@@ -187,10 +210,10 @@ export async function loadV2HomePage(
     spyGamma,
     qqqGamma,
     publicDemo: input.demo,
-    breadthInternals: breadthLoad.snapshot,
+    breadthInternals: spyBreadthLoad.snapshot,
     breadthDurableMeta: {
-      sourceArtifact: breadthLoad.sourceArtifact,
-      unavailableReason: breadthLoad.missingReason,
+      sourceArtifact: spyBreadthLoad.sourceArtifact,
+      unavailableReason: spyBreadthLoad.missingReason,
     },
   });
 
@@ -199,7 +222,8 @@ export async function loadV2HomePage(
     spyGamma,
     qqqGamma,
     methodologyPreview: input.demo,
-    spyBreadth: summarizeSpyBreadthFromDurable(breadthLoad, input.demo),
+    spyBreadth: summarizeSpyBreadthFromDurable(spyBreadthLoad, input.demo),
+    qqqBreadth: summarizeSpyBreadthFromDurable(qqqBreadthLoad, input.demo),
     marketQuotes: marketPanel?.quotes,
     equityBarsBySymbol,
     now,

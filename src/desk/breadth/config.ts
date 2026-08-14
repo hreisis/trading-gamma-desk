@@ -26,3 +26,35 @@ export const SPY_BREADTH_CONFIG = {
 
 export const SPY_HOLDINGS_SOURCE_URL =
   "https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx" as const;
+
+export const QQQ_HOLDINGS_SOURCE_URL =
+  "https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/QQQ/holdings/fund?idType=ticker&interval=monthly&productType=ETF&expand=holdings" as const;
+
+export const QQQ_BREADTH_CONFIG = {
+  universeId: "qqq_etf_holdings",
+  fundSymbol: "QQQ",
+  maxUniverseSessionLag: 1,
+  minSessionsPricePair: 2,
+  minSessionsMa20: 20,
+  minSessionsMa50: 50,
+  minSessionsClosingHighLow20: 20,
+  thresholdPricePair: 0.9,
+  thresholdMa20: 0.85,
+  thresholdMa50: 0.8,
+  thresholdHighLow20: 0.85,
+  hardFloorPricePair: 0.7,
+  alpacaBatchSize: 100,
+  incrementalTradingDays: 5,
+  bootstrapCalendarDays: 400,
+  barAdjustment: "split" as const,
+} as const;
+
+export type BreadthFundConfig =
+  | typeof SPY_BREADTH_CONFIG
+  | typeof QQQ_BREADTH_CONFIG;
+
+export function breadthConfigForFund(
+  fundSymbol: "SPY" | "QQQ",
+): BreadthFundConfig {
+  return fundSymbol === "QQQ" ? QQQ_BREADTH_CONFIG : SPY_BREADTH_CONFIG;
+}

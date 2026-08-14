@@ -68,9 +68,12 @@ export const BreadthCoverageGates = z.object({
   closingHighLow20Coverage: z.number().min(0).max(1),
 });
 
+export const BreadthUniverseId = z.enum(["spy_etf_holdings", "qqq_etf_holdings"]);
+export const BreadthFundSymbol = z.enum(["SPY", "QQQ"]);
+
 export const BreadthUniverseProvenance = z.object({
-  universeId: z.literal("spy_etf_holdings"),
-  fundSymbol: z.literal("SPY"),
+  universeId: BreadthUniverseId,
+  fundSymbol: BreadthFundSymbol,
   provenanceType: z.literal("official_etf_holdings"),
   provider: z.string().min(1),
   sourceUrl: z.string().url(),

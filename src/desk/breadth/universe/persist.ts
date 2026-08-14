@@ -7,13 +7,54 @@ import { SPY_BREADTH_CONFIG } from "../config";
 import { evaluateUniverseFreshness } from "./session-lag";
 
 /**
- * Local-development persistence under `data/universes/SPY/`.
- * Not durable on Vercel serverless — deployment needs external object storage
- * or build-time artifacts; this module is the adapter boundary until then.
+ * Local-development persistence under `data/universes/{fundSymbol}/`.
  */
 
+export function universeDir(dataRoot: string, fundSymbol: string): string {
+  return join(dataRoot, "universes", fundSymbol);
+}
+
+export function universeAsOfPath(
+  dataRoot: string,
+  fundSymbol: string,
+  asOf: string,
+): string {
+  return join(universeDir(dataRoot, fundSymbol), `${asOf}.json`);
+}
+
+export function universeLatestPath(dataRoot: string, fundSymbol: string): string {
+  return join(universeDir(dataRoot, fundSymbol), "latest.json");
+}
+
+export function persistUniverseArtifact(
+  artifact: EtfUniverseArtifact,
+  dataRoot: string,
+): { readonly asOfPath: string; readonly latestPath: string } {
+  const asOfPath = universeAsOfPath(dataRoot, artifact.fundSymbol, artifact.asOf);
+  if (!existsSync(asOfPath)) {
+    writeJsonAtomic(asOfPath, artifact);
+  }
+  const latestPath = universeLatestPath(dataRoot, artifact.fundSymbol);
+  writeJsonAtomic(latestPath, artifact);
+  return { asOfPath, latestPath };
+}
+
+export function readUniverseArtifact(path: string): EtfUniverseArtifact {
+  const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  return EtfUniverseArtifactSchema.parse(raw);
+}
+
+export function loadPersistedUniverse(
+  dataRoot: string,
+  fundSymbol: string,
+): EtfUniverseArtifact | null {
+  const latestPath = universeLatestPath(dataRoot, fundSymbol);
+  if (!existsSync(latestPath)) return null;
+  return readUniverseArtifact(latestPath);
+}
+
 export function spyUniverseDir(dataRoot: string): string {
-  return join(dataRoot, "universes", SPY_BREADTH_CONFIG.fundSymbol);
+  return universeDir(dataRoot, SPY_BREADTH_CONFIG.fundSymbol);
 }
 
 export function spyUniverseAsOfPath(dataRoot: string, asOf: string): string {
@@ -28,25 +69,17 @@ export function persistSpyUniverseArtifact(
   artifact: EtfUniverseArtifact,
   dataRoot: string,
 ): { readonly asOfPath: string; readonly latestPath: string } {
-  const asOfPath = spyUniverseAsOfPath(dataRoot, artifact.asOf);
-  if (!existsSync(asOfPath)) {
-    writeJsonAtomic(asOfPath, artifact);
-  }
-  writeJsonAtomic(spyUniverseLatestPath(dataRoot), artifact);
-  return { asOfPath, latestPath: spyUniverseLatestPath(dataRoot) };
+  return persistUniverseArtifact(artifact, dataRoot);
 }
 
 export function readSpyUniverseArtifact(path: string): EtfUniverseArtifact {
-  const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
-  return EtfUniverseArtifactSchema.parse(raw);
+  return readUniverseArtifact(path);
 }
 
 export function loadPersistedSpyUniverse(
   dataRoot: string,
 ): EtfUniverseArtifact | null {
-  const latestPath = spyUniverseLatestPath(dataRoot);
-  if (!existsSync(latestPath)) return null;
-  return readSpyUniverseArtifact(latestPath);
+  return loadPersistedUniverse(dataRoot, SPY_BREADTH_CONFIG.fundSymbol);
 }
 
 export function applyUniverseFreshness(

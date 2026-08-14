@@ -15,11 +15,13 @@ import { loadBoundedGammaDeskView } from "@/desk";
 const {
   loadDurableSpyBreadthForMarketInput,
   ensureDurableSpyBreadthForMarketInput,
+  ensureDurableQqqBreadthForMarketInput,
   loadSpyUniverse,
   loadAlpacaDailyBarPanel,
 } = vi.hoisted(() => ({
   loadDurableSpyBreadthForMarketInput: vi.fn(),
   ensureDurableSpyBreadthForMarketInput: vi.fn(),
+  ensureDurableQqqBreadthForMarketInput: vi.fn(),
   loadSpyUniverse: vi.fn(),
   loadAlpacaDailyBarPanel: vi.fn(async () => null),
 }));
@@ -27,6 +29,7 @@ const {
 vi.mock("@/desk/breadth/read-durable-breadth", () => ({
   loadDurableSpyBreadthForMarketInput,
   ensureDurableSpyBreadthForMarketInput,
+  ensureDurableQqqBreadthForMarketInput,
 }));
 
 vi.mock("@/desk/breadth/universe/load-spy-universe", () => ({
@@ -114,6 +117,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   loadDurableSpyBreadthForMarketInput.mockReset();
   ensureDurableSpyBreadthForMarketInput.mockReset();
+  ensureDurableQqqBreadthForMarketInput.mockReset();
 });
 
 describe("summarizeSpyBreadthFromDurable", () => {
@@ -300,6 +304,11 @@ describe("loadV2HomePage durable breadth", () => {
     ensureDurableSpyBreadthForMarketInput.mockImplementation(async (opts) =>
       loadDurableSpyBreadthForMarketInput(opts),
     );
+    ensureDurableQqqBreadthForMarketInput.mockResolvedValue({
+      snapshot: null,
+      sourceArtifact: null,
+      missingReason: "No durable QQQ breadth latest pointer published.",
+    });
     loadDurableSpyBreadthForMarketInput.mockResolvedValue({
       snapshot: null,
       sourceArtifact: null,
@@ -318,6 +327,11 @@ describe("loadV2HomePage durable breadth", () => {
     ensureDurableSpyBreadthForMarketInput.mockRejectedValue(
       new Error("blob auth failed secret-token"),
     );
+    ensureDurableQqqBreadthForMarketInput.mockResolvedValue({
+      snapshot: null,
+      sourceArtifact: null,
+      missingReason: "No durable QQQ breadth latest pointer published.",
+    });
 
     const { loadV2HomePage } = await import("@/desk/load-v2-home");
     const { view } = await loadV2HomePage({ demo: false, forceFixture: true });
@@ -332,6 +346,11 @@ describe("loadV2HomePage durable breadth", () => {
     ensureDurableSpyBreadthForMarketInput.mockImplementation(async (opts) =>
       loadDurableSpyBreadthForMarketInput(opts),
     );
+    ensureDurableQqqBreadthForMarketInput.mockResolvedValue({
+      snapshot: null,
+      sourceArtifact: null,
+      missingReason: "No durable QQQ breadth latest pointer published.",
+    });
     loadDurableSpyBreadthForMarketInput.mockResolvedValue({
       snapshot,
       sourceArtifact: "breadth/spy_etf_holdings/snapshots/test.json",

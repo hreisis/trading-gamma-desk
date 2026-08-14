@@ -4,7 +4,12 @@ import type { BreadthStoreResolution } from "@/desk/breadth/store/create-store";
 
 import type { ProduceDailySpyBreadthResult } from "@/desk/breadth/produce-daily-spy-breadth";
 
-const { mockStore, resolveBreadthSnapshotStoreFromEnv, produceDailySpyBreadth } =
+const {
+  mockStore,
+  resolveBreadthSnapshotStoreFromEnv,
+  produceDailySpyBreadth,
+  produceDailyQqqBreadth,
+} =
   vi.hoisted(() => {
     const mockStore = {
       mode: "filesystem" as const,
@@ -32,15 +37,29 @@ const { mockStore, resolveBreadthSnapshotStoreFromEnv, produceDailySpyBreadth } 
       }),
     );
 
+    const produceDailyQqqBreadth = vi.fn(
+      async (): Promise<ProduceDailySpyBreadthResult> => ({
+        status: "published",
+        marketSessionDate: "2026-08-06",
+        snapshotIdentity: "2026-08-06_20260806T220000000Z",
+        publishedAt: "2026-08-06T22:00:00.000Z",
+      }),
+    );
+
     return {
       mockStore,
       resolveBreadthSnapshotStoreFromEnv,
       produceDailySpyBreadth,
+      produceDailyQqqBreadth,
     };
   });
 
 vi.mock("@/desk/breadth/produce-daily-spy-breadth", () => ({
   produceDailySpyBreadth,
+}));
+
+vi.mock("@/desk/breadth/produce-daily-qqq-breadth", () => ({
+  produceDailyQqqBreadth,
 }));
 
 vi.mock("@/desk/breadth/store/create-store", () => ({
@@ -165,6 +184,12 @@ describe("GET /api/cron/breadth-daily", () => {
       marketSessionDate: "2026-08-06",
       detail: "SPY holdings HTTP 503",
     });
+    produceDailyQqqBreadth.mockResolvedValueOnce({
+      status: "failed",
+      reason: "upstream_universe_unavailable",
+      marketSessionDate: "2026-08-06",
+      detail: "QQQ holdings HTTP 503",
+    });
 
     const response = await GET(
       new Request("http://localhost/api/cron/breadth-daily", {
@@ -183,6 +208,12 @@ describe("GET /api/cron/breadth-daily", () => {
   it("returns 502 when producer reports upstream bars failure", async () => {
     process.env.CRON_SECRET = "expected-secret";
     produceDailySpyBreadth.mockResolvedValueOnce({
+      status: "failed",
+      reason: "upstream_bars_unavailable",
+      marketSessionDate: "2026-08-06",
+      detail: "Alpaca daily bar panel returned zero symbols",
+    });
+    produceDailyQqqBreadth.mockResolvedValueOnce({
       status: "failed",
       reason: "upstream_bars_unavailable",
       marketSessionDate: "2026-08-06",
@@ -211,6 +242,12 @@ describe("GET /api/cron/breadth-daily", () => {
       marketSessionDate: "2026-08-06",
       detail: "blob put failed",
     });
+    produceDailyQqqBreadth.mockResolvedValueOnce({
+      status: "failed",
+      reason: "publish_failed",
+      marketSessionDate: "2026-08-06",
+      detail: "blob put failed",
+    });
 
     const response = await GET(
       new Request("http://localhost/api/cron/breadth-daily", {
@@ -224,6 +261,12 @@ describe("GET /api/cron/breadth-daily", () => {
   it("returns 200 when producer is skipped", async () => {
     process.env.CRON_SECRET = "expected-secret";
     produceDailySpyBreadth.mockResolvedValueOnce({
+      status: "skipped",
+      reason: "breadth_unavailable",
+      marketSessionDate: "2026-08-06",
+      detail: "coverage floor",
+    });
+    produceDailyQqqBreadth.mockResolvedValueOnce({
       status: "skipped",
       reason: "breadth_unavailable",
       marketSessionDate: "2026-08-06",

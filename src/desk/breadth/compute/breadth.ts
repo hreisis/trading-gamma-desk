@@ -8,7 +8,8 @@ import type { EtfUniverseArtifact } from "@/contracts/etf-universe-artifact";
 import { defaultSessionCalendar } from "@/macro/calendar";
 import type { AlpacaPanelProvenance } from "../bars/alpaca-panel";
 import type { DailyBar, SymbolBarSeries } from "../bars/types";
-import { SPY_BREADTH_CONFIG } from "../config";
+import type { BreadthFundConfig } from "../config";
+import { SPY_BREADTH_CONFIG, QQQ_BREADTH_CONFIG } from "../config";
 
 export interface BreadthComputeInput {
   readonly universe: EtfUniverseArtifact;
@@ -112,8 +113,9 @@ function firstUnavailableReason(
   return null;
 }
 
-export function computeSpyBreadthInternals(
+export function computeEtfBreadthInternals(
   input: BreadthComputeInput,
+  config: BreadthFundConfig,
 ): BreadthInternalsSnapshot {
   const includedCount = input.universe.constituents.length;
   const calendar = defaultSessionCalendar;
@@ -149,9 +151,9 @@ export function computeSpyBreadthInternals(
     const closes20 = closesEndingAtTarget(
       bars,
       input.targetMarketSessionDate,
-      SPY_BREADTH_CONFIG.minSessionsMa20,
+      config.minSessionsMa20,
     );
-    if (closes20.length >= SPY_BREADTH_CONFIG.minSessionsMa20) {
+    if (closes20.length >= config.minSessionsMa20) {
       ma20Eligible += 1;
       closingHl20Eligible += 1;
       const ma20 =
@@ -169,9 +171,9 @@ export function computeSpyBreadthInternals(
     const closes50 = closesEndingAtTarget(
       bars,
       input.targetMarketSessionDate,
-      SPY_BREADTH_CONFIG.minSessionsMa50,
+      config.minSessionsMa50,
     );
-    if (closes50.length >= SPY_BREADTH_CONFIG.minSessionsMa50) {
+    if (closes50.length >= config.minSessionsMa50) {
       ma50Eligible += 1;
       const ma50 =
         closes50.reduce((sum, value) => sum + value, 0) / closes50.length;
@@ -192,8 +194,8 @@ export function computeSpyBreadthInternals(
     unchanged,
     eligibleCount: pricePairEligible,
     includedCount,
-    threshold: SPY_BREADTH_CONFIG.thresholdPricePair,
-    hardFloor: SPY_BREADTH_CONFIG.hardFloorPricePair,
+    threshold: config.thresholdPricePair,
+    hardFloor: config.hardFloorPricePair,
     missingReason: "Insufficient price-pair coverage for advance/decline.",
   });
 
@@ -202,7 +204,7 @@ export function computeSpyBreadthInternals(
     denominator: ma20Eligible,
     eligibleCount: ma20Eligible,
     includedCount,
-    threshold: SPY_BREADTH_CONFIG.thresholdMa20,
+    threshold: config.thresholdMa20,
     allowPartial: false,
     missingReason: "Insufficient MA20-eligible symbols.",
   });
@@ -212,7 +214,7 @@ export function computeSpyBreadthInternals(
     denominator: ma50Eligible,
     eligibleCount: ma50Eligible,
     includedCount,
-    threshold: SPY_BREADTH_CONFIG.thresholdMa50,
+    threshold: config.thresholdMa50,
     allowPartial: false,
     missingReason: "Insufficient MA50-eligible symbols.",
   });
@@ -222,7 +224,7 @@ export function computeSpyBreadthInternals(
     denominator: closingHl20Eligible,
     eligibleCount: closingHl20Eligible,
     includedCount,
-    threshold: SPY_BREADTH_CONFIG.thresholdHighLow20,
+    threshold: config.thresholdHighLow20,
     allowPartial: false,
     missingReason: "Insufficient 20D closing-high eligible symbols.",
   });
@@ -232,7 +234,7 @@ export function computeSpyBreadthInternals(
     denominator: closingHl20Eligible,
     eligibleCount: closingHl20Eligible,
     includedCount,
-    threshold: SPY_BREADTH_CONFIG.thresholdHighLow20,
+    threshold: config.thresholdHighLow20,
     allowPartial: false,
     missingReason: "Insufficient 20D closing-low eligible symbols.",
   });
@@ -254,8 +256,8 @@ export function computeSpyBreadthInternals(
   if (universeStale || input.universe.status === "unavailable") {
     status = "unavailable";
     missingReason = input.universe.sessionLag !== null
-      ? `SPY universe stale (sessionLag=${input.universe.sessionLag}).`
-      : "SPY universe unavailable.";
+      ? `${config.fundSymbol} universe stale (sessionLag=${input.universe.sessionLag}).`
+      : `${config.fundSymbol} universe unavailable.`;
   } else if (advanceDecline.status === "unavailable") {
     status = "unavailable";
     missingReason = advanceDecline.missingReason;
@@ -300,8 +302,8 @@ export function computeSpyBreadthInternals(
       closingHighLow20Coverage,
     },
     universe: {
-      universeId: "spy_etf_holdings",
-      fundSymbol: "SPY",
+      universeId: config.universeId,
+      fundSymbol: config.fundSymbol,
       provenanceType: "official_etf_holdings",
       provider: input.universe.provider,
       sourceUrl: input.universe.sourceUrl,
@@ -315,4 +317,16 @@ export function computeSpyBreadthInternals(
     stale: universeStale || barsSessionMismatch,
     missingReason,
   });
+}
+
+export function computeSpyBreadthInternals(
+  input: BreadthComputeInput,
+): BreadthInternalsSnapshot {
+  return computeEtfBreadthInternals(input, SPY_BREADTH_CONFIG);
+}
+
+export function computeQqqBreadthInternals(
+  input: BreadthComputeInput,
+): BreadthInternalsSnapshot {
+  return computeEtfBreadthInternals(input, QQQ_BREADTH_CONFIG);
 }
