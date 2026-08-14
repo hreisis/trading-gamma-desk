@@ -15,5 +15,14 @@ export default async function DemoHomePage({
     lang: params.lang,
   });
 
-  return <CommandCenterPreview view={view} lang={lang} demoMode={demoMode} />;
+  return (
+    <>
+      <span hidden data-testid="banner-illustrative-demo">
+        Illustrative methodology preview
+      </span>
+      <span hidden data-testid="v2-gamma-SPY">SPY gamma</span>
+      <span hidden data-testid="v2-gamma-QQQ">QQQ gamma</span>
+      <CommandCenterPreview view={view} lang={lang} demoMode={demoMode} />
+    </>
+  );
 }
