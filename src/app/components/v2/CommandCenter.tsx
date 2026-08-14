@@ -69,6 +69,19 @@ const copy = {
     stanceReduce: "Reduce",
     awaiting: "Awaiting inputs",
     risk: "Portfolio risk",
+    marketRisk: "Market risk",
+    spyStructuralRisk: "SPY structural",
+    qqqStructuralRisk: "QQQ structural",
+    riskDivergence: "QQQ−SPY divergence",
+    divergenceWidening: "Widening",
+    divergenceNarrowing: "Narrowing",
+    divergenceStable: "Stable",
+    divergenceUnavailable: "Divergence unavailable",
+    componentDivergence: "Component divergence",
+    gammaRegimeDivergence: "Gamma regime",
+    ivHvDivergence: "IV−HV spread",
+    breadthDivergence: "Breadth",
+    relativePerformance: "QQQ vs SPY return",
     vsYesterday: "vs yesterday",
     opportunity: "Dip opportunity",
     exposure: "Suggested exposure",
@@ -164,6 +177,19 @@ const copy = {
     stanceReduce: "减仓",
     awaiting: "等待数据",
     risk: "组合风险",
+    marketRisk: "市场风险",
+    spyStructuralRisk: "SPY 结构风险",
+    qqqStructuralRisk: "QQQ 结构风险",
+    riskDivergence: "QQQ−SPY 风险差",
+    divergenceWidening: "扩大",
+    divergenceNarrowing: "收窄",
+    divergenceStable: "稳定",
+    divergenceUnavailable: "风险差不可用",
+    componentDivergence: "分项差异",
+    gammaRegimeDivergence: "Gamma 状态",
+    ivHvDivergence: "IV−HV 价差",
+    breadthDivergence: "广度",
+    relativePerformance: "QQQ 相对 SPY 收益",
     vsYesterday: "较昨日",
     opportunity: "回调机会",
     exposure: "建议仓位",
@@ -236,6 +262,52 @@ function formatRiskChangeLine(
   if (change === 0) return "0";
   const arrow = change > 0 ? "↑" : "↓";
   return `${arrow} ${Math.abs(change)} ${vsYesterday}`;
+}
+
+function formatStructuralRiskScore(score: number | null): string {
+  return score === null ? "—" : String(score);
+}
+
+function formatRiskDivergenceValue(divergence: number | null): string {
+  if (divergence === null) return "—";
+  if (divergence > 0) return `+${divergence}`;
+  return String(divergence);
+}
+
+function formatDivergenceTrendLabel(
+  trend: V2CommandCenterView["riskDivergenceTrend"],
+  lang: V2Language,
+): string | null {
+  if (trend === null) return null;
+  const t = copy[lang];
+  switch (trend) {
+    case "widening":
+      return t.divergenceWidening;
+    case "narrowing":
+      return t.divergenceNarrowing;
+    case "stable":
+      return t.divergenceStable;
+  }
+}
+
+function formatStructuralRiskSummary(
+  view: V2CommandCenterView,
+  lang: V2Language,
+): string {
+  const spy = formatStructuralRiskScore(view.spyStructuralRiskScore);
+  const qqq = formatStructuralRiskScore(view.qqqStructuralRiskScore);
+  const divergence = formatRiskDivergenceValue(view.riskDivergence);
+  const trend = formatDivergenceTrendLabel(view.riskDivergenceTrend, lang);
+  if (spy === "—" && qqq === "—") return copy[lang].divergenceUnavailable;
+  const trendSuffix = trend ? ` · ${trend}` : "";
+  return `SPY ${spy} · QQQ ${qqq} · Divergence ${divergence}${trendSuffix}`;
+}
+
+function formatSignedPct(value: number | null): string {
+  if (value === null) return "—";
+  const rounded = Math.round(value * 100) / 100;
+  if (rounded > 0) return `+${rounded}%`;
+  return `${rounded}%`;
 }
 
 function wallTouchPercentLabel(
@@ -1294,6 +1366,7 @@ export function CommandCenter({
 
               <article className="v2-panel v2-risk-panel">
                 <p className="v2-eyebrow">{t.risk.toUpperCase()}</p>
+                <p className="v2-risk-market-label">{t.marketRisk}</p>
                 <div className="v2-risk-content">
                   <RiskGauge score={view.riskScore} />
                   <div className="v2-risk-stats">
@@ -1318,6 +1391,91 @@ export function CommandCenter({
                       <small>/ 100 {t.opportunity}</small>
                     </strong>
                   </div>
+                </div>
+                <div className="v2-risk-structural">
+                  <p
+                    className="v2-risk-structural-line"
+                    data-testid="v2-risk-structural-summary"
+                  >
+                    {formatStructuralRiskSummary(view, lang)}
+                  </p>
+                  <div className="v2-risk-structural-grid">
+                    <span>
+                      {t.spyStructuralRisk}
+                      <strong data-testid="v2-spy-structural-risk">
+                        {formatStructuralRiskScore(view.spyStructuralRiskScore)}
+                      </strong>
+                    </span>
+                    <span>
+                      {t.qqqStructuralRisk}
+                      <strong data-testid="v2-qqq-structural-risk">
+                        {formatStructuralRiskScore(view.qqqStructuralRiskScore)}
+                      </strong>
+                    </span>
+                    <span>
+                      {t.riskDivergence}
+                      <strong data-testid="v2-risk-divergence">
+                        {formatRiskDivergenceValue(view.riskDivergence)}
+                      </strong>
+                    </span>
+                    {view.riskDivergenceTrend ? (
+                      <span>
+                        Trend
+                        <strong data-testid="v2-risk-divergence-trend">
+                          {formatDivergenceTrendLabel(view.riskDivergenceTrend, lang)}
+                        </strong>
+                      </span>
+                    ) : null}
+                  </div>
+                  {view.riskDivergenceChange !== null ? (
+                    <p className="v2-risk-divergence-change" data-testid="v2-risk-divergence-change">
+                      {formatRiskChangeLine(view.riskDivergenceChange, t.vsYesterday)}
+                    </p>
+                  ) : null}
+                  {view.componentDivergence.gammaRegime.label ||
+                  view.componentDivergence.breadth.label ||
+                  view.componentDivergence.ivHvSpread.spreadDivergencePts !== null ||
+                  view.componentDivergence.relativePerformance.qqqVsSpy1dPct !== null ? (
+                    <div className="v2-risk-component-divergence">
+                      <span>{t.componentDivergence}</span>
+                      <ul data-testid="v2-risk-component-divergence">
+                        {view.componentDivergence.gammaRegime.label ? (
+                          <li>
+                            {t.gammaRegimeDivergence}: {view.componentDivergence.gammaRegime.label}
+                          </li>
+                        ) : null}
+                        {view.componentDivergence.ivHvSpread.spreadDivergencePts !== null ? (
+                          <li>
+                            {t.ivHvDivergence}: SPY{" "}
+                            {view.componentDivergence.ivHvSpread.spySpreadVolPts ?? "—"} · QQQ{" "}
+                            {view.componentDivergence.ivHvSpread.qqqSpreadVolPts ?? "—"} (
+                            {view.componentDivergence.ivHvSpread.spreadDivergencePts > 0
+                              ? `+${view.componentDivergence.ivHvSpread.spreadDivergencePts}`
+                              : view.componentDivergence.ivHvSpread.spreadDivergencePts}{" "}
+                            pts)
+                          </li>
+                        ) : null}
+                        {view.componentDivergence.breadth.label ? (
+                          <li>
+                            {t.breadthDivergence}: {view.componentDivergence.breadth.label}
+                          </li>
+                        ) : null}
+                        {view.componentDivergence.relativePerformance.qqqVsSpy1dPct !== null ? (
+                          <li>
+                            {t.relativePerformance}: 1D{" "}
+                            {formatSignedPct(
+                              view.componentDivergence.relativePerformance.qqqVsSpy1dPct,
+                            )}
+                            {view.componentDivergence.relativePerformance.qqqVsSpy5dPct !== null
+                              ? ` · 5D ${formatSignedPct(
+                                  view.componentDivergence.relativePerformance.qqqVsSpy5dPct,
+                                )}`
+                              : ""}
+                          </li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="v2-exposure">
                   <span>{t.exposure}</span>

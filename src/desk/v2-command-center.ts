@@ -23,6 +23,14 @@ import {
   resolveRiskDecisionDayOverDay,
   resolveRiskDecisionDayOverDayAsync,
 } from "./risk-decision-v1";
+import {
+  deriveRiskDecisionV1_1,
+  unavailableQqqBreadthSummary,
+  resolveRiskDivergenceDayOverDay,
+  loadPriorPublishedRiskDivergence,
+  type RiskComponentDivergence,
+  type RiskDivergenceTrend,
+} from "./risk-decision-v1-1";
 import type { RuntimeJsonStore } from "./runtime-store";
 import {
   dealerFlowContextLines,
@@ -34,6 +42,7 @@ import {
   readGammaFlipStrike,
   resolveWallTouchDailyVolPct,
   summarizeCtaProxy,
+  summarizeSymbolCtaProxy,
   summarizeVolMispricing,
   type CtaProxySummary,
   type RestOfDayRange,
@@ -209,6 +218,16 @@ export interface V2CommandCenterView {
   readonly macroSummary: V2MacroSummary | null;
   readonly sessionDate: string | null;
   readonly sectorRotation: V2SectorRotationSummary;
+  /** SPY structural risk — symbol-specific factors + shared macro/event. */
+  readonly spyStructuralRiskScore: number | null;
+  /** QQQ structural risk — symbol-specific factors + shared macro/event. */
+  readonly qqqStructuralRiskScore: number | null;
+  /** QQQ structural risk minus SPY structural risk when both scores are available. */
+  readonly riskDivergence: number | null;
+  readonly riskDivergenceChange: number | null;
+  readonly riskDivergenceTrend: RiskDivergenceTrend | null;
+  readonly componentDivergence: RiskComponentDivergence;
+  readonly qqqBreadth: V2SpyBreadthSummary;
 }
 
 export type V2AiStudyConfidence = "high" | "moderate" | "limited";
@@ -465,6 +484,28 @@ function summarizeVolMispricingForSymbol(
     representativeIv: ivSnapshot?.representativeIv,
     hv20Bars: options.equityBarsBySymbol?.get(symbol),
     isFixture: view.isFixture,
+  });
+}
+
+function summarizeSymbolCtaProxyFromInputs(input: {
+  readonly symbol: "SPY" | "QQQ";
+  readonly marketQuotes: readonly AlpacaMarketQuote[] | undefined;
+  readonly equityBarsBySymbol:
+    | ReadonlyMap<string, readonly { sessionDate: string; close: number }[]>
+    | undefined;
+  readonly now: Date;
+}): CtaProxySummary {
+  const price = resolveLiveEquitySpot(input.symbol, input.marketQuotes, null);
+  const targetSession = resolveLastCompletedMarketSessionDate(input.now);
+  const bars = input.equityBarsBySymbol?.get(input.symbol);
+  const spyBars = input.equityBarsBySymbol?.get("SPY");
+
+  return summarizeSymbolCtaProxy({
+    symbol: input.symbol,
+    bars,
+    price,
+    targetSession,
+    hv20BenchmarkBars: input.symbol === "SPY" ? bars : spyBars,
   });
 }
 
@@ -1180,6 +1221,19 @@ export async function buildV2CommandCenterView(input: {
     equityBarsBySymbol: input.equityBarsBySymbol,
     now,
   });
+  const spyCtaProxy = summarizeSymbolCtaProxyFromInputs({
+    symbol: "SPY",
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    now,
+  });
+  const qqqCtaProxy = summarizeSymbolCtaProxyFromInputs({
+    symbol: "QQQ",
+    marketQuotes: input.marketQuotes,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    now,
+  });
+  const qqqBreadth = unavailableQqqBreadthSummary();
   const targetSession = resolveLastCompletedMarketSessionDate(now);
   const sectorRotationInput = {
     equityBarsBySymbol: input.equityBarsBySymbol,
@@ -1188,6 +1242,16 @@ export async function buildV2CommandCenterView(input: {
   };
 
   if (preview) {
+    const previewComponentDivergence: RiskComponentDivergence = {
+      gammaRegime: { spy: null, qqq: null, label: null },
+      ivHvSpread: {
+        spySpreadVolPts: null,
+        qqqSpreadVolPts: null,
+        spreadDivergencePts: null,
+      },
+      breadth: { spy: null, qqq: null, label: null },
+      relativePerformance: { qqqVsSpy1dPct: null, qqqVsSpy5dPct: null },
+    };
     return {
       decisionStatus: "methodology_preview",
       stance: "buy",
@@ -1204,29 +1268,46 @@ export async function buildV2CommandCenterView(input: {
       ],
       missingInputs: [],
       spyBreadth,
+      qqqBreadth,
       ctaProxy,
       gamma: [spyGammaSummary, qqqGammaSummary],
       macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
       macroSummary,
       sessionDate: input.driver?.marketSessionDate ?? null,
       sectorRotation: previewSectorRotationSummary(),
+      spyStructuralRiskScore: 48,
+      qqqStructuralRiskScore: 66,
+      riskDivergence: 18,
+      riskDivergenceChange: 4,
+      riskDivergenceTrend: "widening",
+      componentDivergence: previewComponentDivergence,
     };
   }
 
   const sectorRotation = summarizeSectorRotation(sectorRotationInput);
+  const eventGate = eventGateFromMarketInput(input.marketInputSnapshot);
+  const publicationDate = resolveCurrentMarketSessionDate(now);
+  const priorDivergence =
+    input.dataRoot !== null && input.dataRoot !== undefined
+      ? loadPriorPublishedRiskDivergence(input.dataRoot, publicationDate)
+      : null;
 
-  const decision = deriveCommandCenterRiskDecision({
+  const riskV1_1 = deriveRiskDecisionV1_1({
     driver: input.driver,
-    spyGamma: input.spyGamma,
-    qqqGamma: input.qqqGamma,
     spyBreadth,
+    qqqBreadth,
+    spyGamma: spyGammaSummary,
+    qqqGamma: qqqGammaSummary,
+    marketCtaProxy: ctaProxy,
+    spyCtaProxy,
+    qqqCtaProxy,
+    eventGate,
     sectorRotation,
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-    now,
-    marketInputSnapshot: input.marketInputSnapshot,
     targetSession,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    priorDivergence,
   });
+  const decision = riskV1_1.marketRisk;
 
   const driverEvidence = deriveEvidenceFromDriver(input.driver);
   const evidence =
@@ -1242,7 +1323,6 @@ export async function buildV2CommandCenterView(input: {
       ? decision.withheldFactors.map((factor) => `Risk model: ${factor}`)
       : [];
 
-  const publicationDate = resolveCurrentMarketSessionDate(now);
   const dayOverDay =
     decision.status === "ready"
       ? input.artifactStore
@@ -1265,6 +1345,15 @@ export async function buildV2CommandCenterView(input: {
           })
       : { riskChange: null, riskChangeReason: null };
 
+  resolveRiskDivergenceDayOverDay({
+    dataRoot: input.dataRoot,
+    publicationDate,
+    decisionSessionDate: targetSession,
+    result: riskV1_1,
+    now,
+    force: input.forceRiskDecisionDaily === true,
+  });
+
   return {
     decisionStatus: decision.status === "ready" ? "ready" : "awaiting_inputs",
     stance: decision.stance,
@@ -1277,11 +1366,18 @@ export async function buildV2CommandCenterView(input: {
     evidence,
     missingInputs: [...marketMissing, ...riskMissing],
     spyBreadth,
+    qqqBreadth,
     ctaProxy,
     gamma: [spyGammaSummary, qqqGammaSummary],
     macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
     macroSummary,
     sessionDate: publicationDate,
     sectorRotation,
+    spyStructuralRiskScore: riskV1_1.spyStructuralRisk.riskScore,
+    qqqStructuralRiskScore: riskV1_1.qqqStructuralRisk.riskScore,
+    riskDivergence: riskV1_1.riskDivergence,
+    riskDivergenceChange: riskV1_1.riskDivergenceChange,
+    riskDivergenceTrend: riskV1_1.riskDivergenceTrend,
+    componentDivergence: riskV1_1.componentDivergence,
   };
 }

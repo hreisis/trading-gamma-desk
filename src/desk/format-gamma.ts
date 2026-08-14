@@ -769,6 +769,69 @@ export function summarizeCtaProxy(input: {
   };
 }
 
+function symbolCtaContextLine(
+  symbol: "SPY" | "QQQ",
+  signal: CtaProxyTrendSignal,
+): string {
+  switch (signal) {
+    case "buying":
+      return `${symbol} above MA20 & MA50 · systematic trend proxy`;
+    case "selling":
+      return `${symbol} below MA20 & MA50 · systematic trend proxy`;
+    case "neutral":
+      return `${symbol} mixed vs MA20/MA50 · no clear systematic tilt`;
+  }
+}
+
+/**
+ * Single-symbol systematic trend proxy — SPY or QQQ MA structure only.
+ */
+export function summarizeSymbolCtaProxy(input: {
+  readonly symbol: "SPY" | "QQQ";
+  readonly bars:
+    | readonly { readonly sessionDate: string; readonly close: number }[]
+    | null
+    | undefined;
+  readonly price: number | null;
+  readonly targetSession: string;
+  readonly hv20BenchmarkBars?:
+    | readonly { readonly sessionDate: string; readonly close: number }[]
+    | null
+    | undefined;
+}): CtaProxySummary {
+  const bars = equityBarsThroughSession(input.bars, input.targetSession);
+  if (bars.length === 0) {
+    return CTA_PROXY_UNAVAILABLE;
+  }
+
+  const lastSession = bars.at(-1)?.sessionDate ?? null;
+  if (lastSession !== input.targetSession) {
+    return CTA_PROXY_UNAVAILABLE;
+  }
+
+  const ma20 = computeCloseMovingAverage(bars, MA20_PERIOD);
+  const ma50 = computeCloseMovingAverage(bars, MA50_PERIOD);
+  if (input.price === null || ma20 === null || ma50 === null) {
+    return CTA_PROXY_UNAVAILABLE;
+  }
+
+  let signal = classifySymbolCtaTrend(input.price, ma20, ma50);
+  const hvBars = input.hv20BenchmarkBars
+    ? equityBarsThroughSession(input.hv20BenchmarkBars, input.targetSession)
+    : bars;
+  const hv20 = computeHv20AnnualizedPct(hvBars);
+  if (signal === "buying" && hv20 !== null && hv20 >= CTA_HV_ELEVATED_PCT) {
+    signal = "neutral";
+  }
+
+  return {
+    status: "available",
+    signal,
+    contextLine: symbolCtaContextLine(input.symbol, signal),
+    triggerLines: deriveCtaTriggerLines(signal, ma20, ma50),
+  };
+}
+
 export function ctaProxySignalLabel(
   signal: CtaProxyTrendSignal | null,
   status: CtaProxySummary["status"],
