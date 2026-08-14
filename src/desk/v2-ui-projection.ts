@@ -56,6 +56,8 @@ export interface V2TechLeadersLaggardsSummary {
   readonly missingReason: string | null;
 }
 
+type AlignedReturn = { value: number; sessionDate: string };
+
 export function technologyUiBarSymbols(): readonly string[] {
   return [
     "XLK",
@@ -68,7 +70,7 @@ export function technologyUiBarSymbols(): readonly string[] {
 function alignedReturnPct(
   bars: readonly DailyBar[] | undefined,
   lookbackSessions: number,
-): { value: number; sessionDate: string } | null {
+): AlignedReturn | null {
   if (!bars || bars.length < lookbackSessions + 1) return null;
   const recent = bars.slice(-(lookbackSessions + 1));
   const start = recent[0]?.close;
@@ -87,11 +89,11 @@ function alignedReturnPct(
   return { value: ((end / start) - 1) * 100, sessionDate };
 }
 
-function sameSession<T extends { sessionDate: string }>(
-  item: T | null,
+function hasAlignedResult(
+  item: { symbol: string; result: AlignedReturn | null },
   sessionDate: string,
-): item is T {
-  return item !== null && item.sessionDate === sessionDate;
+): item is { symbol: string; result: AlignedReturn } {
+  return item.result !== null && item.result.sessionDate === sessionDate;
 }
 
 export function buildTechnologyInternalSummary(
@@ -109,11 +111,10 @@ export function buildTechnologyInternalSummary(
   }
 
   const rows: V2TechnologyInternalRow[] = [];
-
   const mag7 = MAG7_SYMBOLS.map((symbol) => ({
     symbol,
     result: alignedReturnPct(barsBySymbol.get(symbol), 5),
-  })).filter((item) => sameSession(item.result, xlk.sessionDate));
+  })).filter((item) => hasAlignedResult(item, xlk.sessionDate));
 
   if (mag7.length >= 5) {
     const average =
@@ -127,7 +128,7 @@ export function buildTechnologyInternalSummary(
 
   for (const [symbol, label] of TECHNOLOGY_INTERNAL_ETFS) {
     const result = alignedReturnPct(barsBySymbol.get(symbol), 5);
-    if (!sameSession(result, xlk.sessionDate)) continue;
+    if (result === null || result.sessionDate !== xlk.sessionDate) continue;
     rows.push({ symbol, label, rs5dVsXlk: result.value - xlk.value });
   }
 
@@ -157,7 +158,7 @@ export function buildTechLeadersLaggardsSummary(
     symbol,
     result: alignedReturnPct(barsBySymbol.get(symbol), 1),
   })).filter(
-    (item): item is { symbol: string; result: { value: number; sessionDate: string } } =>
+    (item): item is { symbol: string; result: AlignedReturn } =>
       item.result !== null,
   );
 
