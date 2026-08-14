@@ -30,7 +30,6 @@ export const TECH_LEADER_UNIVERSE = [
 export interface V2TechnologyInternalRow {
   readonly symbol: string;
   readonly label: string;
-  /** Five-session relative strength versus XLK, percentage points. */
   readonly rs5dVsXlk: number;
 }
 
@@ -89,13 +88,6 @@ function alignedReturnPct(
   return { value: ((end / start) - 1) * 100, sessionDate };
 }
 
-function hasAlignedResult(
-  item: { symbol: string; result: AlignedReturn | null },
-  sessionDate: string,
-): item is { symbol: string; result: AlignedReturn } {
-  return item.result !== null && item.result.sessionDate === sessionDate;
-}
-
 export function buildTechnologyInternalSummary(
   barsBySymbol: ReadonlyMap<string, readonly DailyBar[]>,
 ): V2TechnologyInternalSummary {
@@ -111,10 +103,12 @@ export function buildTechnologyInternalSummary(
   }
 
   const rows: V2TechnologyInternalRow[] = [];
-  const mag7 = MAG7_SYMBOLS.map((symbol) => ({
-    symbol,
-    result: alignedReturnPct(barsBySymbol.get(symbol), 5),
-  })).filter((item) => hasAlignedResult(item, xlk.sessionDate));
+  const mag7 = MAG7_SYMBOLS.flatMap((symbol) => {
+    const result = alignedReturnPct(barsBySymbol.get(symbol), 5);
+    return result !== null && result.sessionDate === xlk.sessionDate
+      ? [{ symbol, result }]
+      : [];
+  });
 
   if (mag7.length >= 5) {
     const average =
@@ -154,13 +148,10 @@ export function buildTechnologyInternalSummary(
 export function buildTechLeadersLaggardsSummary(
   barsBySymbol: ReadonlyMap<string, readonly DailyBar[]>,
 ): V2TechLeadersLaggardsSummary {
-  const candidates = TECH_LEADER_UNIVERSE.map((symbol) => ({
-    symbol,
-    result: alignedReturnPct(barsBySymbol.get(symbol), 1),
-  })).filter(
-    (item): item is { symbol: string; result: AlignedReturn } =>
-      item.result !== null,
-  );
+  const candidates = TECH_LEADER_UNIVERSE.flatMap((symbol) => {
+    const result = alignedReturnPct(barsBySymbol.get(symbol), 1);
+    return result === null ? [] : [{ symbol, result }];
+  });
 
   if (candidates.length === 0) {
     return {
