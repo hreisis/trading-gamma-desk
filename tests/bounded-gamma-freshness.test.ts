@@ -22,6 +22,13 @@ vi.mock("@/gamma/marketdata-app/run", () => ({
   runBoundedGammaProvider: vi.fn(),
 }));
 
+vi.mock("@/gamma/marketdata-app/resolve-expiration", () => ({
+  resolveBoundedGammaExpiration: vi.fn(async () => ({
+    expiration: "2026-08-11",
+    source: "default" as const,
+  })),
+}));
+
 const mockedRun = vi.mocked(runBoundedGammaProvider);
 
 function snapshotWithSession(sessionDate: string, status = "available") {
