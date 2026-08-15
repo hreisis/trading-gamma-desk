@@ -320,9 +320,10 @@ async function ensureBoundedGammaSnapshot(options: {
   readonly dataRoot: string;
   readonly env: NodeJS.ProcessEnv;
   readonly artifactStore: RuntimeJsonStore;
+  readonly targetSession: string;
 }): Promise<{ readonly ok: boolean; readonly error?: string }> {
   const artifactRelativePath = boundedGammaArtifactRelativePath(options.symbol);
-  const key = `${options.artifactStore.rootLabel}:${options.symbol}:${artifactRelativePath}`;
+  const key = `${options.artifactStore.rootLabel}:${options.symbol}:${artifactRelativePath}:${options.targetSession}`;
 
   const token = resolveMarketDataApiToken(options.env);
   if (!token) {
@@ -333,7 +334,7 @@ async function ensureBoundedGammaSnapshot(options: {
   }
 
   const params = resolveGammaStrikeParams(options.symbol, options.env);
-  const sessionDate = resolveBoundedGammaTargetSession();
+  const sessionDate = options.targetSession;
   const expiration = await resolveBoundedGammaExpiration({
     symbol: options.symbol,
     sessionDate,
@@ -355,6 +356,7 @@ async function ensureBoundedGammaSnapshot(options: {
         dataRoot: options.dataRoot,
         token,
         env: options.env,
+        sessionDate,
         artifactStore: options.artifactStore,
       });
       if (!result.ok) {
@@ -414,6 +416,7 @@ export async function loadBoundedGammaDeskViewAsync(
     dataRoot,
     env,
     artifactStore,
+    targetSession,
   });
 
   const refreshedRaw = await readJson(artifactStore, artifactRelativePath);
