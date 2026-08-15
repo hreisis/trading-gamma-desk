@@ -57,10 +57,6 @@ import {
   maybePersistCommandCenterV1Daily,
   type V2DailyReview,
 } from "./command-center-v1";
-import {
-  loadRiskDecisionV1DailyAsync,
-  type RiskDecisionV1DailyRecord,
-} from "./risk-decision-v1";
 import { generateV2DailyReviewInterpretation } from "@/ai-study/v2-daily-review-interpret";
 import {
   buildTechnologyInternalSummary,
@@ -93,35 +89,6 @@ export interface V2HomePageModel {
 
 export function parseV2Language(raw: string | undefined): V2Language {
   return raw === "zh" ? "zh" : "en";
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function publishedViewFromRisk(
-  view: V2CommandCenterView,
-  record: RiskDecisionV1DailyRecord | null,
-): V2CommandCenterView {
-  if (!record || !Number.isFinite(record.riskScore)) return view;
-  const riskScore = Math.round(clamp(record.riskScore, 0, 100));
-  const center = Math.round(clamp(145 - riskScore * 1.25, 0, 150));
-  const exposure = {
-    min: clamp(center - 8, 0, 150),
-    max: clamp(center + 8, 0, 150),
-  };
-  const highBeta = Math.round(clamp(50 - riskScore * 0.35, 0, 100));
-  const defense = Math.round(clamp(25 + riskScore * 0.1, 0, 100));
-  const metals = Math.round(clamp(15 + riskScore * 0.1, 0, 100));
-  const hedge = 100 - highBeta - defense - metals;
-  const stance = riskScore <= 40 ? "buy" : riskScore <= 65 ? "hold" : "reduce";
-  return {
-    ...view,
-    riskScore,
-    stance,
-    exposure,
-    allocation: { highBeta, defense, metals, hedge },
-  };
 }
 
 const V2_ZH_LOCALIZATION_SCHEMA = {
@@ -455,7 +422,7 @@ export async function loadV2HomePage(
     },
   });
 
-  const liveBaseView = await buildV2CommandCenterView({
+  const baseView = await buildV2CommandCenterView({
     driver: macro.driver,
     spyGamma,
     qqqGamma,
@@ -473,14 +440,6 @@ export async function loadV2HomePage(
       runtimeEnv.GAMMADESK_FORCE_RISK_DECISION_DAILY === "1" ||
       runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
   });
-
-  const publishedRisk = input.demo
-    ? null
-    : await loadRiskDecisionV1DailyAsync(
-        artifactStore,
-        liveBaseView.sessionDate ?? targetMarketSessionDate,
-      ).catch(() => null);
-  const baseView = publishedViewFromRisk(liveBaseView, publishedRisk);
 
   if (!input.demo) {
     await maybePersistCommandCenterV1Daily({
