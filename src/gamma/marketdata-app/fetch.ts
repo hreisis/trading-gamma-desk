@@ -20,6 +20,7 @@ export interface FetchBoundedChainInput {
   readonly symbol: string;
   readonly expiration: string;
   readonly strikes: readonly number[];
+  readonly date?: string;
   readonly token: string;
   readonly fetchImpl?: FetchLike;
   readonly baseUrl?: string;
@@ -220,10 +221,14 @@ export async function fetchBoundedMarketDataAppChain(
 
   const symbol = encodeURIComponent(input.symbol.toUpperCase());
   const strikeParam = input.strikes.join(",");
+  const dateParam = input.date
+    ? `&date=${encodeURIComponent(input.date)}`
+    : "";
   const path =
     `/v1/options/chain/${symbol}/` +
     `?expiration=${encodeURIComponent(input.expiration)}` +
-    `&strike=${encodeURIComponent(strikeParam)}`;
+    `&strike=${encodeURIComponent(strikeParam)}` +
+    dateParam;
 
   const result = await fetchMarketDataAppJson({
     path,
