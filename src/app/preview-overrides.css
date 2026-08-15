@@ -95,6 +95,57 @@
 .pv-app .pv-confidence strong,
 .pv-app .pv-review strong { font-weight: 600; }
 
+/* Overview stance: keep the explanatory line compact so the card stays balanced. */
+.pv-app #overview .pv-overview > article:first-child p {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 8px;
+}
+
+/* Market Structure header: symbol + spot feel like one compact line, without ETF descriptions. */
+.pv-app .pv-structure-card {
+  position: relative;
+  padding-top: 5px;
+}
+.pv-app .pv-symbol-head {
+  min-height: 28px;
+  padding-right: 0;
+}
+.pv-app .pv-symbol-head > div:first-child {
+  gap: 0;
+}
+.pv-app .pv-symbol-head > div:first-child span {
+  display: none;
+}
+.pv-app .pv-symbol-head strong {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+.pv-app .pv-price {
+  position: absolute;
+  top: 7px;
+  left: 45px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+  color: #31415f;
+}
+.pv-app .pv-regime {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.15;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+.pv-app .pv-structure-grid {
+  margin-top: 7px;
+}
+
 /* Left-bottom language switch replaces Settings. */
 .pv-app .pv-language-switch {
   margin-top: auto;
