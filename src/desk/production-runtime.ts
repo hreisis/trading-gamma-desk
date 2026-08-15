@@ -55,6 +55,7 @@ function resolveGammaArtifactStore(
   env: NodeJS.ProcessEnv,
 ): RuntimeJsonStore {
   if (options.artifactStore) return options.artifactStore;
+  if (isServerlessHost(env)) return resolveRuntimeJsonStore(env);
   if (options.dataRoot) {
     return createFilesystemRuntimeJsonStore({
       dataRoot: deskDataRootFromGammaProviderRoot(options.dataRoot),
