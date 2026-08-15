@@ -19,10 +19,10 @@ import {
 } from "@/ai-study/session";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import {
-  deriveRiskDecisionV1,
   buildRiskSessionComparison,
   loadPriorPublishedRiskDecisionForMarketSession,
   loadPriorPublishedRiskDecisionForMarketSessionAsync,
+  type RiskDecisionV1Result,
   type RiskSessionComparison,
   resolveRiskDecisionDayOverDay,
   resolveRiskDecisionDayOverDayAsync,
@@ -1129,7 +1129,18 @@ function previewSectorRotationSummary(): V2SectorRotationSummary {
   };
 }
 
-export async function buildV2CommandCenterView(input: {
+export interface V2CommandCenterLedgerFreezeContext {
+  readonly decision: RiskDecisionV1Result;
+  readonly eventGate: EventGateSnapshot | null;
+  readonly publicationDate: string;
+}
+
+export interface V2CommandCenterBuildResult {
+  readonly view: V2CommandCenterView;
+  readonly ledgerFreezeContext: V2CommandCenterLedgerFreezeContext | null;
+}
+
+export type V2CommandCenterBuildInput = {
   readonly driver: DominantDriver | null;
   readonly spyGamma: BoundedGammaDeskView;
   readonly qqqGamma: BoundedGammaDeskView;
@@ -1147,7 +1158,17 @@ export async function buildV2CommandCenterView(input: {
   readonly barPanelLatestSession?: string | null;
   readonly artifactStore?: RuntimeJsonStore;
   readonly forceRiskDecisionDaily?: boolean;
-}): Promise<V2CommandCenterView> {
+};
+
+export async function buildV2CommandCenterView(
+  input: V2CommandCenterBuildInput,
+): Promise<V2CommandCenterView> {
+  return (await buildV2CommandCenterViewWithLedgerContext(input)).view;
+}
+
+export async function buildV2CommandCenterViewWithLedgerContext(
+  input: V2CommandCenterBuildInput,
+): Promise<V2CommandCenterBuildResult> {
   const preview = input.methodologyPreview === true;
   const now = input.now ?? new Date();
   const macroSummary = summarizeMacroFromDriver(input.driver, {
@@ -1233,6 +1254,7 @@ export async function buildV2CommandCenterView(input: {
       relativePerformance: { qqqVsSpy1dPct: null, qqqVsSpy5dPct: null },
     };
     return {
+      view: {
       decisionStatus: "methodology_preview",
       stance: "buy",
       riskScore: 42,
@@ -1263,6 +1285,8 @@ export async function buildV2CommandCenterView(input: {
       riskDivergenceChange: 4,
       riskDivergenceTrend: "widening",
       componentDivergence: previewComponentDivergence,
+      },
+      ledgerFreezeContext: null,
     };
   }
 
@@ -1353,7 +1377,7 @@ export async function buildV2CommandCenterView(input: {
     force: input.forceRiskDecisionDaily === true,
   });
 
-  return {
+  const view: V2CommandCenterView = {
     decisionStatus: decision.status === "ready" ? "ready" : "awaiting_inputs",
     stance: decision.stance,
     riskScore: decision.riskScore,
@@ -1380,5 +1404,14 @@ export async function buildV2CommandCenterView(input: {
     riskDivergenceChange: riskV1_1.riskDivergenceChange,
     riskDivergenceTrend: riskV1_1.riskDivergenceTrend,
     componentDivergence: riskV1_1.componentDivergence,
+  };
+
+  return {
+    view,
+    ledgerFreezeContext: {
+      decision,
+      eventGate,
+      publicationDate,
+    },
   };
 }

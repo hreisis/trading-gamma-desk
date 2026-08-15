@@ -17,7 +17,7 @@ import type {
   V2Language,
 } from "./v2-command-center";
 import {
-  buildV2CommandCenterView,
+  buildV2CommandCenterViewWithLedgerContext,
   eventGateFromMarketInput,
   sectorRotationBarSymbols,
   summarizeSpyBreadthFromDurable,
@@ -58,6 +58,7 @@ import {
   maybePersistCommandCenterV1Daily,
   type V2DailyReview,
 } from "./command-center-v1";
+import { maybeAppendPendingDailyDecisionLedgerOutcomes, maybeFreezeDailyDecisionLedgerPrediction } from "./daily-decision-ledger";
 import { generateV2DailyReviewInterpretation } from "@/ai-study/v2-daily-review-interpret";
 import {
   buildTechnologyInternalSummary,
@@ -424,7 +425,8 @@ export async function loadV2HomePage(
     },
   });
 
-  const baseView = await buildV2CommandCenterView({
+  const { view: baseView, ledgerFreezeContext } =
+    await buildV2CommandCenterViewWithLedgerContext({
     driver: macro.driver,
     spyGamma,
     qqqGamma,
@@ -442,6 +444,27 @@ export async function loadV2HomePage(
       runtimeEnv.GAMMADESK_FORCE_RISK_DECISION_DAILY === "1" ||
       runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
   });
+
+  if (!input.demo && ledgerFreezeContext && baseView.decisionStatus === "ready") {
+    await maybeFreezeDailyDecisionLedgerPrediction({
+      view: baseView,
+      decision: ledgerFreezeContext.decision,
+      eventGate: ledgerFreezeContext.eventGate,
+      publicationDate: ledgerFreezeContext.publicationDate,
+      frozenAt: now.toISOString(),
+      dataRoot,
+      artifactStore,
+    });
+  }
+
+  if (!input.demo) {
+    await maybeAppendPendingDailyDecisionLedgerOutcomes({
+      now,
+      equityBarsBySymbol,
+      dataRoot,
+      artifactStore,
+    });
+  }
 
   if (!input.demo) {
     await maybePersistCommandCenterV1Daily({
