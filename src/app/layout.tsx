@@ -46,6 +46,36 @@ const previewLanguageScript = `
       settings.outerHTML = '<div class="pv-language-switch" aria-label="Language"><a class="' + (lang === 'en' ? 'active' : '') + '" href="' + makeHref('en') + '">EN</a><span>|</span><a class="' + (lang === 'zh' ? 'active' : '') + '" href="' + makeHref('zh') + '">中文</a></div>';
     }
 
+    document.querySelectorAll('.pv-regime').forEach((node) => {
+      const value = (node.textContent || '').toUpperCase();
+      if (value.includes('POSITIVE')) node.textContent = 'POSITIVE GAMMA';
+      else if (value.includes('NEGATIVE')) node.textContent = 'NEGATIVE GAMMA';
+      else if (value.includes('NEAR ZERO') || value.includes('NEAR_ZERO')) node.textContent = 'NEAR ZERO GAMMA';
+    });
+
+    const rotationSmall = document.querySelector('.pv-rotation h3 small');
+    if (rotationSmall) rotationSmall.textContent = '(5D vs SPY)';
+    const techSmall = document.querySelector('.pv-tech h3 small');
+    if (techSmall) techSmall.textContent = '(5D vs XLK)';
+
+    const sectorNames = {
+      XLE: 'Energy',
+      XLK: 'Technology',
+      XLF: 'Financials',
+      XLI: 'Industrials',
+      XLY: 'Consumer Discretionary',
+      XLP: 'Consumer Staples',
+      XLV: 'Health Care',
+      XLU: 'Utilities',
+      XLB: 'Materials',
+      XLRE: 'Real Estate',
+      XLC: 'Communication Services',
+    };
+    document.querySelectorAll('.pv-rotation .pv-rotation-row > span:first-child').forEach((node) => {
+      const symbol = (node.textContent || '').trim();
+      if (sectorNames[symbol]) node.textContent = symbol + ' · ' + sectorNames[symbol];
+    });
+
     if (lang !== 'zh') return;
 
     const exact = new Map([
