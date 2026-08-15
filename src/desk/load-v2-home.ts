@@ -41,6 +41,7 @@ import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
 import type { DailyBar } from "@/desk/breadth/bars/types";
 import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
+import type { CatalystFeedResponse } from "@/catalyst/types";
 import { resolveRuntimeDataRoot } from "@/desk/production-runtime";
 import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
@@ -76,6 +77,7 @@ export type V2CommandCenterPageView = V2CommandCenterView & {
   readonly aiStudy: V2AiStudyInterpretation;
   readonly dailyReview: V2DailyReview;
   readonly eventGate: EventGateSnapshot | null;
+  readonly catalystFeed: CatalystFeedResponse | null;
   readonly marketQuotes: readonly AlpacaMarketQuote[];
   readonly technologyInternal: V2TechnologyInternalSummary;
   readonly techLeadersLaggards: V2TechLeadersLaggardsSummary;
@@ -499,6 +501,7 @@ export async function loadV2HomePage(
     aiStudy: localized.aiStudy,
     dailyReview: localized.dailyReview,
     eventGate,
+    catalystFeed: catalystFeed ?? null,
     marketQuotes: marketPanel?.quotes ?? [],
     technologyInternal,
     techLeadersLaggards,

@@ -12,6 +12,9 @@ import {
   isRiskDecisionV1DailyRecordPublishable,
   isRiskDecisionV1Publishable,
   loadPriorPublishedRiskDecision,
+  loadPriorPublishedRiskDecisionForMarketSession,
+  buildRiskSessionComparison,
+  aggregateRiskScoreFromContributions,
   loadRiskDecisionV1Daily,
   persistRiskDecisionV1Daily,
   publishRiskDecisionV1Daily,
@@ -639,5 +642,91 @@ describe("Risk V1 daily publication", () => {
       publishRiskDecisionV1Daily(dataRoot, invalidPartialDailyRecord("2026-08-13")),
     ).toBe(false);
     expect(loadRiskDecisionV1Daily(dataRoot, "2026-08-13")).toBeNull();
+  });
+
+  it("loads prior published record by market session, not publication calendar", () => {
+    const dataRoot = mkdtempSync(join(tmpdir(), "risk-v1-session-"));
+    const sessionPrior: RiskDecisionV1DailyRecord = {
+      schemaVersion: "0.1.0",
+      publicationDate: "2026-08-14",
+      marketSessionDate: "2026-08-13",
+      generatedAt: "2026-08-14T20:00:00.000Z",
+      riskScore: 56,
+      factorContributions: [
+        { id: "breadth", score: 80, effectiveWeight: 25 },
+        { id: "macro", score: 25, effectiveWeight: 12.5 },
+        { id: "gamma", score: 75, effectiveWeight: 11.25 },
+        { id: "event_gate", score: 15, effectiveWeight: 10 },
+      ],
+    };
+    const laterPublication: RiskDecisionV1DailyRecord = {
+      schemaVersion: "0.1.0",
+      publicationDate: "2026-08-15",
+      marketSessionDate: "2026-08-14",
+      generatedAt: "2026-08-15T04:00:00.000Z",
+      riskScore: 40,
+      factorContributions: [
+        { id: "breadth", score: 50, effectiveWeight: 25 },
+        { id: "macro", score: 25, effectiveWeight: 25 },
+        { id: "event_gate", score: 15, effectiveWeight: 10 },
+      ],
+    };
+    expect(persistRiskDecisionV1Daily(dataRoot, sessionPrior)).toBe(true);
+    expect(publishRiskDecisionV1Daily(dataRoot, laterPublication)).toBe(true);
+
+    expect(
+      loadPriorPublishedRiskDecisionForMarketSession(dataRoot, "2026-08-14")?.riskScore,
+    ).toBe(56);
+    expect(
+      loadPriorPublishedRiskDecisionForMarketSession(dataRoot, "2026-08-14")
+        ?.marketSessionDate,
+    ).toBe("2026-08-13");
+    expect(loadPriorPublishedRiskDecision(dataRoot, "2026-08-16")?.riskScore).toBe(
+      40,
+    );
+    expect(
+      loadPriorPublishedRiskDecision(dataRoot, "2026-08-16")?.marketSessionDate,
+    ).toBe("2026-08-14");
+  });
+
+  it("builds session comparison from live decision and prior published record", () => {
+    const today = deriveRiskDecisionV1({
+      driver,
+      spyBreadth: strongBreadth(),
+      spyGamma: spyGammaInput(),
+      ctaProxy: buyingCta,
+      eventGate: clearEventGate,
+      targetSession: "2026-08-14",
+    });
+    const prior: RiskDecisionV1DailyRecord = {
+      schemaVersion: "0.1.0",
+      publicationDate: "2026-08-14",
+      marketSessionDate: "2026-08-13",
+      generatedAt: "2026-08-14T20:00:00.000Z",
+      riskScore: 56,
+      baseRiskScore: 56,
+      concentrationPenalty: 0,
+      factorContributions: [
+        { id: "breadth", score: 80, effectiveWeight: 25 },
+        { id: "gamma", score: 75, effectiveWeight: 11.25 },
+        { id: "event_gate", score: 15, effectiveWeight: 10 },
+      ],
+    };
+    const comparison = buildRiskSessionComparison({
+      decisionSessionDate: "2026-08-14",
+      today,
+      priorRecord: prior,
+    });
+    if (today.riskScore === null || comparison === null) {
+      throw new Error("expected ready comparison");
+    }
+    expect(comparison.todaySession).toBe("2026-08-14");
+    expect(comparison.previousSession).toBe("2026-08-13");
+    expect(comparison.previousRiskScore).toBe(56);
+    expect(comparison.factors.find((row) => row.id === "breadth")?.previousScore).toBe(
+      80,
+    );
+    expect(comparison.todayRiskScore).toBe(today.riskScore);
+    expect(aggregateRiskScoreFromContributions(today.factorContributions)).not.toBeNull();
   });
 });

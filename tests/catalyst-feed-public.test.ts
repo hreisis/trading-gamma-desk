@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   loadCatalystFeed,
+  selectNewsFeedCatalysts,
   toPublicCatalystFeed,
 } from "@/catalyst";
 import { CatalystFeed } from "@/contracts";
@@ -52,5 +53,20 @@ describe("M3-0.5 public CatalystFeed DTO", () => {
     expect(pub.count).toBe(pub.catalysts.length);
     expect(typeof pub.source.briefs?.available).toBe("boolean");
     expect(typeof pub.source.marketContext?.available).toBe("boolean");
+  });
+
+  it("selects up to five near-term high-importance catalysts", () => {
+    const feed = loadCatalystFeed(
+      {},
+      { publicDemo: true, now: new Date("2026-07-29T20:00:00.000Z") },
+    );
+    const items = selectNewsFeedCatalysts(feed.catalysts, {
+      now: new Date("2026-07-29T20:00:00.000Z"),
+    });
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.length).toBeLessThanOrEqual(5);
+    for (const item of items) {
+      expect(["high", "critical", "medium"]).toContain(item.importance);
+    }
   });
 });

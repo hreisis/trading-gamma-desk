@@ -36,6 +36,13 @@ export function resolveLastCompletedMarketSessionDate(now = new Date()): string 
   return easternDate;
 }
 
+/** Prior US equity session before `sessionDate` on the trading calendar. */
+export function resolvePriorCompletedMarketSessionDate(
+  sessionDate: string,
+): string | null {
+  return defaultSessionCalendar.previousSession(sessionDate) ?? null;
+}
+
 export function resolveAiStudyMarketStatus(now = new Date()): AiStudyMarketStatus {
   const ctx = classifyEventSession(now);
   if (ctx.isWeekend) return "weekend";

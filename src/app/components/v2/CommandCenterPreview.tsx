@@ -1,8 +1,11 @@
 import { summarizeV2AiStudyInputCoverage } from "@/ai-study/v2-command-interpret";
+import { selectNewsFeedCatalysts } from "@/catalyst/public-feed";
 import { resolveAiStudyMarketStatus } from "@/ai-study/session";
+import type { CatalystImportance } from "@/contracts";
 import type { V2CommandCenterPageView } from "@/desk/load-v2-home";
 import type { V2Language } from "@/desk";
 import type { V2AiStudyConfidence } from "@/desk/v2-command-center";
+import { SentimentRiskCard } from "./SentimentRiskCard";
 
 const BLUE = "#004fff";
 const GOOD = "#0a963f";
@@ -128,16 +131,44 @@ function quoteFor(view: V2CommandCenterPageView, symbol: string) {
   return view.marketQuotes.find((quote) => quote.symbol === symbol);
 }
 
-function Ticker({ view, symbol }: { view: V2CommandCenterPageView; symbol: string }) {
-  const quote = quoteFor(view, symbol);
-  const change = quote?.dailyChangePct ?? null;
-  if (quote?.latestPrice == null) return null;
+/** Homepage top ticker: display label → Alpaca quote symbol in `marketQuotes`. */
+const TOP_TICKER_SYMBOLS: readonly {
+  readonly label: string;
+  readonly quoteSymbol: string;
+}[] = [
+  { label: "SPY", quoteSymbol: "SPY" },
+  { label: "QQQ", quoteSymbol: "QQQ" },
+  { label: "BTC", quoteSymbol: "BTC/USD" },
+  { label: "GLD", quoteSymbol: "GLD" },
+  { label: "USO", quoteSymbol: "USO" },
+  { label: "UUP", quoteSymbol: "UUP" },
+];
+
+function formatTickerPrice(label: string, price: number) {
+  return fmt(price, label === "BTC" ? 0 : 2);
+}
+
+function Ticker({
+  view,
+  label,
+  quoteSymbol,
+}: {
+  view: V2CommandCenterPageView;
+  label: string;
+  quoteSymbol: string;
+}) {
+  const quote = quoteFor(view, quoteSymbol);
+  const price = quote?.latestPrice;
+  const hasPrice = price != null && Number.isFinite(price);
+  const change = quote?.dailyChangePct;
+  const hasChange = change != null && Number.isFinite(change);
+
   return (
     <span className="pv-ticker">
-      <b>{symbol}</b>
-      <strong>{fmt(quote.latestPrice, 2)}</strong>
-      <em className={change == null ? "" : change >= 0 ? "good" : "bad"}>
-        {change == null ? "" : signed(change, "%", 2)}
+      <b>{label}</b>
+      <strong>{hasPrice ? formatTickerPrice(label, price) : "—"}</strong>
+      <em className={hasChange ? (change >= 0 ? "good" : "bad") : ""}>
+        {hasChange ? signed(change, "%", 2) : hasPrice ? "" : "—"}
       </em>
     </span>
   );
@@ -161,6 +192,99 @@ function formatEventTime(iso: string) {
   } catch {
     return "—";
   }
+}
+
+function formatNewsFeedWhen(iso: string, lang: V2Language) {
+  try {
+    const date = new Date(iso);
+    const dateLabel = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+      timeZone: "America/New_York",
+      month: "short",
+      day: "numeric",
+    }).format(date);
+    return `${dateLabel} ${formatEventTime(iso)} ET`;
+  } catch {
+    return "—";
+  }
+}
+
+function importanceLabel(importance: CatalystImportance, lang: V2Language) {
+  if (lang === "zh") {
+    if (importance === "critical") return "关键";
+    if (importance === "high") return "高";
+    if (importance === "medium") return "中";
+    return "低";
+  }
+  return importance.toUpperCase();
+}
+
+function MarketEventTickerItem({
+  item,
+  lang,
+}: {
+  item: { id: string; importance: CatalystImportance; headline: string; occurredAt: string };
+  lang: V2Language;
+}) {
+  return (
+    <span className="pv-event-ticker">
+      <b className={`is-${item.importance}`}>
+        {importanceLabel(item.importance, lang)}
+      </b>
+      <span>{item.headline}</span>
+      <em>{formatNewsFeedWhen(item.occurredAt, lang)}</em>
+    </span>
+  );
+}
+
+function MarketEventsTape({
+  view,
+  lang,
+}: {
+  view: V2CommandCenterPageView;
+  lang: V2Language;
+}) {
+  const feed = view.catalystFeed;
+  const anchor = feed?.generatedAt ? new Date(feed.generatedAt) : null;
+  const items =
+    feed && anchor
+      ? selectNewsFeedCatalysts(feed.catalysts, { now: anchor })
+      : [];
+  const loopItems = items.length > 0 ? [...items, ...items] : [];
+  const marqueeDuration = Math.max(28, items.length * 14);
+
+  return (
+    <footer
+      className="pv-events-tape"
+      id="market-events"
+      aria-label={lang === "zh" ? "市场事件" : "Market events"}
+    >
+      <strong className="pv-events-label">
+        {lang === "zh" ? "市场事件" : "MARKET EVENTS"}
+      </strong>
+      <div className="pv-events-marquee">
+        {items.length === 0 ? (
+          <span className="pv-events-empty">
+            {lang === "zh"
+              ? "近期无重要宏观日程。"
+              : "No tier-1 macro events in the near-term window."}
+          </span>
+        ) : (
+          <div
+            className="pv-events-track"
+            style={{ animationDuration: `${marqueeDuration}s` }}
+          >
+            {loopItems.map((item, index) => (
+              <MarketEventTickerItem
+                key={`${item.id}-${index}`}
+                item={item}
+                lang={lang}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </footer>
+  );
 }
 
 function scheduledEventLine(view: V2CommandCenterPageView) {
@@ -604,7 +728,14 @@ export function CommandCenterPreview({
         <header className="pv-top">
           <strong>GammaDesk</strong>
           <div className="pv-tickers">
-            {(["SPY", "QQQ", "IWM", "DIA", "VIX", "TLT", "GLD", "BTC"] as const).map((symbol) => <Ticker key={symbol} view={view} symbol={symbol} />)}
+            {TOP_TICKER_SYMBOLS.map((item) => (
+              <Ticker
+                key={item.label}
+                view={view}
+                label={item.label}
+                quoteSymbol={item.quoteSymbol}
+              />
+            ))}
           </div>
           <div className="pv-open">{marketStatusLabel(lang)}</div>
         </header>
@@ -620,11 +751,13 @@ export function CommandCenterPreview({
                   <p>{stanceSummary(view, lang)}</p>
                 </article>
 
-                <article>
-                  <h3>SENTIMENT / RISK</h3>
-                  <div className="pv-gauge"><div className="arc" /><b>{view.riskScore ?? "—"}</b></div>
-                  <p className="center">{riskLabel(view.riskScore, lang)}</p>
-                  <small className="pv-risk-asof">{lang === "zh" ? "数据日期" : "as of"} {view.sessionDate ?? "—"}</small>
+                <article className="pv-sentiment">
+                  <SentimentRiskCard
+                    riskScore={view.riskScore}
+                    sessionDate={view.sessionDate}
+                    comparison={view.riskSessionComparison}
+                    lang={lang}
+                  />
                 </article>
 
                 <article>
@@ -667,13 +800,15 @@ export function CommandCenterPreview({
 
           <AiRail view={view} lang={lang} />
         </main>
+        <MarketEventsTape view={view} lang={lang} />
       </div>
     </div>
   );
 }
 
 const styles = `
-:root{--pv-blue:#004fff;--pv-text:#10214a;--pv-muted:#65728d;--pv-line:#dce6f3;--pv-good:#0a963f;--pv-bad:#ff2e2e}
-*{box-sizing:border-box}.pv-app{min-height:100vh;background:#fff;color:var(--pv-text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:grid;grid-template-columns:118px 1fr;font-size:12px}.pv-nav{border-right:1px solid var(--pv-line);padding:14px 10px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;background:#fff}.pv-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7b61ff,#004fff);display:grid;place-items:center;color:#fff;font-weight:850;font-size:18px;text-decoration:none;margin:0 auto 22px}.pv-nav nav{display:grid;gap:7px}.pv-nav nav a{display:flex;gap:9px;align-items:center;color:#18305e;text-decoration:none;padding:10px 9px;border-radius:7px;font-weight:700}.pv-nav nav a.active{background:#edf4ff;color:var(--pv-blue)}.pv-shell{min-width:0}.pv-top{height:48px;border-bottom:1px solid var(--pv-line);display:grid;grid-template-columns:145px 1fr 110px;align-items:center;padding:0 14px;position:sticky;top:0;background:#fff;z-index:8}.pv-top>strong{font-size:18px}.pv-tickers{display:flex;gap:28px;align-items:center;justify-content:center}.pv-ticker{display:flex;gap:5px;align-items:baseline;justify-content:center;white-space:nowrap;font-size:9px}.pv-ticker b{font-size:9px}.pv-ticker strong{font-size:9px}.pv-ticker em{font-style:normal;font-weight:800;font-size:8px}.pv-open{color:#153257;font-weight:800;font-size:10px;white-space:nowrap}.pv-main{display:grid;grid-template-columns:minmax(780px,1fr) 310px;gap:10px;padding:10px}.pv-center{min-width:0}.pv-section-title{font-size:15px;color:var(--pv-blue);margin:0 0 7px;font-weight:850}.pv-section-title small{font-size:9px}.pv-overview{display:grid;grid-template-columns:1.05fr .95fr .95fr 1fr 1.12fr;gap:7px}.pv-overview>article{border:1px solid var(--pv-line);border-radius:7px;min-height:166px;padding:13px 13px 11px;background:#fff}.pv-overview h3,.pv-flat h3,.pv-leaders h3{font-size:11px;margin:0 0 14px;font-weight:850}.pv-hero{display:block;color:var(--pv-blue);font-size:30px;line-height:1.05;margin:23px 0 11px;text-align:center}.pv-overview p{font-size:10px;line-height:1.55;color:#25365c}.pv-overview p.center{text-align:center}.pv-risk-asof{display:block;text-align:center;color:var(--pv-muted);font-size:9px;margin-top:4px}.pv-gauge{position:relative;height:88px;width:150px;margin:7px auto 0;overflow:hidden}.pv-gauge .arc{width:140px;height:140px;border:14px solid #e8edf5;border-bottom-color:transparent;border-left-color:#ff4242;border-top-color:#ffad16;border-right-color:#1da358;border-radius:50%;transform:rotate(-45deg);margin:8px auto}.pv-gauge b{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:28px}.pv-snapshot{text-align:center;display:grid;gap:7px}.pv-snapshot>span{font-weight:750}.pv-snapshot>strong{font-size:30px;color:var(--pv-bad);margin-top:7px}.pv-snapshot small{border-top:1px solid var(--pv-line);padding-top:9px}.pv-snapshot em{font-style:normal;color:var(--pv-bad);font-weight:850}.pv-exposure{height:7px;border-radius:99px;background:#e8edf4;overflow:hidden;margin:21px 4px 0}.pv-exposure b{display:block;height:100%;background:var(--pv-good)}.pv-drivers{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:9px}.pv-drivers li{font-weight:800;display:flex;gap:5px}.pv-drivers li span{color:#22345a;font-weight:650}.pv-mini-confidence{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;margin-top:10px;font-size:9px}.pv-mini-confidence i,.pv-confidence i{height:5px;background:#e8edf4;border-radius:99px;overflow:hidden}.pv-mini-confidence i b,.pv-confidence i b{display:block;height:100%;background:var(--pv-blue)}.good{color:var(--pv-good)!important}.bad{color:var(--pv-bad)!important}.pv-structure{margin-top:9px;border:1px solid var(--pv-line);border-radius:7px;padding:9px}.pv-structure-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pv-structure-card{min-width:0;padding:6px 9px 4px}.pv-structure-card:first-child{border-right:1px solid var(--pv-line)}.pv-symbol-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.pv-symbol-line{display:flex;gap:8px;align-items:baseline;min-width:max-content}.pv-symbol-line strong{font-size:16px}.pv-price{font-size:15px;font-weight:550;color:#31415f}.pv-regime{font-size:9px;background:#edf4ff;color:var(--pv-blue);padding:4px 9px;border-radius:4px;font-weight:700;white-space:nowrap}.pv-data-date{font-size:8.5px;color:var(--pv-muted);margin:3px 0 7px}.pv-structure-grid{display:grid;grid-template-columns:160px 1fr;gap:8px;min-height:112px}.pv-level-labels{display:grid;grid-template-rows:repeat(4,1fr)}.pv-level-labels>div{display:grid;grid-template-columns:8px 1fr 45px 50px;align-items:center;gap:5px;font-size:9px}.pv-level-labels i{width:6px;height:6px;border-radius:50%}.pv-level-labels strong{text-align:right}.pv-level-labels em{font-style:normal;text-align:right;font-weight:750}.pv-chart{position:relative;border-bottom:1px solid #d6e0ef;overflow:hidden;background:repeating-linear-gradient(to right,transparent 0,transparent calc(20% - 1px),#edf2f8 calc(20% - 1px),#edf2f8 20%)}.pv-axis{position:absolute;left:0;right:0;border-top:1px solid;z-index:2}.pv-dot{position:absolute;width:8px;height:8px;border-radius:50%;top:-4px;transform:translateX(-50%)}.pv-band{position:absolute;top:6%;bottom:6%;border-radius:2px;z-index:1}.pv-band.expected{background:rgba(55,126,255,.10)}.pv-band.core{background:rgba(55,126,255,.22)}.pv-cone-legend{display:flex;gap:18px;border-top:1px solid #edf1f7;margin-top:5px;padding:7px 4px 3px;font-size:8px}.pv-cone-legend span{display:flex;gap:5px;align-items:center}.swatch{width:13px;height:9px;display:inline-block;border:1px solid #c8d8f3}.swatch.expected{background:rgba(55,126,255,.10)}.swatch.core{background:rgba(55,126,255,.25)}.pv-touch-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #edf1f7;margin-top:3px;padding-top:7px;font-size:8px}.pv-touch-row span{text-align:center;border-right:1px solid #edf1f7}.pv-touch-row span:last-child{border-right:0}.pv-bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px}.pv-flat{height:205px;border:1px solid var(--pv-line);border-radius:7px;padding:10px;background:#fff;overflow:hidden;position:relative}.pv-flat h3,.pv-leaders h3{color:var(--pv-blue);font-size:12px;margin-bottom:9px}.pv-flat h3 small,.pv-leaders h3 small{font-size:8px}.pv-metric-row{display:grid;grid-template-columns:1.4fr .55fr .75fr;gap:4px;align-items:center;padding:3px 0;font-size:8px}.pv-metric-row em{font-style:normal;color:var(--pv-muted);text-align:right}.pv-rotation-row{display:grid;grid-template-columns:1.55fr .5fr .7fr;gap:5px;align-items:center;padding:3px 0;font-size:8px}.pv-rotation-row i{height:5px;background:#edf1f6;border-radius:9px;overflow:hidden}.pv-rotation-row b{display:block;height:100%}.pv-rotation-row b.pos{background:#0a963f}.pv-rotation-row b.neg{background:#ff2e2e}.pv-muted{color:var(--pv-muted);font-size:9px;line-height:1.5}.pv-flat-footer{position:absolute;left:10px;right:10px;bottom:8px;border-top:1px solid #edf1f7;padding-top:7px;font-size:8px}.pv-leaders{border:1px solid var(--pv-line);border-radius:7px;padding:9px 10px;margin-top:7px;min-height:82px}.pv-leaders-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.pv-leaders h4{font-size:8px;margin:0 0 5px;color:var(--pv-good)}.pv-ticker-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.pv-ticker-cards span{display:flex;flex-direction:column;border-right:1px solid #edf1f7;padding-right:5px;font-size:8px}.pv-ticker-cards strong{font-size:8px}.pv-right{background:#f8fbff;border-left:1px solid #e2ebf7;min-height:calc(100vh - 68px);padding:9px;display:grid;grid-template-rows:auto auto;align-content:start;gap:8px}.pv-ai,.pv-review{background:#fff;border:1px solid var(--pv-line);border-radius:7px;padding:13px}.pv-ai h2,.pv-review h2{color:var(--pv-blue);font-size:15px;margin:0 0 13px;padding-bottom:8px;border-bottom:1px solid #e5edf8}.pv-ai h4{font-size:9px;color:var(--pv-blue);margin:13px 0 5px}.pv-ai p,.pv-ai li{font-size:9px;line-height:1.55;color:#27385c}.pv-ai ul{padding-left:15px}.pv-confidence{border-top:1px solid #e5edf8;margin-top:13px;padding-top:9px}.pv-confidence>div{display:flex;justify-content:space-between;font-size:9px;gap:8px}.pv-confidence i{display:block;margin-top:7px;height:5px}.pv-review>div{display:grid;grid-template-columns:1fr;gap:2px;padding:9px 0;border-bottom:1px solid #edf1f7;font-size:9px}.pv-review span{color:var(--pv-muted)}.pv-review-block{display:grid;gap:4px}.pv-review-list{list-style:none;margin:0;padding:0;display:grid;gap:4px}.pv-review-list.is-positive li{color:var(--pv-good)}.pv-review-list.is-caution li{color:var(--pv-bad)}.pv-review-pending{color:var(--pv-muted)}
-@media(max-width:1180px){.pv-app{grid-template-columns:72px 1fr}.pv-nav span{display:none}.pv-main{grid-template-columns:1fr}.pv-right{display:none}.pv-overview{grid-template-columns:repeat(3,1fr)}.pv-bottom-row{grid-template-columns:1fr 1fr}.pv-tickers span:nth-child(n+6){display:none}}
+:root{--pv-blue:#004fff;--pv-text:#10214a;--pv-muted:#65728d;--pv-line:#dce6f3;--pv-good:#0a963f;--pv-bad:#ff2e2e;--pv-nav-width:118px;--pv-events-tape-height:36px}
+*{box-sizing:border-box}.pv-app{min-height:100vh;background:#fff;color:var(--pv-text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:grid;grid-template-columns:118px 1fr;font-size:12px}.pv-nav{border-right:1px solid var(--pv-line);padding:14px 10px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;background:#fff}.pv-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7b61ff,#004fff);display:grid;place-items:center;color:#fff;font-weight:850;font-size:18px;text-decoration:none;margin:0 auto 22px}.pv-nav nav{display:grid;gap:7px}.pv-nav nav a{display:flex;gap:9px;align-items:center;color:#18305e;text-decoration:none;padding:10px 9px;border-radius:7px;font-weight:700}.pv-nav nav a.active{background:#edf4ff;color:var(--pv-blue)}.pv-shell{min-width:0;display:flex;flex-direction:column;min-height:100vh;padding-bottom:var(--pv-events-tape-height)}.pv-top{height:48px;border-bottom:1px solid var(--pv-line);display:grid;grid-template-columns:145px 1fr 110px;align-items:center;padding:0 14px;position:sticky;top:0;background:#fff;z-index:8}.pv-top>strong{font-size:18px}.pv-tickers{display:flex;gap:28px;align-items:center;justify-content:center}.pv-ticker{display:flex;gap:5px;align-items:baseline;justify-content:center;white-space:nowrap;font-size:9px}.pv-ticker b{font-size:9px}.pv-ticker strong{font-size:9px}.pv-ticker em{font-style:normal;font-weight:800;font-size:8px}.pv-open{color:#153257;font-weight:800;font-size:10px;white-space:nowrap}.pv-main{flex:1;display:grid;grid-template-columns:minmax(780px,1fr) 310px;gap:10px;padding:10px}.pv-events-tape{position:fixed;bottom:0;left:var(--pv-nav-width);right:0;height:var(--pv-events-tape-height);border-top:1px solid var(--pv-line);display:flex;align-items:center;gap:16px;padding:0 14px;background:#fff;font-size:9px;z-index:9}.pv-events-label{flex-shrink:0;color:var(--pv-blue);font-weight:800;font-size:9px;white-space:nowrap}.pv-events-marquee{flex:1;min-width:0;overflow:hidden}.pv-events-marquee:hover .pv-events-track{animation-play-state:paused}.pv-events-track{display:flex;gap:28px;align-items:center;width:max-content;animation:pv-events-marquee linear infinite}.pv-events-empty{color:var(--pv-muted);font-size:9px;white-space:nowrap}@keyframes pv-events-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}.pv-event-ticker{display:flex;gap:6px;align-items:baseline;white-space:nowrap;font-size:9px}.pv-event-ticker b{font-size:8px;font-weight:800;text-transform:uppercase;color:var(--pv-muted)}.pv-event-ticker b.is-critical,.pv-event-ticker b.is-high{color:var(--pv-bad)}.pv-event-ticker b.is-medium{color:var(--pv-blue)}.pv-event-ticker span{color:#22345a;font-weight:500}.pv-event-ticker em{font-style:normal;color:var(--pv-muted);font-size:8px;font-weight:600}.pv-center{min-width:0}.pv-section-title{font-size:15px;color:var(--pv-blue);margin:0 0 7px;font-weight:850}.pv-section-title small{font-size:9px}.pv-overview{display:grid;grid-template-columns:1.05fr .95fr .95fr 1fr 1.12fr;gap:7px}.pv-overview>article{border:1px solid var(--pv-line);border-radius:7px;min-height:166px;padding:13px 13px 11px;background:#fff}.pv-sentiment-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:14px}.pv-sentiment-head h3{font-size:11px;margin:0;font-weight:850}.pv-details-btn{font-size:8px;font-weight:800;color:var(--pv-blue);background:none;border:0;cursor:pointer;padding:0;line-height:1.2;white-space:nowrap}.pv-risk-details{margin-top:-6px;font-size:8px;line-height:1.35}.pv-risk-details table{width:100%;border-collapse:collapse}.pv-risk-details td{padding:2px 0;vertical-align:top}.pv-risk-factor{font-weight:700;color:#22345a;width:38%}.pv-risk-today{text-align:right;width:18%;font-weight:800;color:#22345a}.pv-risk-prev{text-align:right;width:28%;color:var(--pv-muted);font-weight:600}.pv-risk-delta{text-align:right;width:22%;font-weight:800}.pv-risk-delta.good{color:var(--pv-good)}.pv-risk-delta.bad{color:var(--pv-bad)}.pv-risk-delta.neutral{color:var(--pv-muted)}.pv-risk-summary td{padding-top:6px;border-top:1px solid #edf1f7}.pv-risk-compare-note{display:block;margin-top:8px;color:var(--pv-muted);font-size:7.5px}.pv-overview h3,.pv-flat h3,.pv-leaders h3{font-size:11px;margin:0 0 14px;font-weight:850}.pv-hero{display:block;color:var(--pv-blue);font-size:30px;line-height:1.05;margin:23px 0 11px;text-align:center}.pv-overview p{font-size:10px;line-height:1.55;color:#25365c}.pv-overview p.center{text-align:center}.pv-risk-asof{display:block;text-align:center;color:var(--pv-muted);font-size:9px;margin-top:4px}.pv-gauge{position:relative;height:88px;width:150px;margin:7px auto 0;overflow:hidden}.pv-gauge .arc{width:140px;height:140px;border:14px solid #e8edf5;border-bottom-color:transparent;border-left-color:#ff4242;border-top-color:#ffad16;border-right-color:#1da358;border-radius:50%;transform:rotate(-45deg);margin:8px auto}.pv-gauge b{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:28px}.pv-snapshot{text-align:center;display:grid;gap:7px}.pv-snapshot>span{font-weight:750}.pv-snapshot>strong{font-size:30px;color:var(--pv-bad);margin-top:7px}.pv-snapshot small{border-top:1px solid var(--pv-line);padding-top:9px}.pv-snapshot em{font-style:normal;color:var(--pv-bad);font-weight:850}.pv-exposure{height:7px;border-radius:99px;background:#e8edf4;overflow:hidden;margin:21px 4px 0}.pv-exposure b{display:block;height:100%;background:var(--pv-good)}.pv-drivers{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:9px}.pv-drivers li{font-weight:800;display:flex;gap:5px}.pv-drivers li span{color:#22345a;font-weight:650}.pv-mini-confidence{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;margin-top:10px;font-size:9px}.pv-mini-confidence i,.pv-confidence i{height:5px;background:#e8edf4;border-radius:99px;overflow:hidden}.pv-mini-confidence i b,.pv-confidence i b{display:block;height:100%;background:var(--pv-blue)}.good{color:var(--pv-good)!important}.bad{color:var(--pv-bad)!important}.pv-structure{margin-top:9px;border:1px solid var(--pv-line);border-radius:7px;padding:9px}.pv-structure-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pv-structure-card{min-width:0;padding:6px 9px 4px}.pv-structure-card:first-child{border-right:1px solid var(--pv-line)}.pv-symbol-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.pv-symbol-line{display:flex;gap:8px;align-items:baseline;min-width:max-content}.pv-symbol-line strong{font-size:16px}.pv-price{font-size:15px;font-weight:550;color:#31415f}.pv-regime{font-size:9px;background:#edf4ff;color:var(--pv-blue);padding:4px 9px;border-radius:4px;font-weight:700;white-space:nowrap}.pv-data-date{font-size:8.5px;color:var(--pv-muted);margin:3px 0 7px}.pv-structure-grid{display:grid;grid-template-columns:160px 1fr;gap:8px;min-height:112px}.pv-level-labels{display:grid;grid-template-rows:repeat(4,1fr)}.pv-level-labels>div{display:grid;grid-template-columns:8px 1fr 45px 50px;align-items:center;gap:5px;font-size:9px}.pv-level-labels i{width:6px;height:6px;border-radius:50%}.pv-level-labels strong{text-align:right}.pv-level-labels em{font-style:normal;text-align:right;font-weight:750}.pv-chart{position:relative;border-bottom:1px solid #d6e0ef;overflow:hidden;background:repeating-linear-gradient(to right,transparent 0,transparent calc(20% - 1px),#edf2f8 calc(20% - 1px),#edf2f8 20%)}.pv-axis{position:absolute;left:0;right:0;border-top:1px solid;z-index:2}.pv-dot{position:absolute;width:8px;height:8px;border-radius:50%;top:-4px;transform:translateX(-50%)}.pv-band{position:absolute;top:6%;bottom:6%;border-radius:2px;z-index:1}.pv-band.expected{background:rgba(55,126,255,.10)}.pv-band.core{background:rgba(55,126,255,.22)}.pv-cone-legend{display:flex;gap:18px;border-top:1px solid #edf1f7;margin-top:5px;padding:7px 4px 3px;font-size:8px}.pv-cone-legend span{display:flex;gap:5px;align-items:center}.swatch{width:13px;height:9px;display:inline-block;border:1px solid #c8d8f3}.swatch.expected{background:rgba(55,126,255,.10)}.swatch.core{background:rgba(55,126,255,.25)}.pv-touch-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #edf1f7;margin-top:3px;padding-top:7px;font-size:8px}.pv-touch-row span{text-align:center;border-right:1px solid #edf1f7}.pv-touch-row span:last-child{border-right:0}.pv-bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px}.pv-flat{height:205px;border:1px solid var(--pv-line);border-radius:7px;padding:10px;background:#fff;overflow:hidden;position:relative}.pv-flat h3,.pv-leaders h3{color:var(--pv-blue);font-size:12px;margin-bottom:9px}.pv-flat h3 small,.pv-leaders h3 small{font-size:8px}.pv-metric-row{display:grid;grid-template-columns:1.4fr .55fr .75fr;gap:4px;align-items:center;padding:3px 0;font-size:8px}.pv-metric-row em{font-style:normal;color:var(--pv-muted);text-align:right}.pv-rotation-row{display:grid;grid-template-columns:1.55fr .5fr .7fr;gap:5px;align-items:center;padding:3px 0;font-size:8px}.pv-rotation-row i{height:5px;background:#edf1f6;border-radius:9px;overflow:hidden}.pv-rotation-row b{display:block;height:100%}.pv-rotation-row b.pos{background:#0a963f}.pv-rotation-row b.neg{background:#ff2e2e}.pv-muted{color:var(--pv-muted);font-size:9px;line-height:1.5}.pv-flat-footer{position:absolute;left:10px;right:10px;bottom:8px;border-top:1px solid #edf1f7;padding-top:7px;font-size:8px}.pv-leaders{border:1px solid var(--pv-line);border-radius:7px;padding:9px 10px;margin-top:7px;min-height:82px}.pv-leaders-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.pv-leaders h4{font-size:8px;margin:0 0 5px;color:var(--pv-good)}.pv-ticker-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.pv-ticker-cards span{display:flex;flex-direction:column;border-right:1px solid #edf1f7;padding-right:5px;font-size:8px}.pv-ticker-cards strong{font-size:8px}.pv-right{background:#f8fbff;border-left:1px solid #e2ebf7;min-height:calc(100vh - 68px);padding:9px;display:grid;grid-template-rows:auto auto;align-content:start;gap:8px}.pv-ai,.pv-review{background:#fff;border:1px solid var(--pv-line);border-radius:7px;padding:13px}.pv-ai h2,.pv-review h2{color:var(--pv-blue);font-size:15px;margin:0 0 13px;padding-bottom:8px;border-bottom:1px solid #e5edf8}.pv-ai h4{font-size:9px;color:var(--pv-blue);margin:13px 0 5px}.pv-ai p,.pv-ai li{font-size:9px;line-height:1.55;color:#27385c}.pv-ai ul{padding-left:15px}.pv-confidence{border-top:1px solid #e5edf8;margin-top:13px;padding-top:9px}.pv-confidence>div{display:flex;justify-content:space-between;font-size:9px;gap:8px}.pv-confidence i{display:block;margin-top:7px;height:5px}.pv-review>div{display:grid;grid-template-columns:1fr;gap:2px;padding:9px 0;border-bottom:1px solid #edf1f7;font-size:9px}.pv-review span{color:var(--pv-muted)}.pv-review-block{display:grid;gap:4px}.pv-review-list{list-style:none;margin:0;padding:0;display:grid;gap:4px}.pv-review-list.is-positive li{color:var(--pv-good)}.pv-review-list.is-caution li{color:var(--pv-bad)}.pv-review-pending{color:var(--pv-muted)}
+@media(max-width:1180px){:root{--pv-nav-width:72px}.pv-app{grid-template-columns:72px 1fr}.pv-nav span{display:none}.pv-main{grid-template-columns:1fr}.pv-right{display:none}.pv-overview{grid-template-columns:repeat(3,1fr)}.pv-bottom-row{grid-template-columns:1fr 1fr}.pv-tickers span:nth-child(n+6){display:none}}
+@media(prefers-reduced-motion:reduce){.pv-events-track{animation:none}}
 `;

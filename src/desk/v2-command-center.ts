@@ -20,6 +20,10 @@ import {
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import {
   deriveRiskDecisionV1,
+  buildRiskSessionComparison,
+  loadPriorPublishedRiskDecisionForMarketSession,
+  loadPriorPublishedRiskDecisionForMarketSessionAsync,
+  type RiskSessionComparison,
   resolveRiskDecisionDayOverDay,
   resolveRiskDecisionDayOverDayAsync,
 } from "./risk-decision-v1";
@@ -124,7 +128,7 @@ export const SECTOR_ETF_NAMES: Record<string, string> = {
   XLU: "Utilities",
   XLB: "Materials",
   XLRE: "Real Estate",
-  XLC: "Communication Services",
+  XLC: "Communication",
 };
 
 export function formatSectorEtfLabel(symbol: string): string {
@@ -200,6 +204,7 @@ export interface V2CommandCenterView {
   readonly riskScore: number | null;
   readonly riskChange: number | null;
   readonly riskChangeReason: string | null;
+  readonly riskSessionComparison: RiskSessionComparison | null;
   readonly opportunityScore: number | null;
   readonly exposure: { readonly min: number; readonly max: number } | null;
   readonly allocation:
@@ -1233,6 +1238,7 @@ export async function buildV2CommandCenterView(input: {
       riskScore: 42,
       riskChange: -6,
       riskChangeReason: "Risk eased: breadth improved · CTA strengthened",
+      riskSessionComparison: null,
       opportunityScore: 58,
       exposure: { min: 65, max: 80 },
       allocation: { highBeta: 45, defense: 25, metals: 20, hedge: 10 },
@@ -1321,6 +1327,23 @@ export async function buildV2CommandCenterView(input: {
           })
       : { riskChange: null, riskChangeReason: null };
 
+  const priorRiskRecord = input.artifactStore
+    ? await loadPriorPublishedRiskDecisionForMarketSessionAsync(
+        input.artifactStore,
+        targetSession,
+      )
+    : input.dataRoot
+      ? loadPriorPublishedRiskDecisionForMarketSession(input.dataRoot, targetSession)
+      : null;
+  const riskSessionComparison =
+    decision.status === "ready"
+      ? buildRiskSessionComparison({
+          decisionSessionDate: targetSession,
+          today: decision,
+          priorRecord: priorRiskRecord,
+        })
+      : null;
+
   resolveRiskDivergenceDayOverDay({
     dataRoot: input.dataRoot,
     publicationDate,
@@ -1336,6 +1359,7 @@ export async function buildV2CommandCenterView(input: {
     riskScore: decision.riskScore,
     riskChange: dayOverDay.riskChange,
     riskChangeReason: dayOverDay.riskChangeReason,
+    riskSessionComparison,
     opportunityScore: decision.opportunityScore,
     exposure: decision.exposure,
     allocation: decision.allocation,
@@ -1348,7 +1372,7 @@ export async function buildV2CommandCenterView(input: {
     gammaCone: [spyGammaCone, qqqGammaCone],
     macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
     macroSummary,
-    sessionDate: publicationDate,
+    sessionDate: targetSession,
     sectorRotation,
     spyStructuralRiskScore: riskV1_1.spyStructuralRisk.riskScore,
     qqqStructuralRiskScore: riskV1_1.qqqStructuralRisk.riskScore,
