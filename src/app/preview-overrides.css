@@ -20,7 +20,7 @@
 .pv-app .pv-ai > h2::before {
   font-size: 9px;
   line-height: 1;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   color: #8aa0c4;
 }
@@ -32,38 +32,68 @@
 .pv-app .pv-tech > h3::before { content: "05"; }
 .pv-app .pv-ai > h2::before { content: "06"; }
 
-/* Readability: increase body copy without loosening the overall layout. */
+/* Typography hierarchy: fewer heavy weights, stronger contrast through scale instead. */
 .pv-app { font-size: 13px; }
+.pv-app .pv-section-title,
+.pv-app .pv-ai h2,
+.pv-app .pv-review h2 { font-weight: 700; }
 .pv-app .pv-nav nav a,
-.pv-app .pv-settings { font-size: 11px; }
+.pv-app .pv-settings { font-size: 11px; font-weight: 600; }
 .pv-app .pv-ticker,
 .pv-app .pv-ticker b,
 .pv-app .pv-ticker strong { font-size: 10px; }
-.pv-app .pv-ticker em { font-size: 9px; }
-.pv-app .pv-open { font-size: 11px; }
-.pv-app .pv-overview h3 { font-size: 12px; }
-.pv-app .pv-overview p { font-size: 12px; line-height: 1.5; }
+.pv-app .pv-ticker b { font-weight: 600; }
+.pv-app .pv-ticker strong { font-weight: 500; }
+.pv-app .pv-ticker em { font-size: 9px; font-weight: 600; }
+.pv-app .pv-open { font-size: 11px; font-weight: 600; }
+.pv-app .pv-overview h3 { font-size: 12px; font-weight: 650; letter-spacing: .01em; }
+.pv-app .pv-overview p { font-size: 12px; line-height: 1.5; font-weight: 400; }
+.pv-app .pv-hero { font-weight: 700; }
 .pv-app .pv-snapshot > span,
-.pv-app .pv-snapshot small { font-size: 12px; }
+.pv-app .pv-snapshot small { font-size: 12px; font-weight: 500; }
+.pv-app .pv-snapshot > strong { font-weight: 700; }
+.pv-app .pv-snapshot em { font-weight: 650; }
 .pv-app .pv-drivers,
 .pv-app .pv-mini-confidence { font-size: 11px; }
+.pv-app .pv-drivers li { font-weight: 500; }
+.pv-app .pv-drivers li span { font-weight: 500; }
+.pv-app .pv-mini-confidence strong { font-weight: 600; }
+.pv-app .pv-symbol-head strong { font-weight: 700; }
 .pv-app .pv-symbol-head span,
 .pv-app .pv-regime { font-size: 11px; }
-.pv-app .pv-level-labels > div { font-size: 11px; }
+.pv-app .pv-regime { font-weight: 600; }
+.pv-app .pv-price { font-weight: 700; }
+.pv-app .pv-level-labels > div { font-size: 11px; font-weight: 400; }
+.pv-app .pv-level-labels strong { font-weight: 600; }
+.pv-app .pv-level-labels em { font-weight: 600; }
 .pv-app .pv-cone-legend,
 .pv-app .pv-touch-row { font-size: 10px; }
+.pv-app .pv-cone-legend strong,
+.pv-app .pv-touch-row strong { font-weight: 600; }
+.pv-app .pv-flat h3,
+.pv-app .pv-leaders h3 { font-weight: 700; }
 .pv-app .pv-metric-row,
-.pv-app .pv-rotation-row { font-size: 10.5px; line-height: 1.35; }
+.pv-app .pv-rotation-row { font-size: 10.5px; line-height: 1.35; font-weight: 400; }
+.pv-app .pv-metric-row strong,
+.pv-app .pv-rotation-row strong { font-weight: 600; }
+.pv-app .pv-metric-row em { font-weight: 500; }
 .pv-app .pv-muted,
-.pv-app .pv-flat-footer { font-size: 11px; }
+.pv-app .pv-flat-footer { font-size: 11px; font-weight: 400; }
+.pv-app .pv-flat-footer strong { font-weight: 600; }
 .pv-app .pv-leaders h4,
 .pv-app .pv-ticker-cards span,
 .pv-app .pv-ticker-cards strong { font-size: 10px; }
-.pv-app .pv-ai h4 { font-size: 11px; }
+.pv-app .pv-leaders h4 { font-weight: 600; }
+.pv-app .pv-ticker-cards b,
+.pv-app .pv-ticker-cards strong { font-weight: 600; }
+.pv-app .pv-ai h4 { font-size: 11px; font-weight: 650; }
 .pv-app .pv-ai p,
 .pv-app .pv-ai li,
 .pv-app .pv-confidence > div,
-.pv-app .pv-review > div { font-size: 12px; line-height: 1.55; }
+.pv-app .pv-review > div { font-size: 12px; line-height: 1.55; font-weight: 400; }
+.pv-app .pv-ai li strong,
+.pv-app .pv-confidence strong,
+.pv-app .pv-review strong { font-weight: 600; }
 
 /* Left-bottom language switch replaces Settings. */
 .pv-app .pv-language-switch {
@@ -74,7 +104,7 @@
   gap: 6px;
   padding: 10px 6px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: #9aa9c1;
   white-space: nowrap;
 }
@@ -98,24 +128,44 @@
   min-width: 360px;
 }
 
-/* Risk gauge: restore the stronger original palette and anchor the pointer at the semicircle center. */
+/* Risk gauge: softer reference palette, thin needle, score below pivot. */
+.pv-app .pv-gauge {
+  height: 108px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
 .pv-app .pv-gauge .arc {
-  border-color: #e8edf5;
-  border-bottom-color: transparent;
-  border-left-color: #ff4242;
-  border-top-color: #ffad16;
-  border-right-color: #1da358;
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  width: 140px;
+  height: 140px;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  transform: none;
+  background: conic-gradient(
+    from 270deg,
+    #75c59f 0deg 45deg,
+    #d8d978 45deg 90deg,
+    #e7a15d 90deg 135deg,
+    #d66b6b 135deg 180deg,
+    transparent 180deg 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 14px), #000 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 14px), #000 0);
 }
 
 .pv-app .pv-gauge::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: 12px;
-  width: 48px;
-  height: 3px;
-  border-radius: 3px;
-  background: #20345b;
+  bottom: 31px;
+  width: 52px;
+  height: 2px;
+  border-radius: 2px;
+  background: #11151c;
   transform-origin: 0 50%;
   transform: rotate(var(--risk-angle, -90deg));
   opacity: 0;
@@ -125,14 +175,23 @@
 .pv-app .pv-gauge::before {
   content: "";
   position: absolute;
-  left: calc(50% - 5px);
-  bottom: 7px;
-  width: 10px;
-  height: 10px;
+  left: calc(50% - 4px);
+  bottom: 27px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #20345b;
+  background: #11151c;
   opacity: 0;
   z-index: 4;
+}
+
+.pv-app .pv-gauge > b {
+  bottom: 0;
+  z-index: 5;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1;
+  color: #10151d;
 }
 
 .pv-app .pv-gauge[data-pointer="on"]::after,
