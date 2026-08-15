@@ -26,6 +26,7 @@ import { extractOutputText } from "./openai-utils";
 
 export const V2_COMMAND_AI_STUDY_PROMPT_VERSION = "0.2.0";
 export const V2_COMMAND_AI_STUDY_MAX_OUTPUT_TOKENS = 480;
+export const V2_AI_STUDY_INPUT_TOPIC_COUNT = 8;
 
 export interface V2AiStudyPayload {
   readonly promptVersion: string;
@@ -540,6 +541,18 @@ export function buildV2AiStudyPayload(
     ...payload,
     dataQuality,
   } as V2AiStudyPayload;
+}
+
+/** Counts available AI Study payload topics (macro, gammas, breadth, CTA, vol, rotation, event gate). */
+export function summarizeV2AiStudyInputCoverage(
+  view: V2CommandCenterView,
+  eventGate: EventGateSnapshot | null,
+): { readonly available: number; readonly total: number } {
+  const missingTopics = buildV2AiStudyPayload(view, eventGate).dataQuality.missingTopics;
+  return {
+    available: V2_AI_STUDY_INPUT_TOPIC_COUNT - missingTopics.length,
+    total: V2_AI_STUDY_INPUT_TOPIC_COUNT,
+  };
 }
 
 /** Verifies AI Study payload mirrors the command center view (same source fields). */

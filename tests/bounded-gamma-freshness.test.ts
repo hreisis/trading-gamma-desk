@@ -1,8 +1,12 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import spyFixture from "../fixtures/gamma/providers/marketdata-app/spy-bounded-ui.json";
+import {
+  markMarketDataCreditsExhausted,
+  resetMarketDataCreditDeferral,
+} from "@/gamma/marketdata-app/credits";
 import {
   boundedGammaFreshnessLabel,
   isBoundedGammaSessionStale,
@@ -75,6 +79,11 @@ async function writeArtifactToStore(
 describe("bounded gamma session freshness", () => {
   beforeEach(() => {
     mockedRun.mockReset();
+    resetMarketDataCreditDeferral();
+  });
+
+  afterEach(() => {
+    resetMarketDataCreditDeferral();
   });
 
   it("marks stale when generatedAt is new but sessionDate lags target", () => {
@@ -196,6 +205,27 @@ describe("bounded gamma session freshness", () => {
     expect(view.freshness).toBe("stale");
     expect(view.status).toBe("ready");
     expect(view.error?.code).toBe("refresh_failed");
+  });
+
+  it("skips MarketData refresh when daily credits are exhausted", async () => {
+    const deskRoot = mkdtempSync(join(tmpdir(), "gamma-credit-"));
+    const root = gammaProviderRoot(deskRoot);
+    writeArtifact(root, "SPY", snapshotWithSession("2026-08-07"));
+
+    markMarketDataCreditsExhausted(new Date("2026-08-10T15:00:00.000Z"));
+
+    const view = await loadBoundedGammaDeskViewAsync({
+      symbol: "SPY",
+      dataRoot: root,
+      env: { ...process.env, MARKETDATA_API_TOKEN: "test-token" },
+      targetSession: "2026-08-10",
+      now: new Date("2026-08-10T15:00:00.000Z"),
+    });
+
+    expect(mockedRun).not.toHaveBeenCalled();
+    expect(view.snapshot?.sessionDate).toBe("2026-08-07");
+    expect(view.freshness).toBe("stale");
+    expect(view.error?.code).toBe("credit_limit_deferred");
   });
 
   it("handles SPY and QQQ independently", async () => {

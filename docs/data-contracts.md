@@ -745,6 +745,7 @@ Credit-bounded, single-expiry MarketData.app → Gamma Engine derived snapshot f
 | `gammaFlip` | Spot-shock modeled flip + `scope: bounded_single_expiry`; `method: spot_shock_bs_gamma` when available |
 | `status` | Same engine semantics: `available` \| `incomplete` \| `partial` \| `unavailable` |
 | Credits | `credits.consumed` / `credits.remaining` from vendor rate-limit headers when present |
+| Credit reset | MarketData.app daily credits reset at **9:30 AM ET** (6:30 AM PT). On HTTP 429 / credit-limit exhaustion, `loadBoundedGammaDeskViewAsync` defers further homepage refresh until reset (`src/gamma/marketdata-app/credits.ts`), does not overwrite blob artifacts, and serves the latest valid persisted snapshot with its real `sessionDate` / vendor as-of when present; otherwise gamma stays unavailable. |
 | Persistence | `data/gamma/providers/marketdata-app/{SYMBOL}-bounded-latest.json` (gitignored); write only on success |
 
 Env: `MARKETDATA_API_TOKEN` (alias `MARKETDATA_APP_TOKEN`). Default safety cap: estimated contracts `strikeCount × 2` ≤ **250** unless `--allow-above-cap`.

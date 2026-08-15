@@ -12,6 +12,10 @@ import { computeEstimatedGammaStructure } from "../compute";
 import { extractRepresentativeIvFromChain } from "../aggregate";
 import { grossGex } from "../gex";
 import { resolveMarketDataApiToken } from "./config";
+import {
+  isMarketDataCreditLimitExhausted,
+  markMarketDataCreditsExhausted,
+} from "./credits";
 import { fetchBoundedMarketDataAppChain } from "./fetch";
 import { MarketDataAppNormalizeError } from "./errors";
 import { normalizeMarketDataAppChain } from "./normalize";
@@ -240,6 +244,28 @@ export async function runBoundedGammaProvider(
       ok: false,
       code: "token_leak",
       error: "refusing to continue: request path unexpectedly contained token",
+      path: null,
+      wrote: false,
+    };
+  }
+
+  if (
+    isMarketDataCreditLimitExhausted({
+      httpStatus: fetchResult.httpStatus,
+      body: fetchResult.body,
+    })
+  ) {
+    markMarketDataCreditsExhausted();
+    const detail =
+      isRecord(fetchResult.body) &&
+      typeof fetchResult.body.errmsg === "string" &&
+      fetchResult.body.errmsg.length > 0
+        ? fetchResult.body.errmsg
+        : `MarketData.app HTTP ${fetchResult.httpStatus}: daily API credit limit exhausted`;
+    return {
+      ok: false,
+      code: "credit_limit",
+      error: detail,
       path: null,
       wrote: false,
     };

@@ -1,6 +1,8 @@
+import { summarizeV2AiStudyInputCoverage } from "@/ai-study/v2-command-interpret";
 import { resolveAiStudyMarketStatus } from "@/ai-study/session";
 import type { V2CommandCenterPageView } from "@/desk/load-v2-home";
 import type { V2Language } from "@/desk";
+import type { V2AiStudyConfidence } from "@/desk/v2-command-center";
 
 const BLUE = "#004fff";
 const GOOD = "#0a963f";
@@ -17,7 +19,7 @@ const SECTOR_NAMES: Record<string, string> = {
   XLU: "Utilities",
   XLB: "Materials",
   XLRE: "Real Estate",
-  XLC: "Communication Services",
+  XLC: "Communication",
 };
 
 function fmt(n: number | null | undefined, digits = 0) {
@@ -78,6 +80,17 @@ function confidencePct(level: V2CommandCenterPageView["aiStudy"]["confidence"]) 
   if (level === "high") return 82;
   if (level === "moderate") return 58;
   return 35;
+}
+
+function aiStudyConfidenceLabel(level: V2AiStudyConfidence, lang: V2Language) {
+  if (lang === "zh") {
+    if (level === "high") return "高";
+    if (level === "moderate") return "中等";
+    return "有限";
+  }
+  if (level === "high") return "High";
+  if (level === "moderate") return "Moderate";
+  return "Limited";
 }
 
 function coneFor(view: V2CommandCenterPageView, symbol: "SPY" | "QQQ") {
@@ -466,36 +479,80 @@ function KeyDrivers({ view }: { view: V2CommandCenterPageView }) {
   );
 }
 
-function AiRail({ view }: { view: V2CommandCenterPageView }) {
-  const conf = confidencePct(view.aiStudy.confidence);
+function AiRail({ view, lang }: { view: V2CommandCenterPageView; lang: V2Language }) {
+  const coverage = summarizeV2AiStudyInputCoverage(view, view.eventGate);
+  const coveragePct = Math.round((coverage.available / coverage.total) * 100);
+  const confidenceLabel = aiStudyConfidenceLabel(view.aiStudy.confidence, lang);
+  const review = view.dailyReview;
+  const pendingLabel = lang === "zh" ? "待定" : "Pending";
+
   return (
     <aside className="pv-right">
       <section className="pv-ai" id="ai-study">
-        <h2>AI STUDY / INSIGHTS</h2>
-        <h4>AI VIEW</h4>
+        <h2>{lang === "zh" ? "AI 研究 / 洞察" : "AI STUDY / INSIGHTS"}</h2>
+        <h4>{lang === "zh" ? "AI 观点" : "AI VIEW"}</h4>
         <p>{view.aiStudy.baseCase}</p>
-        <h4>KEY LEVELS TO WATCH</h4>
+        <h4>{lang === "zh" ? "关键价位" : "KEY LEVELS TO WATCH"}</h4>
         <ul>
           {view.gamma.map((g) => (
             <li key={g.symbol}><strong>{g.symbol}</strong> Call {fmt(g.callWall)} · Flip {fmt(g.gammaFlip)} · Put {fmt(g.putWall)}</li>
           ))}
         </ul>
-        <h4>BULL CASE</h4>
+        <h4>{lang === "zh" ? "多头情景" : "BULL CASE"}</h4>
         <p>{view.aiStudy.ifThen}</p>
-        <h4>BEAR CASE</h4>
+        <h4>{lang === "zh" ? "空头情景" : "BEAR CASE"}</h4>
         <p>{view.aiStudy.invalidation}</p>
         <div className="pv-confidence">
-          <div><strong>CONFIDENCE</strong><span>{view.aiStudy.confidence} ({conf}/100)</span></div>
-          <i><b style={{ width: `${conf}%` }} /></i>
+          <div>
+            <strong>{lang === "zh" ? "置信度" : "CONFIDENCE"}</strong>
+            <span>{confidenceLabel}</span>
+          </div>
+          <div>
+            <strong>{lang === "zh" ? "数据覆盖" : "DATA COVERAGE"}</strong>
+            <span>
+              {coverage.available}/{coverage.total}{lang === "zh" ? " 项输入" : " inputs"}
+            </span>
+          </div>
+          <i><b style={{ width: `${coveragePct}%` }} /></i>
         </div>
       </section>
 
       <section className="pv-review" id="daily-review">
-        <h2>DAILY REVIEW</h2>
-        <div><strong>Morning stance</strong><span>{view.dailyReview.morningStance ?? view.stance ?? "—"}</span></div>
-        <div><strong>Actual outcome</strong><span>{view.dailyReview.actualOutcome || "Pending"}</span></div>
-        <div><strong>What worked</strong><span>{view.dailyReview.whatWorked[0] ?? "Pending"}</span></div>
-        <div><strong>Tomorrow watch</strong><span>{view.dailyReview.tomorrowWatch[0] ?? "Pending"}</span></div>
+        <h2>{lang === "zh" ? "每日复盘" : "DAILY REVIEW"}</h2>
+        <div>
+          <strong>{lang === "zh" ? "早盘立场" : "Morning stance"}</strong>
+          <span>{review.morningStance ?? view.stance ?? "—"}</span>
+        </div>
+        <div>
+          <strong>{lang === "zh" ? "实际结果" : "Actual outcome"}</strong>
+          <span>{review.actualOutcome || pendingLabel}</span>
+        </div>
+        <div className="pv-review-block">
+          <strong>{lang === "zh" ? "有效部分" : "What worked"}</strong>
+          {review.whatWorked.length > 0 ? (
+            <ul className="pv-review-list is-positive">
+              {review.whatWorked.map((line) => (
+                <li key={line}>✅ {line}</li>
+              ))}
+            </ul>
+          ) : (
+            <span className="pv-review-pending">{pendingLabel}</span>
+          )}
+        </div>
+        {review.whatFailed.length > 0 ? (
+          <div className="pv-review-block">
+            <strong>{lang === "zh" ? "失效部分" : "What failed"}</strong>
+            <ul className="pv-review-list is-caution">
+              {review.whatFailed.map((line) => (
+                <li key={line}>⚠ {line}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div>
+          <strong>{lang === "zh" ? "明日关注" : "Tomorrow watch"}</strong>
+          <span>{review.tomorrowWatch[0] ?? pendingLabel}</span>
+        </div>
       </section>
     </aside>
   );
@@ -608,7 +665,7 @@ export function CommandCenterPreview({
             <TechLeadersLaggards view={view} />
           </div>
 
-          <AiRail view={view} />
+          <AiRail view={view} lang={lang} />
         </main>
       </div>
     </div>
@@ -617,6 +674,6 @@ export function CommandCenterPreview({
 
 const styles = `
 :root{--pv-blue:#004fff;--pv-text:#10214a;--pv-muted:#65728d;--pv-line:#dce6f3;--pv-good:#0a963f;--pv-bad:#ff2e2e}
-*{box-sizing:border-box}.pv-app{min-height:100vh;background:#fff;color:var(--pv-text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:grid;grid-template-columns:118px 1fr;font-size:12px}.pv-nav{border-right:1px solid var(--pv-line);padding:14px 10px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;background:#fff}.pv-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7b61ff,#004fff);display:grid;place-items:center;color:#fff;font-weight:850;font-size:18px;text-decoration:none;margin:0 auto 22px}.pv-nav nav{display:grid;gap:7px}.pv-nav nav a{display:flex;gap:9px;align-items:center;color:#18305e;text-decoration:none;padding:10px 9px;border-radius:7px;font-weight:700}.pv-nav nav a.active{background:#edf4ff;color:var(--pv-blue)}.pv-shell{min-width:0}.pv-top{height:48px;border-bottom:1px solid var(--pv-line);display:grid;grid-template-columns:145px 1fr 110px;align-items:center;padding:0 14px;position:sticky;top:0;background:#fff;z-index:8}.pv-top>strong{font-size:18px}.pv-tickers{display:flex;gap:28px;align-items:center;justify-content:center}.pv-ticker{display:flex;gap:5px;align-items:baseline;justify-content:center;white-space:nowrap;font-size:9px}.pv-ticker b{font-size:9px}.pv-ticker strong{font-size:9px}.pv-ticker em{font-style:normal;font-weight:800;font-size:8px}.pv-open{color:#153257;font-weight:800;font-size:10px;white-space:nowrap}.pv-main{display:grid;grid-template-columns:minmax(780px,1fr) 310px;gap:10px;padding:10px}.pv-center{min-width:0}.pv-section-title{font-size:15px;color:var(--pv-blue);margin:0 0 7px;font-weight:850}.pv-section-title small{font-size:9px}.pv-overview{display:grid;grid-template-columns:1.05fr .95fr .95fr 1fr 1.12fr;gap:7px}.pv-overview>article{border:1px solid var(--pv-line);border-radius:7px;min-height:166px;padding:13px 13px 11px;background:#fff}.pv-overview h3,.pv-flat h3,.pv-leaders h3{font-size:11px;margin:0 0 14px;font-weight:850}.pv-hero{display:block;color:var(--pv-blue);font-size:30px;line-height:1.05;margin:23px 0 11px;text-align:center}.pv-overview p{font-size:10px;line-height:1.55;color:#25365c}.pv-overview p.center{text-align:center}.pv-risk-asof{display:block;text-align:center;color:var(--pv-muted);font-size:9px;margin-top:4px}.pv-gauge{position:relative;height:88px;width:150px;margin:7px auto 0;overflow:hidden}.pv-gauge .arc{width:140px;height:140px;border:14px solid #e8edf5;border-bottom-color:transparent;border-left-color:#ff4242;border-top-color:#ffad16;border-right-color:#1da358;border-radius:50%;transform:rotate(-45deg);margin:8px auto}.pv-gauge b{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:28px}.pv-snapshot{text-align:center;display:grid;gap:7px}.pv-snapshot>span{font-weight:750}.pv-snapshot>strong{font-size:30px;color:var(--pv-bad);margin-top:7px}.pv-snapshot small{border-top:1px solid var(--pv-line);padding-top:9px}.pv-snapshot em{font-style:normal;color:var(--pv-bad);font-weight:850}.pv-exposure{height:7px;border-radius:99px;background:#e8edf4;overflow:hidden;margin:21px 4px 0}.pv-exposure b{display:block;height:100%;background:var(--pv-good)}.pv-drivers{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:9px}.pv-drivers li{font-weight:800;display:flex;gap:5px}.pv-drivers li span{color:#22345a;font-weight:650}.pv-mini-confidence{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;margin-top:10px;font-size:9px}.pv-mini-confidence i,.pv-confidence i{height:5px;background:#e8edf4;border-radius:99px;overflow:hidden}.pv-mini-confidence i b,.pv-confidence i b{display:block;height:100%;background:var(--pv-blue)}.good{color:var(--pv-good)!important}.bad{color:var(--pv-bad)!important}.pv-structure{margin-top:9px;border:1px solid var(--pv-line);border-radius:7px;padding:9px}.pv-structure-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pv-structure-card{min-width:0;padding:6px 9px 4px}.pv-structure-card:first-child{border-right:1px solid var(--pv-line)}.pv-symbol-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.pv-symbol-line{display:flex;gap:8px;align-items:baseline;min-width:max-content}.pv-symbol-line strong{font-size:16px}.pv-price{font-size:15px;font-weight:550;color:#31415f}.pv-regime{font-size:9px;background:#edf4ff;color:var(--pv-blue);padding:4px 9px;border-radius:4px;font-weight:700;white-space:nowrap}.pv-data-date{font-size:8.5px;color:var(--pv-muted);margin:3px 0 7px}.pv-structure-grid{display:grid;grid-template-columns:160px 1fr;gap:8px;min-height:112px}.pv-level-labels{display:grid;grid-template-rows:repeat(4,1fr)}.pv-level-labels>div{display:grid;grid-template-columns:8px 1fr 45px 50px;align-items:center;gap:5px;font-size:9px}.pv-level-labels i{width:6px;height:6px;border-radius:50%}.pv-level-labels strong{text-align:right}.pv-level-labels em{font-style:normal;text-align:right;font-weight:750}.pv-chart{position:relative;border-bottom:1px solid #d6e0ef;overflow:hidden;background:repeating-linear-gradient(to right,transparent 0,transparent calc(20% - 1px),#edf2f8 calc(20% - 1px),#edf2f8 20%)}.pv-axis{position:absolute;left:0;right:0;border-top:1px solid;z-index:2}.pv-dot{position:absolute;width:8px;height:8px;border-radius:50%;top:-4px;transform:translateX(-50%)}.pv-band{position:absolute;top:6%;bottom:6%;border-radius:2px;z-index:1}.pv-band.expected{background:rgba(55,126,255,.10)}.pv-band.core{background:rgba(55,126,255,.22)}.pv-cone-legend{display:flex;gap:18px;border-top:1px solid #edf1f7;margin-top:5px;padding:7px 4px 3px;font-size:8px}.pv-cone-legend span{display:flex;gap:5px;align-items:center}.swatch{width:13px;height:9px;display:inline-block;border:1px solid #c8d8f3}.swatch.expected{background:rgba(55,126,255,.10)}.swatch.core{background:rgba(55,126,255,.25)}.pv-touch-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #edf1f7;margin-top:3px;padding-top:7px;font-size:8px}.pv-touch-row span{text-align:center;border-right:1px solid #edf1f7}.pv-touch-row span:last-child{border-right:0}.pv-bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px}.pv-flat{height:205px;border:1px solid var(--pv-line);border-radius:7px;padding:10px;background:#fff;overflow:hidden;position:relative}.pv-flat h3,.pv-leaders h3{color:var(--pv-blue);font-size:12px;margin-bottom:9px}.pv-flat h3 small,.pv-leaders h3 small{font-size:8px}.pv-metric-row{display:grid;grid-template-columns:1.4fr .55fr .75fr;gap:4px;align-items:center;padding:3px 0;font-size:8px}.pv-metric-row em{font-style:normal;color:var(--pv-muted);text-align:right}.pv-rotation-row{display:grid;grid-template-columns:1.55fr .5fr .7fr;gap:5px;align-items:center;padding:3px 0;font-size:8px}.pv-rotation-row i{height:5px;background:#edf1f6;border-radius:9px;overflow:hidden}.pv-rotation-row b{display:block;height:100%}.pv-rotation-row b.pos{background:#0a963f}.pv-rotation-row b.neg{background:#ff2e2e}.pv-muted{color:var(--pv-muted);font-size:9px;line-height:1.5}.pv-flat-footer{position:absolute;left:10px;right:10px;bottom:8px;border-top:1px solid #edf1f7;padding-top:7px;font-size:8px}.pv-leaders{border:1px solid var(--pv-line);border-radius:7px;padding:9px 10px;margin-top:7px;min-height:82px}.pv-leaders-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.pv-leaders h4{font-size:8px;margin:0 0 5px;color:var(--pv-good)}.pv-ticker-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.pv-ticker-cards span{display:flex;flex-direction:column;border-right:1px solid #edf1f7;padding-right:5px;font-size:8px}.pv-ticker-cards strong{font-size:8px}.pv-right{background:#f8fbff;border-left:1px solid #e2ebf7;min-height:calc(100vh - 68px);padding:9px;display:grid;grid-template-rows:auto auto;align-content:start;gap:8px}.pv-ai,.pv-review{background:#fff;border:1px solid var(--pv-line);border-radius:7px;padding:13px}.pv-ai h2,.pv-review h2{color:var(--pv-blue);font-size:15px;margin:0 0 13px;padding-bottom:8px;border-bottom:1px solid #e5edf8}.pv-ai h4{font-size:9px;color:var(--pv-blue);margin:13px 0 5px}.pv-ai p,.pv-ai li{font-size:9px;line-height:1.55;color:#27385c}.pv-ai ul{padding-left:15px}.pv-confidence{border-top:1px solid #e5edf8;margin-top:13px;padding-top:9px}.pv-confidence>div{display:flex;justify-content:space-between;font-size:9px}.pv-confidence i{display:block;margin-top:7px;height:5px}.pv-review>div{display:grid;grid-template-columns:1fr;gap:2px;padding:9px 0;border-bottom:1px solid #edf1f7;font-size:9px}.pv-review span{color:var(--pv-muted)}
+*{box-sizing:border-box}.pv-app{min-height:100vh;background:#fff;color:var(--pv-text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:grid;grid-template-columns:118px 1fr;font-size:12px}.pv-nav{border-right:1px solid var(--pv-line);padding:14px 10px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;background:#fff}.pv-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7b61ff,#004fff);display:grid;place-items:center;color:#fff;font-weight:850;font-size:18px;text-decoration:none;margin:0 auto 22px}.pv-nav nav{display:grid;gap:7px}.pv-nav nav a{display:flex;gap:9px;align-items:center;color:#18305e;text-decoration:none;padding:10px 9px;border-radius:7px;font-weight:700}.pv-nav nav a.active{background:#edf4ff;color:var(--pv-blue)}.pv-shell{min-width:0}.pv-top{height:48px;border-bottom:1px solid var(--pv-line);display:grid;grid-template-columns:145px 1fr 110px;align-items:center;padding:0 14px;position:sticky;top:0;background:#fff;z-index:8}.pv-top>strong{font-size:18px}.pv-tickers{display:flex;gap:28px;align-items:center;justify-content:center}.pv-ticker{display:flex;gap:5px;align-items:baseline;justify-content:center;white-space:nowrap;font-size:9px}.pv-ticker b{font-size:9px}.pv-ticker strong{font-size:9px}.pv-ticker em{font-style:normal;font-weight:800;font-size:8px}.pv-open{color:#153257;font-weight:800;font-size:10px;white-space:nowrap}.pv-main{display:grid;grid-template-columns:minmax(780px,1fr) 310px;gap:10px;padding:10px}.pv-center{min-width:0}.pv-section-title{font-size:15px;color:var(--pv-blue);margin:0 0 7px;font-weight:850}.pv-section-title small{font-size:9px}.pv-overview{display:grid;grid-template-columns:1.05fr .95fr .95fr 1fr 1.12fr;gap:7px}.pv-overview>article{border:1px solid var(--pv-line);border-radius:7px;min-height:166px;padding:13px 13px 11px;background:#fff}.pv-overview h3,.pv-flat h3,.pv-leaders h3{font-size:11px;margin:0 0 14px;font-weight:850}.pv-hero{display:block;color:var(--pv-blue);font-size:30px;line-height:1.05;margin:23px 0 11px;text-align:center}.pv-overview p{font-size:10px;line-height:1.55;color:#25365c}.pv-overview p.center{text-align:center}.pv-risk-asof{display:block;text-align:center;color:var(--pv-muted);font-size:9px;margin-top:4px}.pv-gauge{position:relative;height:88px;width:150px;margin:7px auto 0;overflow:hidden}.pv-gauge .arc{width:140px;height:140px;border:14px solid #e8edf5;border-bottom-color:transparent;border-left-color:#ff4242;border-top-color:#ffad16;border-right-color:#1da358;border-radius:50%;transform:rotate(-45deg);margin:8px auto}.pv-gauge b{position:absolute;left:0;right:0;bottom:2px;text-align:center;font-size:28px}.pv-snapshot{text-align:center;display:grid;gap:7px}.pv-snapshot>span{font-weight:750}.pv-snapshot>strong{font-size:30px;color:var(--pv-bad);margin-top:7px}.pv-snapshot small{border-top:1px solid var(--pv-line);padding-top:9px}.pv-snapshot em{font-style:normal;color:var(--pv-bad);font-weight:850}.pv-exposure{height:7px;border-radius:99px;background:#e8edf4;overflow:hidden;margin:21px 4px 0}.pv-exposure b{display:block;height:100%;background:var(--pv-good)}.pv-drivers{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:9px}.pv-drivers li{font-weight:800;display:flex;gap:5px}.pv-drivers li span{color:#22345a;font-weight:650}.pv-mini-confidence{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;margin-top:10px;font-size:9px}.pv-mini-confidence i,.pv-confidence i{height:5px;background:#e8edf4;border-radius:99px;overflow:hidden}.pv-mini-confidence i b,.pv-confidence i b{display:block;height:100%;background:var(--pv-blue)}.good{color:var(--pv-good)!important}.bad{color:var(--pv-bad)!important}.pv-structure{margin-top:9px;border:1px solid var(--pv-line);border-radius:7px;padding:9px}.pv-structure-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pv-structure-card{min-width:0;padding:6px 9px 4px}.pv-structure-card:first-child{border-right:1px solid var(--pv-line)}.pv-symbol-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.pv-symbol-line{display:flex;gap:8px;align-items:baseline;min-width:max-content}.pv-symbol-line strong{font-size:16px}.pv-price{font-size:15px;font-weight:550;color:#31415f}.pv-regime{font-size:9px;background:#edf4ff;color:var(--pv-blue);padding:4px 9px;border-radius:4px;font-weight:700;white-space:nowrap}.pv-data-date{font-size:8.5px;color:var(--pv-muted);margin:3px 0 7px}.pv-structure-grid{display:grid;grid-template-columns:160px 1fr;gap:8px;min-height:112px}.pv-level-labels{display:grid;grid-template-rows:repeat(4,1fr)}.pv-level-labels>div{display:grid;grid-template-columns:8px 1fr 45px 50px;align-items:center;gap:5px;font-size:9px}.pv-level-labels i{width:6px;height:6px;border-radius:50%}.pv-level-labels strong{text-align:right}.pv-level-labels em{font-style:normal;text-align:right;font-weight:750}.pv-chart{position:relative;border-bottom:1px solid #d6e0ef;overflow:hidden;background:repeating-linear-gradient(to right,transparent 0,transparent calc(20% - 1px),#edf2f8 calc(20% - 1px),#edf2f8 20%)}.pv-axis{position:absolute;left:0;right:0;border-top:1px solid;z-index:2}.pv-dot{position:absolute;width:8px;height:8px;border-radius:50%;top:-4px;transform:translateX(-50%)}.pv-band{position:absolute;top:6%;bottom:6%;border-radius:2px;z-index:1}.pv-band.expected{background:rgba(55,126,255,.10)}.pv-band.core{background:rgba(55,126,255,.22)}.pv-cone-legend{display:flex;gap:18px;border-top:1px solid #edf1f7;margin-top:5px;padding:7px 4px 3px;font-size:8px}.pv-cone-legend span{display:flex;gap:5px;align-items:center}.swatch{width:13px;height:9px;display:inline-block;border:1px solid #c8d8f3}.swatch.expected{background:rgba(55,126,255,.10)}.swatch.core{background:rgba(55,126,255,.25)}.pv-touch-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #edf1f7;margin-top:3px;padding-top:7px;font-size:8px}.pv-touch-row span{text-align:center;border-right:1px solid #edf1f7}.pv-touch-row span:last-child{border-right:0}.pv-bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px}.pv-flat{height:205px;border:1px solid var(--pv-line);border-radius:7px;padding:10px;background:#fff;overflow:hidden;position:relative}.pv-flat h3,.pv-leaders h3{color:var(--pv-blue);font-size:12px;margin-bottom:9px}.pv-flat h3 small,.pv-leaders h3 small{font-size:8px}.pv-metric-row{display:grid;grid-template-columns:1.4fr .55fr .75fr;gap:4px;align-items:center;padding:3px 0;font-size:8px}.pv-metric-row em{font-style:normal;color:var(--pv-muted);text-align:right}.pv-rotation-row{display:grid;grid-template-columns:1.55fr .5fr .7fr;gap:5px;align-items:center;padding:3px 0;font-size:8px}.pv-rotation-row i{height:5px;background:#edf1f6;border-radius:9px;overflow:hidden}.pv-rotation-row b{display:block;height:100%}.pv-rotation-row b.pos{background:#0a963f}.pv-rotation-row b.neg{background:#ff2e2e}.pv-muted{color:var(--pv-muted);font-size:9px;line-height:1.5}.pv-flat-footer{position:absolute;left:10px;right:10px;bottom:8px;border-top:1px solid #edf1f7;padding-top:7px;font-size:8px}.pv-leaders{border:1px solid var(--pv-line);border-radius:7px;padding:9px 10px;margin-top:7px;min-height:82px}.pv-leaders-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.pv-leaders h4{font-size:8px;margin:0 0 5px;color:var(--pv-good)}.pv-ticker-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.pv-ticker-cards span{display:flex;flex-direction:column;border-right:1px solid #edf1f7;padding-right:5px;font-size:8px}.pv-ticker-cards strong{font-size:8px}.pv-right{background:#f8fbff;border-left:1px solid #e2ebf7;min-height:calc(100vh - 68px);padding:9px;display:grid;grid-template-rows:auto auto;align-content:start;gap:8px}.pv-ai,.pv-review{background:#fff;border:1px solid var(--pv-line);border-radius:7px;padding:13px}.pv-ai h2,.pv-review h2{color:var(--pv-blue);font-size:15px;margin:0 0 13px;padding-bottom:8px;border-bottom:1px solid #e5edf8}.pv-ai h4{font-size:9px;color:var(--pv-blue);margin:13px 0 5px}.pv-ai p,.pv-ai li{font-size:9px;line-height:1.55;color:#27385c}.pv-ai ul{padding-left:15px}.pv-confidence{border-top:1px solid #e5edf8;margin-top:13px;padding-top:9px}.pv-confidence>div{display:flex;justify-content:space-between;font-size:9px;gap:8px}.pv-confidence i{display:block;margin-top:7px;height:5px}.pv-review>div{display:grid;grid-template-columns:1fr;gap:2px;padding:9px 0;border-bottom:1px solid #edf1f7;font-size:9px}.pv-review span{color:var(--pv-muted)}.pv-review-block{display:grid;gap:4px}.pv-review-list{list-style:none;margin:0;padding:0;display:grid;gap:4px}.pv-review-list.is-positive li{color:var(--pv-good)}.pv-review-list.is-caution li{color:var(--pv-bad)}.pv-review-pending{color:var(--pv-muted)}
 @media(max-width:1180px){.pv-app{grid-template-columns:72px 1fr}.pv-nav span{display:none}.pv-main{grid-template-columns:1fr}.pv-right{display:none}.pv-overview{grid-template-columns:repeat(3,1fr)}.pv-bottom-row{grid-template-columns:1fr 1fr}.pv-tickers span:nth-child(n+6){display:none}}
 `;
