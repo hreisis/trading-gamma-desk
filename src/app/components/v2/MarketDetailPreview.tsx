@@ -163,7 +163,7 @@ function SectorRotation({ view }: { view: V2CommandCenterPageView }) {
     () => [...view.sectorRotation.sectors].sort((a, b) => b.rs5d - a.rs5d).slice(0, 10),
     [view.sectorRotation.sectors],
   );
-  const maxAbs = Math.max(1, ...rows.map((row) => Math.abs(row.rs5d));
+  const maxAbs = Math.max(1, ...rows.map((row) => Math.abs(row.rs5d)));
   return (
     <section className="mk-card mk-rotation">
       <h2>SECTOR ROTATION <small>(vs SPY)</small></h2>
