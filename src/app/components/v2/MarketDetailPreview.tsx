@@ -125,6 +125,7 @@ export function MarketDetailPreview({ view, lang }: { view: V2CommandCenterPageV
   const spyQuote = quoteFor(view, "SPY");
   const qqqQuote = quoteFor(view, "QQQ");
   const exposureMid = view.exposure ? Math.round((view.exposure.min + view.exposure.max) / 2) : null;
+  const sectors = [...view.sectorRotation.sectors].sort((a, b) => b.rs5d - a.rs5d).slice(0, 8);
 
   return (
     <div className="md-app">
@@ -162,7 +163,7 @@ export function MarketDetailPreview({ view, lang }: { view: V2CommandCenterPageV
             <div className="md-structure-grid"><Structure view={view} symbol="SPY"/><Structure view={view} symbol="QQQ"/></div>
             <ManualInput view={view}/>
 
-            <section className="md-card md-rotation"><div className="md-card-title"><h3>SECTOR ROTATION</h3><small>5D vs SPY</small></div><div className="md-rotation-grid">{view.sectorRotation.rows.slice(0, 8).map((row) => <div key={row.symbol}><span>{row.symbol}</span><b className={row.rs5dVsSpy >= 0 ? "good" : "bad"}>{signed(row.rs5dVsSpy)}</b><i><em className={row.rs5dVsSpy >= 0 ? "goodbar" : "badbar"} style={{ width: `${Math.min(100, Math.max(8, Math.abs(row.rs5dVsSpy) * 16))}%` }}/></i></div>)}</div></section>
+            <section className="md-card md-rotation"><div className="md-card-title"><h3>SECTOR ROTATION</h3><small>5D vs SPY</small></div><div className="md-rotation-grid">{sectors.map((row) => <div key={row.symbol}><span>{row.symbol}</span><b className={row.rs5d >= 0 ? "good" : "bad"}>{signed(row.rs5d)}</b><i><em className={row.rs5d >= 0 ? "goodbar" : "badbar"} style={{ width: `${Math.min(100, Math.max(8, Math.abs(row.rs5d) * 16))}%` }}/></i></div>)}</div></section>
 
             <section className="md-history"><span>Saved snapshots:</span><button>Aug 14</button><button>Aug 15</button><button>Aug 16</button><button className="active">Aug 17 (Latest)</button><a href="#">View all snapshots →</a></section>
           </div>
