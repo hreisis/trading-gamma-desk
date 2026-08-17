@@ -5,6 +5,7 @@ import type { V2GammaSummary } from "./v2-command-center";
 
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const IsoDateTime = z.string().datetime({ offset: true });
+const EtLocalDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
 
 export const ManualGammaSymbolInput = z.object({
   spot: z.number().finite().positive(),
@@ -15,13 +16,25 @@ export const ManualGammaSymbolInput = z.object({
   iv30Pct: z.number().finite().positive(),
 });
 
+export const ManualGammaSaveRequest = z.object({
+  source: z.string().trim().min(1).max(80),
+  priceAsOfEt: EtLocalDateTime,
+  oiAsOf: IsoDate,
+  notes: z.string().max(500).default(""),
+  symbols: z.object({
+    SPY: ManualGammaSymbolInput,
+    QQQ: ManualGammaSymbolInput,
+  }),
+});
+
 export const ManualGammaSnapshot = z.object({
   kind: z.literal("ManualGammaSnapshot"),
   schemaVersion: z.literal("0.1.0"),
   marketSessionDate: IsoDate,
   savedAt: IsoDateTime,
   source: z.string().min(1),
-  priceAsOf: IsoDateTime,
+  /** Wall-clock value entered in the UI; explicitly interpreted as America/New_York. */
+  priceAsOfEt: EtLocalDateTime,
   oiAsOf: IsoDate,
   notes: z.string(),
   symbols: z.object({
@@ -30,6 +43,7 @@ export const ManualGammaSnapshot = z.object({
   }),
 });
 
+export type ManualGammaSaveRequest = z.infer<typeof ManualGammaSaveRequest>;
 export type ManualGammaSnapshot = z.infer<typeof ManualGammaSnapshot>;
 export type ManualGammaSymbolInput = z.infer<typeof ManualGammaSymbolInput>;
 
@@ -132,7 +146,7 @@ export function buildManualGammaSummary(input: {
     putWallTouch: { status: "unavailable", percent: null },
     restOfDayRange: { status: "unavailable", lower: null, upper: null, confidencePct: null },
     volMispricing,
-    quality: `manual · ${input.snapshot.source} · price ${input.snapshot.priceAsOf} · OI ${input.snapshot.oiAsOf}`,
+    quality: `manual · ${input.snapshot.source} · price ${input.snapshot.priceAsOfEt} ET · OI ${input.snapshot.oiAsOf}`,
     source: `Manual (${input.snapshot.source})`,
     isFixture: false,
   };
