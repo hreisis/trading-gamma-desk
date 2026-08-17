@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import type { V2CommandCenterPageView } from "@/desk/load-v2-home";
 import type { V2Language } from "@/desk";
+import type { ManualGammaSnapshot } from "@/desk/manual-gamma";
 
 function fmt(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -55,51 +56,111 @@ function factorTone(id: string, signal: string) {
   return "neutral";
 }
 
+function inputDefault(value: number | null | undefined, digits = 2) {
+  return value == null || !Number.isFinite(value) ? "" : value.toFixed(digits);
+}
+
 function ManualGammaPanel({
   view,
+  snapshot,
   onClose,
 }: {
   view: V2CommandCenterPageView;
+  snapshot: ManualGammaSnapshot | null;
   onClose: () => void;
 }) {
   const spy = gammaFor(view, "SPY");
   const qqq = gammaFor(view, "QQQ");
+  const [saving, setSaving] = useState(false);
+
+  const rows = [
+    ["Spot", "spot", snapshot?.symbols.SPY.spot ?? spy?.spot, snapshot?.symbols.QQQ.spot ?? qqq?.spot],
+    ["Net GEX ($B)", "netGexBillions", snapshot?.symbols.SPY.netGexBillions ?? (spy?.netGex == null ? null : spy.netGex / 1e9), snapshot?.symbols.QQQ.netGexBillions ?? (qqq?.netGex == null ? null : qqq.netGex / 1e9)],
+    ["Gamma Flip", "gammaFlip", snapshot?.symbols.SPY.gammaFlip ?? spy?.gammaFlip, snapshot?.symbols.QQQ.gammaFlip ?? qqq?.gammaFlip],
+    ["Call Wall", "callWall", snapshot?.symbols.SPY.callWall ?? spy?.callWall, snapshot?.symbols.QQQ.callWall ?? qqq?.callWall],
+    ["Put Wall", "putWall", snapshot?.symbols.SPY.putWall ?? spy?.putWall, snapshot?.symbols.QQQ.putWall ?? qqq?.putWall],
+    ["IV30 (%)", "iv30Pct", snapshot?.symbols.SPY.iv30Pct ?? spy?.volMispricing.ivPct, snapshot?.symbols.QQQ.iv30Pct ?? qqq?.volMispricing.ivPct],
+  ] as const;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const form = new FormData(event.currentTarget);
+    const number = (name: string) => Number(form.get(name));
+    const payload = {
+      source: String(form.get("source") ?? "GEXTool"),
+      priceAsOfEt: String(form.get("priceAsOfEt") ?? ""),
+      oiAsOf: String(form.get("oiAsOf") ?? ""),
+      notes: String(form.get("notes") ?? ""),
+      symbols: {
+        SPY: {
+          spot: number("SPY.spot"),
+          netGexBillions: number("SPY.netGexBillions"),
+          gammaFlip: number("SPY.gammaFlip"),
+          callWall: number("SPY.callWall"),
+          putWall: number("SPY.putWall"),
+          iv30Pct: number("SPY.iv30Pct"),
+        },
+        QQQ: {
+          spot: number("QQQ.spot"),
+          netGexBillions: number("QQQ.netGexBillions"),
+          gammaFlip: number("QQQ.gammaFlip"),
+          callWall: number("QQQ.callWall"),
+          putWall: number("QQQ.putWall"),
+          iv30Pct: number("QQQ.iv30Pct"),
+        },
+      },
+    };
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/manual-gamma", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        window.alert(body?.error ?? "Manual Gamma save failed.");
+        return;
+      }
+      window.location.reload();
+    } catch {
+      window.alert("Manual Gamma save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <aside className="mk-manual-panel" aria-label="Manual gamma input">
+    <form className="mk-manual-panel" aria-label="Manual gamma input" onSubmit={handleSubmit}>
       <div className="mk-manual-head">
         <h3>MANUAL GAMMA INPUT</h3>
         <button type="button" onClick={onClose} aria-label="Close manual gamma input">×</button>
       </div>
       <label className="mk-source">
         <span>Source</span>
-        <select defaultValue="GEXTool">
+        <select name="source" defaultValue={snapshot?.source ?? "GEXTool"}>
           <option>GEXTool</option>
           <option>Manual</option>
         </select>
       </label>
       <div className="mk-manual-symbols"><b>SPY</b><b>QQQ</b></div>
-      {[
-        ["Spot", spy?.spot, qqq?.spot],
-        ["Net GEX ($B)", spy?.netGex == null ? null : spy.netGex / 1e9, qqq?.netGex == null ? null : qqq.netGex / 1e9],
-        ["Gamma Flip", spy?.gammaFlip, qqq?.gammaFlip],
-        ["Call Wall", spy?.callWall, qqq?.callWall],
-        ["Put Wall", spy?.putWall, qqq?.putWall],
-        ["IV30 (%)", null, null],
-      ].map(([label, spyValue, qqqValue]) => (
-        <label className="mk-manual-row" key={String(label)}>
-          <span>{String(label)}</span>
-          <input defaultValue={typeof spyValue === "number" ? fmt(spyValue, 2) : ""} />
-          <input defaultValue={typeof qqqValue === "number" ? fmt(qqqValue, 2) : ""} />
+      {rows.map(([label, key, spyValue, qqqValue]) => (
+        <label className="mk-manual-row" key={key}>
+          <span>{label}</span>
+          <input name={`SPY.${key}`} type="number" step="any" required defaultValue={inputDefault(spyValue)} />
+          <input name={`QQQ.${key}`} type="number" step="any" required defaultValue={inputDefault(qqqValue)} />
         </label>
       ))}
-      <label className="mk-manual-wide"><span>Price as-of (ET)</span><input type="datetime-local" /></label>
-      <label className="mk-manual-wide"><span>OI as-of (OCC)</span><input type="date" /></label>
-      <label className="mk-manual-wide"><span>Notes (optional)</span><textarea rows={2} placeholder="e.g. GEXTool snapshot" /></label>
+      <label className="mk-manual-wide"><span>Price as-of (ET)</span><input name="priceAsOfEt" type="datetime-local" required defaultValue={snapshot?.priceAsOfEt ?? ""} /></label>
+      <label className="mk-manual-wide"><span>OI as-of (OCC)</span><input name="oiAsOf" type="date" required defaultValue={snapshot?.oiAsOf ?? ""} /></label>
+      <label className="mk-manual-wide"><span>Notes (optional)</span><textarea name="notes" rows={2} placeholder="e.g. GEXTool snapshot" defaultValue={snapshot?.notes ?? ""} /></label>
       <div className="mk-manual-actions">
         <button type="button" className="secondary" onClick={onClose}>Cancel</button>
-        <button type="button" className="primary">Save &amp; Update</button>
+        <button type="submit" className="primary" disabled={saving}>{saving ? "Saving…" : "Save & Update"}</button>
       </div>
-    </aside>
+    </form>
   );
 }
 
@@ -186,7 +247,15 @@ function SectorRotation({ view }: { view: V2CommandCenterPageView }) {
   );
 }
 
-export function MarketDetailPreview({ view, lang }: { view: V2CommandCenterPageView; lang: V2Language }) {
+export function MarketDetailPreview({
+  view,
+  lang,
+  manualGammaSnapshot,
+}: {
+  view: V2CommandCenterPageView;
+  lang: V2Language;
+  manualGammaSnapshot: ManualGammaSnapshot | null;
+}) {
   const [manualOpen, setManualOpen] = useState(true);
   const exposureMid = view.exposure ? Math.round((view.exposure.min + view.exposure.max) / 2) : null;
   const factorOrder = [
@@ -267,7 +336,7 @@ export function MarketDetailPreview({ view, lang }: { view: V2CommandCenterPageV
         </main>
       </div>
 
-      {manualOpen ? <ManualGammaPanel view={view} onClose={() => setManualOpen(false)}/> : <button type="button" className="mk-open-manual" onClick={() => setManualOpen(true)}>Manual Gamma Input</button>}
+      {manualOpen ? <ManualGammaPanel view={view} snapshot={manualGammaSnapshot} onClose={() => setManualOpen(false)}/> : <button type="button" className="mk-open-manual" onClick={() => setManualOpen(true)}>Manual Gamma Input</button>}
     </div>
   );
 }
