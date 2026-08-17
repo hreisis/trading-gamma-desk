@@ -7,7 +7,11 @@ import {
   deriveRiskDecisionV1,
   loadPriorPublishedRiskDecisionForMarketSessionAsync,
 } from "./risk-decision-v1";
-import { breadthToRiskInput, gammaToRiskInput } from "./risk-decision-v1-1";
+import {
+  breadthToRiskInput,
+  deriveRiskDecisionV1_1,
+  gammaToRiskInput,
+} from "./risk-decision-v1-1";
 import { resolveRuntimeJsonStore } from "./runtime-store";
 import {
   buildManualGammaSummary,
@@ -91,6 +95,35 @@ export async function loadV2MarketPage(
     targetSession: snapshot.marketSessionDate,
   });
 
+  const equityBarsBySymbol = new Map<
+    string,
+    readonly { readonly sessionDate: string; readonly close: number }[]
+  >();
+  if (spyBars) equityBarsBySymbol.set("SPY", spyBars);
+  if (qqqBars) equityBarsBySymbol.set("QQQ", qqqBars);
+
+  // Reuse the canonical SPY/QQQ structural-risk model, but swap in the
+  // manual Gamma + IV snapshot. Other factors stay on their existing live
+  // pipelines; no model weights or scoring rules are changed here.
+  const structural = deriveRiskDecisionV1_1({
+    driver: macro.driver,
+    spyBreadth: base.view.spyBreadth,
+    qqqBreadth: base.view.qqqBreadth,
+    spyGamma,
+    qqqGamma,
+    marketCtaProxy: base.view.ctaProxy,
+    spyCtaProxy: base.view.ctaProxy,
+    qqqCtaProxy: base.view.ctaProxy,
+    eventGate: base.view.eventGate,
+    sectorRotation: base.view.sectorRotation,
+    targetSession: snapshot.marketSessionDate,
+    equityBarsBySymbol,
+    // Do not reuse the automatic-provider prior divergence for a manual
+    // snapshot. Trend remains unavailable until a comparable manual history
+    // point exists.
+    priorDivergence: null,
+  });
+
   const previous = await loadPriorPublishedRiskDecisionForMarketSessionAsync(
     store,
     snapshot.marketSessionDate,
@@ -135,6 +168,12 @@ export async function loadV2MarketPage(
           : base.view.missingInputs,
       gamma: [spyGamma, qqqGamma],
       sessionDate: snapshot.marketSessionDate,
+      spyStructuralRiskScore: structural.spyStructuralRisk.riskScore,
+      qqqStructuralRiskScore: structural.qqqStructuralRisk.riskScore,
+      riskDivergence: structural.riskDivergence,
+      riskDivergenceChange: structural.riskDivergenceChange,
+      riskDivergenceTrend: structural.riskDivergenceTrend,
+      componentDivergence: structural.componentDivergence,
     },
     manualGammaSnapshot: snapshot,
     manualGammaHistoryDates: history.map((row) => row.marketSessionDate),
