@@ -12,12 +12,28 @@ export const EVENT_GATE_WINDOW_MS: Readonly<
 };
 
 /**
+ * Latest unmatched BLS series prints are materialized onto the Catalyst feed
+ * for display. Their `occurredAt` is the results-fetch clock, not a scheduled
+ * release time — they must never open Event Gate.
+ */
+export function isIndependentSeriesObservation(catalyst: Catalyst): boolean {
+  if (catalyst.dedupeKey.startsWith("ext:bls-result-")) return true;
+  if (/\(independent observation\)/i.test(catalyst.headline)) return true;
+  return catalyst.evidence.some((row) =>
+    row.statement.startsWith("Independent BLS observation"),
+  );
+}
+
+/**
  * Classify catalyst rows eligible for the shock gate.
  * FOMC press conference is checked before generic FOMC decision headlines.
+ * Independent series observations are not scheduled events and are ignored.
  */
 export function classifyHighImpactEvent(
   catalyst: Catalyst,
 ): EventGateEventKind | null {
+  if (isIndependentSeriesObservation(catalyst)) return null;
+
   const headline = catalyst.headline.toLowerCase();
 
   if (
