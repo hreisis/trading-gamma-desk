@@ -1,4 +1,5 @@
 import { MarketDetailPreview } from "@/app/components/v2/MarketDetailPreview";
+import { RiskSnapshotScores } from "@/app/components/v2/RiskSnapshotScores";
 import { loadV2MarketPage } from "@/desk/load-v2-market";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,16 @@ export default async function MarketPage({
   });
 
   return (
-    <MarketDetailPreview
-      view={view}
-      lang={lang}
-      manualGammaSnapshot={manualGammaSnapshot}
-    />
+    <>
+      <MarketDetailPreview
+        view={view}
+        lang={lang}
+        manualGammaSnapshot={manualGammaSnapshot}
+      />
+      <RiskSnapshotScores
+        spyScore={view.spyStructuralRiskScore}
+        qqqScore={view.qqqStructuralRiskScore}
+      />
+    </>
   );
 }
