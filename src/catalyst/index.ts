@@ -131,4 +131,3 @@ export * from "./market-reactions/ai/enhance";
 export type { CatalystAiMarketReactionsCache } from "./market-reactions/ai/types";
 export * from "./integration-smoke";
 export * from "./update";
-export * from "./feed-view";

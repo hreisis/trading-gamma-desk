@@ -10,6 +10,8 @@ export interface SessionCalendar {
   isSession(date: string): boolean;
   /** Previous expected session, or null if the calendar cannot reach back. */
   previousSession(date: string): string | null;
+  /** Next expected session after `date`, or null if the calendar cannot reach forward. */
+  nextSession(date: string): string | null;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -60,7 +62,17 @@ export function usSessionCalendar(
     return null;
   }
 
-  return { isSession, previousSession };
+  function nextSession(date: string): string | null {
+    let ms = toUtc(date);
+    for (let i = 0; i < MAX_LOOKBACK_DAYS; i += 1) {
+      ms += MS_PER_DAY;
+      const candidate = toIso(ms);
+      if (isSession(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  return { isSession, previousSession, nextSession };
 }
 
 /**

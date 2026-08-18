@@ -1,5 +1,9 @@
 import type { FetchLike } from "@/ingest/http";
 import {
+  isMarketDataCreditLimitExhausted,
+  markMarketDataCreditsExhausted,
+} from "./credits";
+import {
   MARKETDATA_APP_BASE_URL,
   MARKETDATA_APP_TIMEOUT_MS,
 } from "./config";
@@ -20,6 +24,7 @@ export interface FetchBoundedChainInput {
   readonly symbol: string;
   readonly expiration: string;
   readonly strikes: readonly number[];
+  readonly date?: string;
   readonly token: string;
   readonly fetchImpl?: FetchLike;
   readonly baseUrl?: string;
@@ -186,6 +191,17 @@ export async function fetchMarketDataAppExpirations(
     baseUrl: input.baseUrl,
     timeoutMs: input.timeoutMs,
   });
+  if (isMarketDataCreditLimitExhausted({
+    httpStatus: result.httpStatus,
+    body: result.body,
+  })) {
+    markMarketDataCreditsExhausted();
+    throw new MarketDataAppFetchError(
+      "credit_limit",
+      `MarketData.app HTTP ${result.httpStatus}: daily API credit limit exhausted`,
+      result.httpStatus,
+    );
+  }
   if (result.httpStatus === 401 || result.httpStatus === 403) {
     throw new MarketDataAppFetchError(
       "auth",
@@ -220,10 +236,14 @@ export async function fetchBoundedMarketDataAppChain(
 
   const symbol = encodeURIComponent(input.symbol.toUpperCase());
   const strikeParam = input.strikes.join(",");
+  const dateParam = input.date
+    ? `&date=${encodeURIComponent(input.date)}`
+    : "";
   const path =
     `/v1/options/chain/${symbol}/` +
     `?expiration=${encodeURIComponent(input.expiration)}` +
-    `&strike=${encodeURIComponent(strikeParam)}`;
+    `&strike=${encodeURIComponent(strikeParam)}` +
+    dateParam;
 
   const result = await fetchMarketDataAppJson({
     path,

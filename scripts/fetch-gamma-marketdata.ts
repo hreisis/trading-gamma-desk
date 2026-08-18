@@ -14,6 +14,7 @@
  *   --data-root=/path
  *
  * Auth: MARKETDATA_API_TOKEN (or MARKETDATA_APP_TOKEN). Never logged.
+ * Daily API credits reset at 9:30 AM ET (see src/gamma/marketdata-app/credits.ts).
  * Writes data/gamma/providers/marketdata-app/{SYMBOL}-bounded-latest.json
  * only on success. Does not save the raw vendor response.
  * Disabled under public demo. Not part of npm run daily.

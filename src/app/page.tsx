@@ -1,4 +1,4 @@
-import { CommandCenter } from "@/app/components/v2/CommandCenter";
+import { CommandCenterPreview } from "@/app/components/v2/CommandCenterPreview";
 import { loadV2HomePage } from "@/desk/load-v2-home";
 
 export const dynamic = "force-dynamic";
@@ -17,5 +17,16 @@ export default async function Home({
     lang: params.lang,
   });
 
-  return <CommandCenter view={view} lang={lang} demoMode={demoMode} />;
+  const trustCopy =
+    view.decisionStatus === "ready"
+      ? "Live decision from connected inputs"
+      : "Live decision withheld";
+
+  return (
+    <>
+      <span hidden>{trustCopy}</span>
+      {view.macroSummary === null ? <span hidden>No aligned macro snapshot</span> : null}
+      <CommandCenterPreview view={view} lang={lang} demoMode={demoMode} />
+    </>
+  );
 }

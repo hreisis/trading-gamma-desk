@@ -12,6 +12,10 @@ import { computeEstimatedGammaStructure } from "../compute";
 import { extractRepresentativeIvFromChain } from "../aggregate";
 import { grossGex } from "../gex";
 import { resolveMarketDataApiToken } from "./config";
+import {
+  isMarketDataCreditLimitExhausted,
+  markMarketDataCreditsExhausted,
+} from "./credits";
 import { fetchBoundedMarketDataAppChain } from "./fetch";
 import { MarketDataAppNormalizeError } from "./errors";
 import { normalizeMarketDataAppChain } from "./normalize";
@@ -62,6 +66,7 @@ export interface RunBoundedGammaProviderInput {
   readonly baseUrl?: string;
   readonly generatedAt?: string;
   readonly fetchedAt?: string;
+  readonly sessionDate?: string;
   readonly synthetic?: boolean;
   readonly artifactStore?: RuntimeJsonStore;
 }
@@ -219,6 +224,7 @@ export async function runBoundedGammaProvider(
       symbol: input.symbol,
       expiration: input.expiration,
       strikes: plan.strikes,
+      date: input.sessionDate,
       token,
       fetchImpl: input.fetchImpl,
       baseUrl: input.baseUrl,
@@ -238,6 +244,28 @@ export async function runBoundedGammaProvider(
       ok: false,
       code: "token_leak",
       error: "refusing to continue: request path unexpectedly contained token",
+      path: null,
+      wrote: false,
+    };
+  }
+
+  if (
+    isMarketDataCreditLimitExhausted({
+      httpStatus: fetchResult.httpStatus,
+      body: fetchResult.body,
+    })
+  ) {
+    markMarketDataCreditsExhausted();
+    const detail =
+      isRecord(fetchResult.body) &&
+      typeof fetchResult.body.errmsg === "string" &&
+      fetchResult.body.errmsg.length > 0
+        ? fetchResult.body.errmsg
+        : `MarketData.app HTTP ${fetchResult.httpStatus}: daily API credit limit exhausted`;
+    return {
+      ok: false,
+      code: "credit_limit",
+      error: detail,
       path: null,
       wrote: false,
     };
@@ -312,7 +340,6 @@ export async function runBoundedGammaProvider(
     };
   }
 
-  // Engine uses vendor asOf from normalize (max updated) — not wall clock.
   const structure = computeEstimatedGammaStructure(chain);
   const gross = grossGex(structure.byStrike);
   const strikeReturned = returnedStrikeRange(structure.byStrike);

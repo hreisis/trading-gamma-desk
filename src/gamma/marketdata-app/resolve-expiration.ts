@@ -1,5 +1,9 @@
 import type { FetchLike } from "@/ingest/http";
-import { fetchMarketDataAppExpirations } from "./fetch";
+import { fetchMarketDataAppExpirations, MarketDataAppFetchError } from "./fetch";
+import {
+  isMarketDataCreditLimitExhausted,
+  markMarketDataCreditsExhausted,
+} from "./credits";
 import { defaultBoundedExpiration } from "./time";
 
 export type BoundedGammaExpirationSource = "env" | "discovered" | "default";
@@ -51,8 +55,18 @@ export async function resolveBoundedGammaExpiration(input: {
     if (picked) {
       return { expiration: picked, source: "discovered" };
     }
-  } catch {
-    // Fall through to deterministic default.
+  } catch (error: unknown) {
+    if (
+      error instanceof MarketDataAppFetchError &&
+      isMarketDataCreditLimitExhausted({
+        httpStatus: error.httpStatus,
+        message: error.message,
+      })
+    ) {
+      markMarketDataCreditsExhausted();
+      throw error;
+    }
+    // Fall through to deterministic default for other errors.
   }
 
   return {

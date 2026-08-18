@@ -71,7 +71,39 @@ export interface RiskDecisionV1DailyRecord {
   readonly marketSessionDate: string;
   readonly generatedAt: string;
   readonly riskScore: number;
+  /** Weighted factor score before leadership concentration (present on new publishes). */
+  readonly baseRiskScore?: number;
+  /** Leadership concentration add-on (present on new publishes). */
+  readonly concentrationPenalty?: number;
   readonly factorContributions: readonly RiskFactorContributionSnapshot[];
+}
+
+/** Canonical Risk V1 factor ids in UI order (headline market risk). */
+export const RISK_V1_FACTOR_IDS = [
+  "breadth",
+  "macro",
+  "cta",
+  "vol",
+  "gamma",
+  "event_gate",
+] as const;
+
+export type RiskV1FactorId = (typeof RISK_V1_FACTOR_IDS)[number];
+
+export interface RiskSessionComparison {
+  readonly todaySession: string;
+  readonly previousSession: string | null;
+  readonly todayRiskScore: number | null;
+  readonly previousRiskScore: number | null;
+  readonly todayBaseRiskScore: number | null;
+  readonly previousBaseRiskScore: number | null;
+  readonly todayConcentrationPenalty: number | null;
+  readonly previousConcentrationPenalty: number | null;
+  readonly factors: readonly {
+    readonly id: RiskV1FactorId;
+    readonly todayScore: number | null;
+    readonly previousScore: number | null;
+  }[];
 }
 
 export interface RiskDecisionDayOverDay {
@@ -263,13 +295,71 @@ function stanceFromRisk(riskScore: number): RiskDecisionStance {
 }
 
 function aggregateRiskScore(factors: readonly RiskFactorContribution[]): number {
-  const totalWeight = factors.reduce((sum, row) => sum + row.effectiveWeight, 0);
-  if (totalWeight <= 0) return 0;
-  const weighted = factors.reduce(
+  const score = aggregateRiskScoreFromContributions(
+    factors.map((row) => ({
+      id: row.id,
+      score: row.score,
+      effectiveWeight: row.effectiveWeight,
+    })),
+  );
+  return score ?? 0;
+}
+
+/** Same weighted average as `aggregateRiskScore`, from stored factor snapshots. */
+export function aggregateRiskScoreFromContributions(
+  contributions: readonly RiskFactorContributionSnapshot[],
+): number | null {
+  const totalWeight = contributions.reduce(
+    (sum, row) => sum + row.effectiveWeight,
+    0,
+  );
+  if (totalWeight <= 0) return null;
+  const weighted = contributions.reduce(
     (sum, row) => sum + row.effectiveWeight * row.score,
     0,
   );
   return roundRisk(weighted / totalWeight);
+}
+
+export function factorScoreFromContributions(
+  contributions: readonly RiskFactorContributionSnapshot[],
+  id: string,
+): number | null {
+  const row = contributions.find((factor) => factor.id === id);
+  return row?.score ?? null;
+}
+
+export function buildRiskSessionComparison(input: {
+  readonly decisionSessionDate: string;
+  readonly today: RiskDecisionV1Result;
+  readonly priorRecord: RiskDecisionV1DailyRecord | null;
+}): RiskSessionComparison | null {
+  if (input.today.status !== "ready") return null;
+
+  const priorContributions =
+    input.priorRecord?.factorContributions ?? [];
+  const factors = RISK_V1_FACTOR_IDS.map((id) => ({
+    id,
+    todayScore: factorScoreFromContributions(
+      input.today.factorContributions,
+      id,
+    ),
+    previousScore: input.priorRecord
+      ? factorScoreFromContributions(priorContributions, id)
+      : null,
+  }));
+
+  return {
+    todaySession: input.decisionSessionDate,
+    previousSession: input.priorRecord?.marketSessionDate ?? null,
+    todayRiskScore: input.today.riskScore,
+    previousRiskScore: input.priorRecord?.riskScore ?? null,
+    todayBaseRiskScore: input.today.baseRiskScore,
+    previousBaseRiskScore: input.priorRecord?.baseRiskScore ?? null,
+    todayConcentrationPenalty: input.today.concentrationPenalty,
+    previousConcentrationPenalty: input.priorRecord?.concentrationPenalty ?? null,
+    factors,
+  };
 }
 
 function buildEvidenceWithConcentration(
@@ -485,6 +575,12 @@ function buildRiskDecisionV1DailyRecordFromResult(input: {
     marketSessionDate: input.decisionSessionDate,
     generatedAt: input.now?.toISOString() ?? new Date().toISOString(),
     riskScore,
+    ...(input.today.baseRiskScore !== null
+      ? { baseRiskScore: input.today.baseRiskScore }
+      : {}),
+    ...(input.today.concentrationPenalty !== null
+      ? { concentrationPenalty: input.today.concentrationPenalty }
+      : {}),
     factorContributions: input.today.factorContributions,
   };
 }
@@ -585,6 +681,41 @@ export function loadPriorPublishedRiskDecision(
   return prior.at(-1) ?? null;
 }
 
+/** Latest publishable record for a completed market session strictly before `decisionSessionDate`. */
+export function loadPriorPublishedRiskDecisionForMarketSession(
+  dataRoot: string,
+  decisionSessionDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const prior = listRiskDecisionV1DailyRecords(dataRoot).filter(
+    (record) =>
+      record.marketSessionDate < decisionSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return prior
+    .sort((left, right) =>
+      left.marketSessionDate.localeCompare(right.marketSessionDate),
+    )
+    .at(-1) ?? null;
+}
+
+export function loadPublishedRiskDecisionForMarketSession(
+  dataRoot: string,
+  marketSessionDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const matches = listRiskDecisionV1DailyRecords(dataRoot).filter(
+    (record) =>
+      record.marketSessionDate === marketSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return matches
+    .sort((left, right) =>
+      riskDecisionPublicationDate(left).localeCompare(
+        riskDecisionPublicationDate(right),
+      ),
+    )
+    .at(-1) ?? null;
+}
+
 export async function loadPriorPublishedRiskDecisionAsync(
   artifactStore: RuntimeJsonStore,
   publicationDate: string,
@@ -597,6 +728,44 @@ export async function loadPriorPublishedRiskDecisionAsync(
       isRiskDecisionV1DailyRecordPublishable(record),
   );
   return prior.at(-1) ?? null;
+}
+
+export async function loadPriorPublishedRiskDecisionForMarketSessionAsync(
+  artifactStore: RuntimeJsonStore,
+  decisionSessionDate: string,
+): Promise<RiskDecisionV1DailyRecord | null> {
+  const prior = (
+    await listRiskDecisionV1DailyRecordsAsync(artifactStore)
+  ).filter(
+    (record) =>
+      record.marketSessionDate < decisionSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return prior
+    .sort((left, right) =>
+      left.marketSessionDate.localeCompare(right.marketSessionDate),
+    )
+    .at(-1) ?? null;
+}
+
+export async function loadPublishedRiskDecisionForMarketSessionAsync(
+  artifactStore: RuntimeJsonStore,
+  marketSessionDate: string,
+): Promise<RiskDecisionV1DailyRecord | null> {
+  const matches = (
+    await listRiskDecisionV1DailyRecordsAsync(artifactStore)
+  ).filter(
+    (record) =>
+      record.marketSessionDate === marketSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return matches
+    .sort((left, right) =>
+      riskDecisionPublicationDate(left).localeCompare(
+        riskDecisionPublicationDate(right),
+      ),
+    )
+    .at(-1) ?? null;
 }
 
 export function persistRiskDecisionV1Daily(
@@ -712,7 +881,10 @@ export function resolveRiskDecisionDayOverDay(input: {
 }): RiskDecisionDayOverDay {
   const previous =
     input.dataRoot !== null && input.dataRoot !== undefined
-      ? loadPriorPublishedRiskDecision(input.dataRoot, input.publicationDate)
+      ? loadPriorPublishedRiskDecisionForMarketSession(
+          input.dataRoot,
+          input.decisionSessionDate,
+        )
       : null;
 
   const record = buildRiskDecisionV1DailyRecordFromResult({
@@ -755,9 +927,9 @@ export async function resolveRiskDecisionDayOverDayAsync(input: {
   readonly now?: Date;
   readonly force?: boolean;
 }): Promise<RiskDecisionDayOverDay> {
-  const previous = await loadPriorPublishedRiskDecisionAsync(
+  const previous = await loadPriorPublishedRiskDecisionForMarketSessionAsync(
     input.artifactStore,
-    input.publicationDate,
+    input.decisionSessionDate,
   );
 
   const record = buildRiskDecisionV1DailyRecordFromResult({

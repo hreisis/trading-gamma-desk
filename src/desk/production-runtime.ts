@@ -5,6 +5,11 @@ import { fetchOfficialCalendar } from "@/catalyst/fetch-calendar";
 import { loadCatalystFeed } from "@/catalyst/load";
 import { fetchOfficialResults } from "@/catalyst/results/fetch-results";
 import { resolveMarketDataApiToken } from "@/gamma/marketdata-app/config";
+import {
+  isMarketDataCreditLimitExhausted,
+  markMarketDataCreditsExhausted,
+  shouldDeferMarketDataGammaRefresh,
+} from "@/gamma/marketdata-app/credits";
 import { resolveBoundedGammaExpiration } from "@/gamma/marketdata-app/resolve-expiration";
 import { runBoundedGammaProvider } from "@/gamma/marketdata-app/run";
 import { boundedGammaArtifactRelativePath, boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
@@ -55,6 +60,7 @@ function resolveGammaArtifactStore(
   env: NodeJS.ProcessEnv,
 ): RuntimeJsonStore {
   if (options.artifactStore) return options.artifactStore;
+  if (isServerlessHost(env)) return resolveRuntimeJsonStore(env);
   if (options.dataRoot) {
     return createFilesystemRuntimeJsonStore({
       dataRoot: deskDataRootFromGammaProviderRoot(options.dataRoot),
@@ -314,14 +320,20 @@ function boundedGammaNeedsRefresh(
 
 const gammaRefreshByKey = new Map<string, Promise<void>>();
 
+function cachedGammaCreditLimitMessage(sessionDate: string | null | undefined): string {
+  const label = sessionDate ?? "cached";
+  return `MarketData.app daily credits exhausted — showing cached snapshot (${label}) until 9:30 AM ET reset.`;
+}
+
 async function ensureBoundedGammaSnapshot(options: {
   readonly symbol: string;
   readonly dataRoot: string;
   readonly env: NodeJS.ProcessEnv;
   readonly artifactStore: RuntimeJsonStore;
+  readonly targetSession: string;
 }): Promise<{ readonly ok: boolean; readonly error?: string }> {
   const artifactRelativePath = boundedGammaArtifactRelativePath(options.symbol);
-  const key = `${options.artifactStore.rootLabel}:${options.symbol}:${artifactRelativePath}`;
+  const key = `${options.artifactStore.rootLabel}:${options.symbol}:${artifactRelativePath}:${options.targetSession}`;
 
   const token = resolveMarketDataApiToken(options.env);
   if (!token) {
@@ -331,14 +343,32 @@ async function ensureBoundedGammaSnapshot(options: {
     };
   }
 
+  if (shouldDeferMarketDataGammaRefresh()) {
+    return {
+      ok: false,
+      error:
+        "MarketData.app daily credits exhausted — refresh deferred until 9:30 AM ET reset",
+    };
+  }
+
   const params = resolveGammaStrikeParams(options.symbol, options.env);
-  const sessionDate = resolveBoundedGammaTargetSession();
-  const expiration = await resolveBoundedGammaExpiration({
-    symbol: options.symbol,
-    sessionDate,
-    configuredExpiration: options.env.GAMMA_BOUNDED_EXPIRATION,
-    token,
-  });
+  const sessionDate = options.targetSession;
+
+  let expiration: Awaited<ReturnType<typeof resolveBoundedGammaExpiration>>;
+  try {
+    expiration = await resolveBoundedGammaExpiration({
+      symbol: options.symbol,
+      sessionDate,
+      configuredExpiration: options.env.GAMMA_BOUNDED_EXPIRATION,
+      token,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isMarketDataCreditLimitExhausted({ message })) {
+      markMarketDataCreditsExhausted();
+    }
+    return { ok: false, error: message };
+  }
 
   let pending = gammaRefreshByKey.get(key);
   if (!pending) {
@@ -354,9 +384,16 @@ async function ensureBoundedGammaSnapshot(options: {
         dataRoot: options.dataRoot,
         token,
         env: options.env,
+        sessionDate,
         artifactStore: options.artifactStore,
       });
       if (!result.ok) {
+        if (
+          result.code === "credit_limit" ||
+          isMarketDataCreditLimitExhausted({ message: result.error })
+        ) {
+          markMarketDataCreditsExhausted();
+        }
         throw new Error(result.error);
       }
     })().finally(() => {
@@ -408,11 +445,26 @@ export async function loadBoundedGammaDeskViewAsync(
     return sync;
   }
 
+  const now = options.now ?? new Date();
+  if (shouldDeferMarketDataGammaRefresh(now)) {
+    if (sync.snapshot !== null) {
+      return {
+        ...sync,
+        error: {
+          code: "credit_limit_deferred",
+          message: cachedGammaCreditLimitMessage(sync.snapshot.sessionDate),
+        },
+      };
+    }
+    return sync;
+  }
+
   const refresh = await ensureBoundedGammaSnapshot({
     symbol,
     dataRoot,
     env,
     artifactStore,
+    targetSession,
   });
 
   const refreshedRaw = await readJson(artifactStore, artifactRelativePath);
@@ -431,11 +483,16 @@ export async function loadBoundedGammaDeskViewAsync(
   if (!refresh.ok) {
     if (reloaded.snapshot !== null) {
       const sessionLabel = reloaded.snapshot.sessionDate;
+      const creditDeferred = isMarketDataCreditLimitExhausted({
+        message: refresh.error,
+      });
       return {
         ...reloaded,
         error: {
-          code: "refresh_failed",
-          message: `${refresh.error ?? "Bounded gamma refresh failed"} — showing cached snapshot (${sessionLabel}).`,
+          code: creditDeferred ? "credit_limit_deferred" : "refresh_failed",
+          message: creditDeferred
+            ? cachedGammaCreditLimitMessage(sessionLabel)
+            : `${refresh.error ?? "Bounded gamma refresh failed"} — showing cached snapshot (${sessionLabel}).`,
         },
       };
     }
