@@ -28,6 +28,8 @@ export default async function MarketPage({
       <RiskSnapshotScores
         spyScore={view.spyStructuralRiskScore}
         qqqScore={view.qqqStructuralRiskScore}
+        baseHighBeta={view.allocation?.highBeta ?? null}
+        riskDivergence={view.riskDivergence}
       />
     </>
   );
