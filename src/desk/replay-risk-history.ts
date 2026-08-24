@@ -31,11 +31,11 @@ import {
 import { breadthToRiskInput, gammaToRiskInput } from "@/desk/risk-decision-v1-1";
 import { createFilesystemRuntimeJsonStore } from "@/desk/runtime-store";
 import { deriveOpportunityScoreV2 } from "@/desk/opportunity-score-v2";
-import type {
-  OpportunityGammaInput,
-  OpportunityV2Result,
-} from "@/desk/opportunity-score-v2";
-import { summarizeSpyBreadthFromDurable } from "@/desk/v2-command-center";
+import type { OpportunityV2Result } from "@/desk/opportunity-score-v2";
+import {
+  summarizeSpyBreadthFromDurable,
+  type V2GammaSummary,
+} from "@/desk/v2-command-center";
 import {
   deriveRiskTrendV2,
   type RiskTrendSnapshot,
@@ -478,8 +478,8 @@ export async function replayRiskHistoryForDate(
   const gammaSnapshot: ManualGammaSnapshot | null =
     await loadManualGammaSnapshot(store, sessionDate);
   let spyGamma = UNAVAILABLE_GAMMA;
-  let spyGammaSummary: OpportunityGammaInput | null = null;
-  let qqqGammaSummary: OpportunityGammaInput | null = null;
+  let spyGammaSummary: V2GammaSummary | null = null;
+  let qqqGammaSummary: V2GammaSummary | null = null;
   if (!gammaSnapshot) {
     notes.push("gamma missing");
     notes.push("vol missing (no same-session manual gamma IV)");
@@ -542,7 +542,11 @@ export async function replayRiskHistoryForDate(
   const opportunity = deriveOpportunityScoreV2({
     spyGamma: spyGammaSummary,
     qqqGamma: qqqGammaSummary,
-    breadth: breadth.input,
+    breadth: {
+      breadthSignalStatus: breadth.input.breadthSignalStatus,
+      breadthSignal: breadth.input.breadthSignal,
+      advancingPct: breadth.input.advancingPct ?? null,
+    },
     eventGate: event.eventGate,
   });
 
