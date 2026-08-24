@@ -24,7 +24,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 Removed from this repo: Historical Study pipeline, Decide surface, Alpaca News panel, and related study fixtures/tests.
 
-**Queued (not started):** Market risk indicator — simple 0–100 score + green/yellow/red from current Macro + Gamma + market signals (spec only; do not implement until scheduled).
+**In progress:** Opportunity Score V2, Risk Trend V2, and Positioning V2 are replay-only (not UI/routes). Risk V1 scoring and AI Study are unchanged.
+
+**Queued (not started):** Market risk indicator UI remains deferred.
 
 ### M1-6b calibration status (split)
 

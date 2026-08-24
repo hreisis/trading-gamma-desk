@@ -5,33 +5,25 @@
  */
 import { join } from "node:path";
 import {
-  RISK_HISTORY_PRIORITY_DATES,
-  formatRiskHistoryReplayTable,
+  OPPORTUNITY_V2_REPLAY_DATES,
+  formatPositioningReplayTable,
   replayRiskHistory,
-  riskHistoryReplayToCsv,
 } from "@/desk/replay-risk-history";
 
 async function main(): Promise<void> {
   const dataRoot = join(process.cwd(), "data");
-  const rows = await replayRiskHistory({ dataRoot });
-  const priority = new Set<string>(RISK_HISTORY_PRIORITY_DATES);
-  const priorityRows = rows.filter((row) => priority.has(row.date));
-  const otherRows = rows.filter((row) => !priority.has(row.date));
+  const argvDates = process.argv
+    .slice(2)
+    .filter((arg) => /^\d{4}-\d{2}-\d{2}$/.test(arg));
+  const dates = argvDates.length > 0 ? argvDates : [...OPPORTUNITY_V2_REPLAY_DATES];
+  const rows = await replayRiskHistory({
+    dataRoot,
+    dates,
+  });
 
-  console.log("Risk V1 historical replay (same-session inputs only)");
-  console.log("Model weight 90; withheld when effective coverage < 45.");
-  console.log("Event gate is reconstructed as-of 16:00 ET that session from local catalyst caches.");
+  console.log("Positioning V2 (replay only; Risk / Opportunity / Trend unchanged)");
   console.log("");
-  console.log("Priority dates");
-  console.log(formatRiskHistoryReplayTable(priorityRows));
-  if (otherRows.length > 0) {
-    console.log("");
-    console.log("Other available dates");
-    console.log(formatRiskHistoryReplayTable(otherRows));
-  }
-  console.log("");
-  console.log("CSV");
-  console.log(riskHistoryReplayToCsv(rows).trimEnd());
+  console.log(formatPositioningReplayTable(rows));
 }
 
 main().catch((error: unknown) => {

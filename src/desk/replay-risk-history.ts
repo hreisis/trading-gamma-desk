@@ -30,12 +30,24 @@ import {
 } from "@/desk/risk-decision-v1";
 import { breadthToRiskInput, gammaToRiskInput } from "@/desk/risk-decision-v1-1";
 import { createFilesystemRuntimeJsonStore } from "@/desk/runtime-store";
+import { deriveOpportunityScoreV2 } from "@/desk/opportunity-score-v2";
+import type {
+  OpportunityGammaInput,
+  OpportunityV2Result,
+} from "@/desk/opportunity-score-v2";
 import { summarizeSpyBreadthFromDurable } from "@/desk/v2-command-center";
+import {
+  deriveRiskTrendV2,
+  type RiskTrendSnapshot,
+  type RiskTrendV2Label,
+} from "@/desk/risk-trend-v2";
+import { derivePositioningV2, type PositioningV2Label } from "@/desk/positioning-v2";
 import {
   RISK_HISTORY_BACKFILL_END,
   RISK_HISTORY_BACKFILL_START,
   tradingSessionsInRange,
 } from "@/desk/backfill-risk-history-inputs";
+import { defaultSessionCalendar } from "@/macro/calendar";
 
 export const RISK_HISTORY_PRIORITY_DATES = [
   "2026-08-14",
@@ -44,6 +56,20 @@ export const RISK_HISTORY_PRIORITY_DATES = [
   "2026-08-20",
   "2026-08-21",
   "2026-08-22",
+] as const;
+
+export const OPPORTUNITY_V2_REPLAY_DATES = [
+  "2026-07-27",
+  "2026-07-28",
+  "2026-07-29",
+  "2026-07-30",
+  "2026-07-31",
+  "2026-08-14",
+  "2026-08-17",
+  "2026-08-19",
+  "2026-08-20",
+  "2026-08-21",
+  "2026-08-24",
 ] as const;
 
 const UNAVAILABLE_GAMMA: RiskDecisionSpyGammaInput = {
@@ -73,6 +99,15 @@ export interface RiskHistoryReplayRow {
   readonly qqqNext1dReturn: number | null;
   readonly spyNext3SessionMdd: number | null;
   readonly qqqNext3SessionMdd: number | null;
+  readonly opportunityScore: number | null;
+  readonly opportunityCoverage: number | null;
+  readonly opportunityFactors: OpportunityV2Result["factors"];
+  readonly opportunityMissing: readonly string[];
+  readonly trendSnapshot: RiskTrendSnapshot;
+  readonly riskTrend: RiskTrendV2Label | null;
+  readonly riskTrendPriorDate: string | null;
+  readonly riskTrendReasons: readonly string[];
+  readonly positioning: PositioningV2Label | null;
   readonly notes: readonly string[];
 }
 
@@ -96,6 +131,27 @@ function loadUniverseBars(dataRoot: string, symbol: "SPY" | "QQQ"): DailyBar[] {
   return [...bars].sort((left, right) =>
     left.sessionDate.localeCompare(right.sessionDate),
   );
+}
+
+function shiftIsoDate(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+export function priorCompletedSession(
+  sessionDate: string,
+  spyBars: readonly DailyBar[],
+): string | null {
+  const fromBars = spyBars.filter((bar) => bar.sessionDate < sessionDate);
+  if (fromBars.length > 0) return fromBars[fromBars.length - 1]!.sessionDate;
+  let cursor = shiftIsoDate(sessionDate, -1);
+  for (let step = 0; step < 10; step += 1) {
+    if (defaultSessionCalendar.isSession(cursor)) return cursor;
+    cursor = shiftIsoDate(cursor, -1);
+  }
+  return null;
 }
 
 function barsThroughSession(
@@ -422,17 +478,25 @@ export async function replayRiskHistoryForDate(
   const gammaSnapshot: ManualGammaSnapshot | null =
     await loadManualGammaSnapshot(store, sessionDate);
   let spyGamma = UNAVAILABLE_GAMMA;
+  let spyGammaSummary: OpportunityGammaInput | null = null;
+  let qqqGammaSummary: OpportunityGammaInput | null = null;
   if (!gammaSnapshot) {
     notes.push("gamma missing");
     notes.push("vol missing (no same-session manual gamma IV)");
   } else {
     const hv20Bars = barsThroughSession(spyBars, sessionDate);
-    const summary = buildManualGammaSummary({
+    const qqqHv20Bars = barsThroughSession(qqqBars, sessionDate);
+    spyGammaSummary = buildManualGammaSummary({
       snapshot: gammaSnapshot,
       symbol: "SPY",
       hv20Bars,
     });
-    spyGamma = gammaToRiskInput(summary);
+    qqqGammaSummary = buildManualGammaSummary({
+      snapshot: gammaSnapshot,
+      symbol: "QQQ",
+      hv20Bars: qqqHv20Bars,
+    });
+    spyGamma = gammaToRiskInput(spyGammaSummary);
     if (spyGamma.volMispricing.status !== "available") {
       notes.push("vol missing (IV/HV not aligned for session)");
     }
@@ -475,6 +539,42 @@ export async function replayRiskHistoryForDate(
     );
   }
 
+  const opportunity = deriveOpportunityScoreV2({
+    spyGamma: spyGammaSummary,
+    qqqGamma: qqqGammaSummary,
+    breadth: breadth.input,
+    eventGate: event.eventGate,
+  });
+
+  const vol = spyGamma.volMispricing;
+  const trendSnapshot: RiskTrendSnapshot = {
+    sessionDate,
+    riskScore: result.riskScore,
+    breadthSignal:
+      breadth.input.breadthSignalStatus === "available"
+        ? breadth.input.breadthSignal
+        : null,
+    advancingPct: breadth.input.advancingPct ?? null,
+    macroScore: factorScores.macro,
+    macroDirection:
+      factorScores.macro === null
+        ? null
+        : driver?.riskDirection === "risk_on" ||
+            driver?.riskDirection === "mixed" ||
+            driver?.riskDirection === "risk_off"
+          ? driver.riskDirection
+          : null,
+    gammaRegime: spyGamma.regime,
+    volSignal:
+      vol.status === "available" &&
+      (vol.signal === "vol_underpriced" ||
+        vol.signal === "balanced" ||
+        vol.signal === "vol_expensive")
+        ? vol.signal
+        : null,
+    volSpread: vol.status === "available" ? vol.spreadVolPts : null,
+  };
+
   return {
     date: sessionDate,
     status: result.status,
@@ -489,6 +589,15 @@ export async function replayRiskHistoryForDate(
     qqqNext1dReturn: next1dReturn(qqqBars, sessionDate),
     spyNext3SessionMdd: next3SessionMaxDrawdown(spyBars, sessionDate),
     qqqNext3SessionMdd: next3SessionMaxDrawdown(qqqBars, sessionDate),
+    opportunityScore: opportunity.opportunityScore,
+    opportunityCoverage: opportunity.coverage,
+    opportunityFactors: opportunity.factors,
+    opportunityMissing: opportunity.missing,
+    trendSnapshot,
+    riskTrend: null,
+    riskTrendPriorDate: null,
+    riskTrendReasons: [],
+    positioning: null,
     notes,
   };
 }
@@ -496,15 +605,44 @@ export async function replayRiskHistoryForDate(
 export async function replayRiskHistory(
   options: ReplayRiskHistoryOptions,
 ): Promise<readonly RiskHistoryReplayRow[]> {
-  const dates =
+  const requested =
     options.dates && options.dates.length > 0
       ? [...options.dates]
       : await listRiskHistoryReplayDates(options.dataRoot);
-  const rows: RiskHistoryReplayRow[] = [];
-  for (const date of dates) {
-    rows.push(await replayRiskHistoryForDate(date, options));
+  const spyBars = loadUniverseBars(options.dataRoot, "SPY");
+  const toReplay = new Set(requested);
+  for (const date of requested) {
+    const prior = priorCompletedSession(date, spyBars);
+    if (prior) toReplay.add(prior);
   }
-  return rows;
+  const byDate = new Map<string, RiskHistoryReplayRow>();
+  for (const date of [...toReplay].sort((left, right) => left.localeCompare(right))) {
+    byDate.set(date, await replayRiskHistoryForDate(date, options));
+  }
+  return requested.map((date) => {
+    const row = byDate.get(date);
+    if (!row) {
+      throw new Error(`Missing replay row for ${date}`);
+    }
+    const priorDate = priorCompletedSession(date, spyBars);
+    const prior = priorDate ? (byDate.get(priorDate) ?? null) : null;
+    const trend = deriveRiskTrendV2({
+      current: row.trendSnapshot,
+      prior: prior?.trendSnapshot ?? null,
+      priorDate,
+    });
+    return {
+      ...row,
+      riskTrend: trend.trend,
+      riskTrendPriorDate: trend.priorDate,
+      riskTrendReasons: trend.reasons,
+      positioning: derivePositioningV2({
+        riskScore: row.riskScore,
+        opportunityScore: row.opportunityScore,
+        trend: trend.trend,
+      }),
+    };
+  });
 }
 
 function csvCell(value: string | number | null): string {
@@ -542,6 +680,18 @@ export function riskHistoryReplayToCsv(
     "qqqNext1dReturnPct",
     "spyNext3SessionMddPct",
     "qqqNext3SessionMddPct",
+    "opportunityScore",
+    "opportunityCoverage",
+    "oppDislocation",
+    "oppVolStress",
+    "oppBreadthWashout",
+    "oppGammaConvexity",
+    "oppEventRisk",
+    "opportunityMissing",
+    "riskTrend",
+    "riskTrendPriorDate",
+    "riskTrendReasons",
+    "positioning",
     "notes",
   ];
   const lines = [header.join(",")];
@@ -563,6 +713,33 @@ export function riskHistoryReplayToCsv(
         csvCell(pctCell(row.qqqNext1dReturn)),
         csvCell(pctCell(row.spyNext3SessionMdd)),
         csvCell(pctCell(row.qqqNext3SessionMdd)),
+        csvCell(row.opportunityScore),
+        csvCell(row.opportunityCoverage),
+        csvCell(
+          row.opportunityFactors.find((factor) => factor.id === "dislocation")
+            ?.score ?? null,
+        ),
+        csvCell(
+          row.opportunityFactors.find((factor) => factor.id === "vol_stress")
+            ?.score ?? null,
+        ),
+        csvCell(
+          row.opportunityFactors.find((factor) => factor.id === "breadth_washout")
+            ?.score ?? null,
+        ),
+        csvCell(
+          row.opportunityFactors.find((factor) => factor.id === "gamma_convexity")
+            ?.score ?? null,
+        ),
+        csvCell(
+          row.opportunityFactors.find((factor) => factor.id === "event_risk")
+            ?.score ?? null,
+        ),
+        csvCell(row.opportunityMissing.join("|")),
+        csvCell(row.riskTrend),
+        csvCell(row.riskTrendPriorDate),
+        csvCell(row.riskTrendReasons.join("; ")),
+        csvCell(row.positioning),
         csvCell(row.notes.join("; ")),
       ].join(","),
     );
@@ -587,6 +764,7 @@ export function formatRiskHistoryReplayTable(
     "qqq1d",
     "spy3dd",
     "qqq3dd",
+    "opp",
     "missing",
   ] as const;
   const body = rows.map((row) => [
@@ -613,7 +791,125 @@ export function formatRiskHistoryReplayTable(
     row.qqqNext3SessionMdd === null
       ? "—"
       : `${(row.qqqNext3SessionMdd * 100).toFixed(2)}%`,
+    row.opportunityScore === null ? "—" : String(row.opportunityScore),
     row.missingFactors.join("|") || "—",
+  ]);
+  const widths = cols.map((col, index) =>
+    Math.max(col.length, ...body.map((line) => line[index]!.length)),
+  );
+  const fmt = (cells: readonly string[]) =>
+    cells
+      .map((cell, index) => cell.padEnd(widths[index]!))
+      .join("  ");
+  return [fmt([...cols]), ...body.map((line) => fmt(line))].join("\n");
+}
+
+export function formatOpportunityReplayTable(
+  rows: readonly RiskHistoryReplayRow[],
+): string {
+  const cols = [
+    "date",
+    "opp",
+    "cov",
+    "disloc",
+    "vol",
+    "wash",
+    "convex",
+    "event",
+    "missing",
+  ] as const;
+  const scoreOf = (
+    row: RiskHistoryReplayRow,
+    id: OpportunityV2Result["factors"][number]["id"],
+  ) => {
+    const factor = row.opportunityFactors.find((item) => item.id === id);
+    return factor ? String(factor.score) : "—";
+  };
+  const body = rows.map((row) => [
+    row.date,
+    row.opportunityScore === null ? "—" : String(row.opportunityScore),
+    row.opportunityCoverage === null ? "—" : String(row.opportunityCoverage),
+    scoreOf(row, "dislocation"),
+    scoreOf(row, "vol_stress"),
+    scoreOf(row, "breadth_washout"),
+    scoreOf(row, "gamma_convexity"),
+    scoreOf(row, "event_risk"),
+    row.opportunityMissing.join("|") || "—",
+  ]);
+  const widths = cols.map((col, index) =>
+    Math.max(col.length, ...body.map((line) => line[index]!.length)),
+  );
+  const fmt = (cells: readonly string[]) =>
+    cells
+      .map((cell, index) => cell.padEnd(widths[index]!))
+      .join("  ");
+  return [fmt([...cols]), ...body.map((line) => fmt(line))].join("\n");
+}
+
+export function formatOpportunityReplayDetails(
+  rows: readonly RiskHistoryReplayRow[],
+): string {
+  return rows
+    .map((row) => {
+      const header = `${row.date}  Opportunity ${
+        row.opportunityScore === null ? "—" : row.opportunityScore
+      }  coverage ${row.opportunityCoverage ?? 0}`;
+      const factors =
+        row.opportunityFactors.length === 0
+          ? "  (no factors)"
+          : row.opportunityFactors
+              .map(
+                (factor) =>
+                  `  ${factor.id.padEnd(17)} ${String(factor.score).padStart(3)}  w=${factor.weight}  ${factor.detail}`,
+              )
+              .join("\n");
+      const missing =
+        row.opportunityMissing.length > 0
+          ? `  missing: ${row.opportunityMissing.join(", ")}`
+          : "";
+      return [header, factors, missing].filter(Boolean).join("\n");
+    })
+    .join("\n\n");
+}
+
+export function formatRiskTrendReplayTable(
+  rows: readonly RiskHistoryReplayRow[],
+): string {
+  const cols = ["date", "risk", "opp", "trend", "reasons"] as const;
+  const body = rows.map((row) => [
+    row.date,
+    row.riskScore === null ? "—" : String(row.riskScore),
+    row.opportunityScore === null ? "—" : String(row.opportunityScore),
+    row.riskTrend ?? "—",
+    row.riskTrendReasons.join("; ") || "—",
+  ]);
+  const widths = cols.map((col, index) =>
+    Math.max(
+      col.length,
+      ...body.map((line) => (index === 4 ? 0 : line[index]!.length)),
+    ),
+  );
+  widths[4] = Math.max(
+    cols[4].length,
+    ...body.map((line) => Math.min(line[4]!.length, 96)),
+  );
+  const fmt = (cells: readonly string[]) =>
+    cells
+      .map((cell, index) => cell.padEnd(widths[index]!))
+      .join("  ");
+  return [fmt([...cols]), ...body.map((line) => fmt(line))].join("\n");
+}
+
+export function formatPositioningReplayTable(
+  rows: readonly RiskHistoryReplayRow[],
+): string {
+  const cols = ["date", "risk", "opp", "trend", "positioning"] as const;
+  const body = rows.map((row) => [
+    row.date,
+    row.riskScore === null ? "—" : String(row.riskScore),
+    row.opportunityScore === null ? "—" : String(row.opportunityScore),
+    row.riskTrend ?? "—",
+    row.positioning ?? "—",
   ]);
   const widths = cols.map((col, index) =>
     Math.max(col.length, ...body.map((line) => line[index]!.length)),
