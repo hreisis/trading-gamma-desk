@@ -33,13 +33,11 @@ import {
 } from "@/desk/risk-decision-v1";
 import type { DominantDriver } from "@/contracts";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
-import type { CtaProxySummary } from "@/desk/format-gamma";
-import { summarizeCtaProxy, summarizeVolMispricing, dealerFlowRegimeLabel } from "@/desk/format-gamma";
+import { summarizeVolMispricing, dealerFlowRegimeLabel } from "@/desk/format-gamma";
 import type { BoundedGammaDeskView } from "@/desk/load-bounded-gamma";
 
 const BREADTH_WEIGHT = 25;
 const MACRO_WEIGHT = 25;
-const CTA_WEIGHT = 15;
 const VOL_WEIGHT = 15;
 const GAMMA_WEIGHT = 15;
 const EVENT_GATE_WEIGHT = 10;
@@ -76,7 +74,6 @@ function auditFactorRows(input: {
   readonly driver: DominantDriver | null;
   readonly spyBreadth: V2SpyBreadthSummary;
   readonly spyGamma: RiskDecisionSpyGammaInput;
-  readonly ctaProxy: CtaProxySummary;
   readonly eventGate: EventGateSnapshot | null;
   readonly targetSession: string;
 }): FactorAuditRow[] {
@@ -168,43 +165,6 @@ function auditFactorRows(input: {
       detail: macroUnavailable
         ? input.driver?.label ?? "no driver"
         : "—",
-    });
-  }
-
-  // CTA
-  if (input.ctaProxy.status === "available" && input.ctaProxy.signal !== null) {
-    const score =
-      input.ctaProxy.signal === "buying"
-        ? 25
-        : input.ctaProxy.signal === "neutral"
-          ? 50
-          : input.ctaProxy.signal === "selling"
-            ? 75
-            : null;
-    rows.push({
-      id: "cta",
-      label: "CTA proxy",
-      status: "available",
-      rawSignal: input.ctaProxy.signal,
-      factorScore: score,
-      configuredWeight: CTA_WEIGHT,
-      freshnessPenalty: 0,
-      effectiveWeight: CTA_WEIGHT,
-      weightedContribution: score !== null ? score * CTA_WEIGHT : null,
-      detail: input.ctaProxy.contextLine ?? "—",
-    });
-  } else {
-    rows.push({
-      id: "cta",
-      label: "CTA proxy",
-      status: "unavailable",
-      rawSignal: input.ctaProxy.signal ?? "—",
-      factorScore: null,
-      configuredWeight: CTA_WEIGHT,
-      freshnessPenalty: CTA_WEIGHT,
-      effectiveWeight: 0,
-      weightedContribution: null,
-      detail: input.ctaProxy.contextLine ?? "needs SPY/QQQ quotes and bars",
     });
   }
 
@@ -494,19 +454,11 @@ async function main() {
 
   const spyGammaInput = buildSpyGammaRiskInput(spyGamma, equityBarsBySymbol);
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
-  const ctaProxy = summarizeCtaProxy({
-    spyBars: equityBarsBySymbol.get("SPY"),
-    qqqBars: equityBarsBySymbol.get("QQQ"),
-    spyPrice: liveEquityPrice("SPY", marketPanel?.quotes),
-    qqqPrice: liveEquityPrice("QQQ", marketPanel?.quotes),
-    targetSession,
-  });
 
   const decision = deriveRiskDecisionV1({
     driver: macro.driver,
     spyBreadth,
     spyGamma: spyGammaInput,
-    ctaProxy,
     eventGate,
     sectorRotation,
     targetSession,
@@ -516,7 +468,6 @@ async function main() {
     driver: macro.driver,
     spyBreadth,
     spyGamma: spyGammaInput,
-    ctaProxy,
     eventGate,
     targetSession,
   });

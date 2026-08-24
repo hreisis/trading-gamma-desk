@@ -10,10 +10,7 @@ import {
   writeJson,
   type RuntimeJsonStore,
 } from "./runtime-store";
-import type {
-  CtaProxySummary,
-  VolMispricingSummary,
-} from "./format-gamma";
+import type { VolMispricingSummary } from "./format-gamma";
 import type { V2SectorRotationSummary } from "./v2-command-center";
 import {
   computeLeadershipConcentrationPenalty,
@@ -21,6 +18,7 @@ import {
 } from "./risk-leadership-concentration";
 
 export const RISK_DECISION_V1_VERSION = "0.1.0";
+export const RISK_DECISION_V1_MODEL_WEIGHT = 90;
 
 export type RiskDecisionStance = "buy" | "hold" | "reduce";
 export type RiskDecisionConfidence = "high" | "moderate" | "limited";
@@ -82,7 +80,6 @@ export interface RiskDecisionV1DailyRecord {
 export const RISK_V1_FACTOR_IDS = [
   "breadth",
   "macro",
-  "cta",
   "vol",
   "gamma",
   "event_gate",
@@ -134,7 +131,6 @@ const PARTIAL_WEIGHT_MULTIPLIER = 0.75;
 
 const BREADTH_WEIGHT = 25;
 const MACRO_WEIGHT = 25;
-const CTA_WEIGHT = 15;
 const VOL_WEIGHT = 15;
 const GAMMA_WEIGHT = 15;
 const EVENT_GATE_WEIGHT = 10;
@@ -207,18 +203,6 @@ function breadthFactorScore(
       return 50;
     case "weak":
       return 80;
-  }
-}
-
-function ctaFactorScore(signal: CtaProxySummary["signal"]): number | null {
-  if (signal === null) return null;
-  switch (signal) {
-    case "buying":
-      return 25;
-    case "neutral":
-      return 50;
-    case "selling":
-      return 75;
   }
 }
 
@@ -370,7 +354,7 @@ function buildEvidenceWithConcentration(
   concentrationReason: string | null,
 ): readonly string[] {
   const lines: string[] = [
-    `Structural risk ${adjustedRiskScore}/100 · ${coverage.confidence} input coverage (${coverage.effectiveWeight}% of model weight used).`,
+    `Structural risk ${adjustedRiskScore}/100 · ${coverage.confidence} input coverage (${coverage.effectiveWeight} of ${RISK_DECISION_V1_MODEL_WEIGHT} model weight used).`,
   ];
 
   const concentrationLine = formatLeadershipConcentrationEvidence(
@@ -413,11 +397,6 @@ const FACTOR_CHANGE_LABELS: Record<
     eased: "macro eased",
     rose: "macro added risk",
   },
-  cta: {
-    short: "CTA",
-    eased: "CTA strengthened",
-    rose: "CTA weakened",
-  },
   vol: {
     short: "vol mispricing",
     eased: "vol mispricing eased",
@@ -454,6 +433,7 @@ function factorContributionDeltas(
   const deltas: { id: string; delta: number; weight: number }[] = [];
 
   for (const id of ids) {
+    if (!(RISK_V1_FACTOR_IDS as readonly string[]).includes(id)) continue;
     const todayRow = todayById.get(id);
     const prior = previousById.get(id);
     const todayWeighted = todayRow ? factorWeightedContribution(todayRow) : 0;
@@ -992,7 +972,6 @@ export interface DeriveRiskDecisionV1Input {
   readonly driver: DominantDriver | null;
   readonly spyBreadth: RiskDecisionSpyBreadthInput;
   readonly spyGamma: RiskDecisionSpyGammaInput;
-  readonly ctaProxy: CtaProxySummary;
   readonly eventGate: EventGateSnapshot | null;
   readonly sectorRotation?: V2SectorRotationSummary | null;
   readonly targetSession: string;
@@ -1023,7 +1002,7 @@ function auditWithheldFactors(
 
   if (effectiveWeight < MIN_EFFECTIVE_WEIGHT) {
     lines.push(
-      `Coverage ${effectiveWeight}% of 100 model weight (minimum 45% required).`,
+      `Coverage ${effectiveWeight} of ${RISK_DECISION_V1_MODEL_WEIGHT} model weight (minimum 45 required).`,
     );
   }
 
@@ -1037,14 +1016,6 @@ function auditWithheldFactors(
 
   if (!used.has("macro")) {
     lines.push(`Macro driver: ${macroSkipReason(input.driver)}.`);
-  }
-
-  if (!used.has("cta")) {
-    lines.push(
-      input.ctaProxy.status === "available"
-        ? "CTA proxy signal unavailable."
-        : "CTA proxy unavailable (needs aligned SPY/QQQ quotes and bars).",
-    );
   }
 
   if (!used.has("vol")) {
@@ -1117,20 +1088,6 @@ export function deriveRiskDecisionV1(
         effectiveWeight: MACRO_WEIGHT * multiplier,
         score,
         detail: `${macroFactorLabel(driver)} · ${driver.label}${multiplier < 1 ? " · dated" : ""}`,
-      });
-    }
-  }
-
-  if (input.ctaProxy.status === "available" && input.ctaProxy.signal !== null) {
-    const score = ctaFactorScore(input.ctaProxy.signal);
-    if (score !== null) {
-      factors.push({
-        id: "cta",
-        label: "CTA proxy",
-        baseWeight: CTA_WEIGHT,
-        effectiveWeight: CTA_WEIGHT,
-        score,
-        detail: input.ctaProxy.contextLine ?? `CTA proxy ${input.ctaProxy.signal}`,
       });
     }
   }
@@ -1209,7 +1166,7 @@ export function deriveRiskDecisionV1(
       evidence: [],
       coverage: null,
       withheldReason:
-        "Structural risk withheld — fewer than 45% of model weight has defensible live inputs.",
+        "Structural risk withheld — fewer than 45 model-weight points have defensible live inputs.",
       withheldFactors: auditWithheldFactors(input, usedIds, effectiveWeight),
       factorContributions: [],
     };

@@ -200,7 +200,6 @@ async function main(): Promise<void> {
     driver: macro.driver,
     spyBreadth,
     spyGamma: buildSpyGammaRiskInput(spyGamma, equityBarsBySymbol),
-    ctaProxy: view.ctaProxy,
     eventGate,
     sectorRotation: view.sectorRotation,
     targetSession,
@@ -265,28 +264,6 @@ async function main(): Promise<void> {
         driver?.primaryRegime !== "mixed_unresolved" &&
         driver?.primaryRegime !== "single_asset_shock"),
     issue: driver?.label ?? "—",
-  });
-
-  // CTA
-  const ctaFactor = factorById.get("cta");
-  rows.push({
-    factor: "CTA proxy",
-    sourceSession: `bars ≤ ${targetSession} · quotes live`,
-    status:
-      view.ctaProxy.status === "available"
-        ? "available"
-        : `excluded (${view.ctaProxy.status})`,
-    score: fmt(ctaFactor?.score ?? "—"),
-    effectiveWeight: fmt(ctaFactor?.effectiveWeight ?? 0),
-    contribution: ctaFactor
-      ? fmt(contribution(ctaFactor.score, ctaFactor.effectiveWeight))
-      : "—",
-    match:
-      (ctaFactor !== undefined) === (view.ctaProxy.status === "available"),
-    issue:
-      view.ctaProxy.status !== "available"
-        ? "needs aligned SPY/QQQ bars + live quotes"
-        : "—",
   });
 
   // Vol

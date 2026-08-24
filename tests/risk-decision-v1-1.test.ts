@@ -17,7 +17,6 @@ import {
   resolveRiskDivergenceDayOverDay,
   RISK_DECISION_V1_1_VERSION,
 } from "@/desk/risk-decision-v1-1";
-import type { CtaProxySummary } from "@/desk/format-gamma";
 
 const driver = fixtureDriver as DominantDriver;
 
@@ -85,20 +84,6 @@ function gammaSummary(
   };
 }
 
-const buyingCta: CtaProxySummary = {
-  status: "available",
-  signal: "buying",
-  contextLine: "SPY above MA20 & MA50",
-  triggerLines: [],
-};
-
-const neutralCta: CtaProxySummary = {
-  status: "available",
-  signal: "neutral",
-  contextLine: "Mixed vs MA20/MA50",
-  triggerLines: [],
-};
-
 const clearEventGate: EventGateSnapshot = {
   kind: "EventGate",
   schemaVersion: "0.1.0",
@@ -162,9 +147,6 @@ describe("deriveRiskDecisionV1_1", () => {
       qqqBreadth,
       spyGamma,
       qqqGamma,
-      marketCtaProxy: buyingCta,
-      spyCtaProxy: buyingCta,
-      qqqCtaProxy: neutralCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-10",
     });
@@ -218,9 +200,6 @@ describe("deriveRiskDecisionV1_1", () => {
       qqqBreadth: unavailableQqqBreadthSummary(),
       spyGamma,
       qqqGamma,
-      marketCtaProxy: neutralCta,
-      spyCtaProxy: neutralCta,
-      qqqCtaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-10",
     });
@@ -261,9 +240,6 @@ describe("deriveRiskDecisionV1_1", () => {
       qqqBreadth: unavailableQqqBreadthSummary(),
       spyGamma,
       qqqGamma,
-      marketCtaProxy: buyingCta,
-      spyCtaProxy: buyingCta,
-      qqqCtaProxy: neutralCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-10",
       priorDivergence: prior,
@@ -284,7 +260,7 @@ describe("deriveRiskDecisionV1_1", () => {
     expect(dayOverDay.change).toBe(result.riskDivergence! - 12);
   });
 
-  it("withholds QQQ structural risk when QQQ gamma and CTA are unavailable", () => {
+  it("withholds QQQ structural risk when QQQ gamma and breadth are unavailable", () => {
     const unavailableQqqGamma = gammaSummary("QQQ", {
       status: "unavailable",
       freshness: null,
@@ -299,18 +275,11 @@ describe("deriveRiskDecisionV1_1", () => {
         ivDataLabel: null,
       },
     });
-    const unavailableCta: CtaProxySummary = {
-      status: "unavailable",
-      signal: null,
-      contextLine: null,
-      triggerLines: [],
-    };
 
     const result = deriveStructuralRiskV1({
       driver,
       breadth: unavailableQqqBreadthSummary(),
       gamma: unavailableQqqGamma,
-      ctaProxy: unavailableCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-10",
     });
@@ -341,14 +310,6 @@ describe("deriveRiskDecisionV1_1", () => {
           ivDataLabel: null,
         },
       }),
-      marketCtaProxy: buyingCta,
-      spyCtaProxy: buyingCta,
-      qqqCtaProxy: {
-        status: "unavailable",
-        signal: null,
-        contextLine: null,
-        triggerLines: [],
-      },
       eventGate: clearEventGate,
       targetSession: "2026-08-10",
     });
@@ -395,9 +356,6 @@ describe("deriveRiskDecisionV1_1", () => {
       qqqBreadth: unavailableQqqBreadthSummary(),
       spyGamma,
       qqqGamma,
-      marketCtaProxy: buyingCta,
-      spyCtaProxy: buyingCta,
-      qqqCtaProxy: neutralCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-10",
       equityBarsBySymbol: equityBars,

@@ -14,7 +14,6 @@ import {
   type RiskDecisionSpyGammaInput,
   type RiskDecisionV1Result,
 } from "./risk-decision-v1";
-import type { CtaProxySummary } from "./format-gamma";
 
 export const RISK_DECISION_V1_1_VERSION = "0.1.0";
 
@@ -76,9 +75,6 @@ export interface DeriveRiskDecisionV1_1Input {
   readonly qqqBreadth: V2SpyBreadthSummary;
   readonly spyGamma: V2GammaSummary;
   readonly qqqGamma: V2GammaSummary;
-  readonly marketCtaProxy: CtaProxySummary;
-  readonly spyCtaProxy: CtaProxySummary;
-  readonly qqqCtaProxy: CtaProxySummary;
   readonly eventGate: EventGateSnapshot | null;
   readonly sectorRotation?: V2SectorRotationSummary | null;
   readonly targetSession: string;
@@ -321,7 +317,6 @@ export function deriveStructuralRiskV1(input: {
   readonly driver: DominantDriver | null;
   readonly breadth: V2SpyBreadthSummary;
   readonly gamma: V2GammaSummary;
-  readonly ctaProxy: CtaProxySummary;
   readonly eventGate: EventGateSnapshot | null;
   readonly sectorRotation?: V2SectorRotationSummary | null;
   readonly targetSession: string;
@@ -330,7 +325,6 @@ export function deriveStructuralRiskV1(input: {
     driver: input.driver,
     spyBreadth: breadthToRiskInput(input.breadth),
     spyGamma: gammaToRiskInput(input.gamma),
-    ctaProxy: input.ctaProxy,
     eventGate: input.eventGate,
     sectorRotation: input.sectorRotation,
     targetSession: input.targetSession,
@@ -344,7 +338,6 @@ export function deriveRiskDecisionV1_1(
     driver: input.driver,
     spyBreadth: breadthToRiskInput(input.spyBreadth),
     spyGamma: gammaToRiskInput(input.spyGamma),
-    ctaProxy: input.marketCtaProxy,
     eventGate: input.eventGate,
     sectorRotation: input.sectorRotation,
     targetSession: input.targetSession,
@@ -354,7 +347,6 @@ export function deriveRiskDecisionV1_1(
     driver: input.driver,
     breadth: input.spyBreadth,
     gamma: input.spyGamma,
-    ctaProxy: input.spyCtaProxy,
     eventGate: input.eventGate,
     sectorRotation: input.sectorRotation,
     targetSession: input.targetSession,
@@ -364,7 +356,6 @@ export function deriveRiskDecisionV1_1(
     driver: input.driver,
     breadth: input.qqqBreadth,
     gamma: input.qqqGamma,
-    ctaProxy: input.qqqCtaProxy,
     eventGate: input.eventGate,
     sectorRotation: null,
     targetSession: input.targetSession,

@@ -24,7 +24,6 @@ import {
   type RiskDecisionSpyGammaInput,
   type RiskDecisionV1DailyRecord,
 } from "@/desk/risk-decision-v1";
-import type { CtaProxySummary } from "@/desk/format-gamma";
 
 const driver = fixtureDriver as DominantDriver;
 
@@ -61,13 +60,6 @@ function spyGammaInput(
     ...overrides,
   };
 }
-
-const buyingCta: CtaProxySummary = {
-  status: "available",
-  signal: "buying",
-  contextLine: "SPY & QQQ above MA20 & MA50 · systematic trend proxy",
-  triggerLines: ["Sell pressure below 740"],
-};
 
 const clearEventGate: EventGateSnapshot = {
   kind: "EventGate",
@@ -111,12 +103,6 @@ describe("deriveRiskDecisionV1", () => {
           ivDataLabel: null,
         },
       }),
-      ctaProxy: {
-        status: "unavailable",
-        signal: null,
-        contextLine: null,
-        triggerLines: [],
-      },
       eventGate: null,
       targetSession: "2026-08-10",
     });
@@ -132,7 +118,6 @@ describe("deriveRiskDecisionV1", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-07-28",
     });
@@ -157,6 +142,9 @@ describe("deriveRiskDecisionV1", () => {
     expect(result.baseRiskScore).not.toBeNull();
     expect(result.evidence[0]).toMatch(/Structural risk/);
     expect(result.coverage?.factorsUsed.length).toBeGreaterThanOrEqual(4);
+    expect(result.factorContributions.some((row) => row.id === "cta")).toBe(false);
+    expect(result.coverage?.factorsUsed).not.toContain("cta");
+    expect(result.evidence.join(" ")).not.toMatch(/CTA/i);
   });
 
   it("reduces stale factor weight instead of treating dated inputs as live", () => {
@@ -164,7 +152,6 @@ describe("deriveRiskDecisionV1", () => {
       driver,
       spyBreadth: strongBreadth(false),
       spyGamma: spyGammaInput({ freshness: "fresh" }),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-07-28",
     });
@@ -172,7 +159,6 @@ describe("deriveRiskDecisionV1", () => {
       driver,
       spyBreadth: strongBreadth(true),
       spyGamma: spyGammaInput({ freshness: "stale" }),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-07-28",
     });
@@ -218,12 +204,6 @@ describe("deriveRiskDecisionV1", () => {
           ivDataLabel: "Options IV · Aug 10 close",
         },
       }),
-      ctaProxy: {
-        status: "available",
-        signal: "selling",
-        contextLine: "SPY & QQQ below MA20 & MA50 · systematic trend proxy",
-        triggerLines: [],
-      },
       eventGate: {
         ...clearEventGate,
         state: "active_shock",
@@ -257,14 +237,13 @@ describe("deriveRiskDecisionV1", () => {
       -4,
       [
         { id: "breadth", score: 25, effectiveWeight: 25 },
-        { id: "cta", score: 25, effectiveWeight: 15 },
       ],
       [
         { id: "breadth", score: 50, effectiveWeight: 25 },
-        { id: "cta", score: 50, effectiveWeight: 15 },
       ],
     );
-    expect(reason).toBe("Risk eased: breadth improved · CTA strengthened");
+    expect(reason).toBe("Risk eased: breadth improved");
+    expect(reason).not.toMatch(/CTA/i);
   });
 
   it("persists daily output and compares to the prior published record", () => {
@@ -287,7 +266,6 @@ describe("deriveRiskDecisionV1", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-07-30",
     });
@@ -323,7 +301,6 @@ describe("deriveRiskDecisionV1", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-11",
     });
@@ -355,7 +332,6 @@ describe("deriveRiskDecisionV1", () => {
         new20DayClosingLow: 6,
       },
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-07-28",
       sectorRotation: {
@@ -423,12 +399,6 @@ describe("Risk V1 daily publication", () => {
           ivDataLabel: null,
         },
       }),
-      ctaProxy: {
-        status: "unavailable",
-        signal: null,
-        contextLine: null,
-        triggerLines: [],
-      },
       eventGate: null,
       targetSession: "2026-08-13",
     });
@@ -452,7 +422,6 @@ describe("Risk V1 daily publication", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-12",
     });
@@ -481,7 +450,6 @@ describe("Risk V1 daily publication", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-12",
     });
@@ -507,12 +475,6 @@ describe("Risk V1 daily publication", () => {
         stale: false,
       },
       spyGamma: spyGammaInput({ freshness: "fresh", regime: "negative" }),
-      ctaProxy: {
-        status: "available",
-        signal: "selling",
-        contextLine: "selling",
-        triggerLines: [],
-      },
       eventGate: {
         ...clearEventGate,
         state: "active_shock",
@@ -561,7 +523,6 @@ describe("Risk V1 daily publication", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-12",
     });
@@ -613,7 +574,6 @@ describe("Risk V1 daily publication", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-12",
     });
@@ -694,7 +654,6 @@ describe("Risk V1 daily publication", () => {
       driver,
       spyBreadth: strongBreadth(),
       spyGamma: spyGammaInput(),
-      ctaProxy: buyingCta,
       eventGate: clearEventGate,
       targetSession: "2026-08-14",
     });

@@ -47,7 +47,6 @@ import {
   readGammaFlipStrike,
   resolveWallTouchDailyVolPct,
   summarizeCtaProxy,
-  summarizeSymbolCtaProxy,
   summarizeVolMispricing,
   type CtaProxySummary,
   type RestOfDayRange,
@@ -491,28 +490,6 @@ function summarizeVolMispricingForSymbol(
     representativeIv: ivSnapshot?.representativeIv,
     hv20Bars: options.equityBarsBySymbol?.get(symbol),
     isFixture: view.isFixture,
-  });
-}
-
-function summarizeSymbolCtaProxyFromInputs(input: {
-  readonly symbol: "SPY" | "QQQ";
-  readonly marketQuotes: readonly AlpacaMarketQuote[] | undefined;
-  readonly equityBarsBySymbol:
-    | ReadonlyMap<string, readonly { sessionDate: string; close: number }[]>
-    | undefined;
-  readonly now: Date;
-}): CtaProxySummary {
-  const price = resolveLiveEquitySpot(input.symbol, input.marketQuotes, null);
-  const targetSession = resolveLastCompletedMarketSessionDate(input.now);
-  const bars = input.equityBarsBySymbol?.get(input.symbol);
-  const spyBars = input.equityBarsBySymbol?.get("SPY");
-
-  return summarizeSymbolCtaProxy({
-    symbol: input.symbol,
-    bars,
-    price,
-    targetSession,
-    hv20BenchmarkBars: input.symbol === "SPY" ? bars : spyBars,
   });
 }
 
@@ -1199,18 +1176,6 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     equityBarsBySymbol: input.equityBarsBySymbol,
     now,
   });
-  const spyCtaProxy = summarizeSymbolCtaProxyFromInputs({
-    symbol: "SPY",
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-    now,
-  });
-  const qqqCtaProxy = summarizeSymbolCtaProxyFromInputs({
-    symbol: "QQQ",
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-    now,
-  });
   const qqqBreadth =
     input.qqqBreadth ??
     summarizeSpyBreadthFromDurable(
@@ -1304,9 +1269,6 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     qqqBreadth,
     spyGamma: spyGammaSummary,
     qqqGamma: qqqGammaSummary,
-    marketCtaProxy: ctaProxy,
-    spyCtaProxy,
-    qqqCtaProxy,
     eventGate,
     sectorRotation,
     targetSession,

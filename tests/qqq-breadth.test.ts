@@ -365,24 +365,6 @@ describe("SPY vs QQQ breadth divergence in risk v1.1", () => {
       qqqBreadth,
       spyGamma: gammaSummary("SPY"),
       qqqGamma: gammaSummary("QQQ"),
-      marketCtaProxy: {
-        status: "available",
-        signal: "neutral",
-        contextLine: "neutral",
-        triggerLines: [],
-      },
-      spyCtaProxy: {
-        status: "available",
-        signal: "neutral",
-        contextLine: "neutral",
-        triggerLines: [],
-      },
-      qqqCtaProxy: {
-        status: "available",
-        signal: "neutral",
-        contextLine: "neutral",
-        triggerLines: [],
-      },
       eventGate: clearEventGate,
       targetSession,
     });

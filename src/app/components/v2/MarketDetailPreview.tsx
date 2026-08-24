@@ -46,7 +46,6 @@ function factorSignal(view: V2CommandCenterPageView, id: string) {
   const spy = gammaFor(view, "SPY");
   if (id === "breadth") return view.spyBreadth.breadthSignal ?? "—";
   if (id === "gamma") return spy?.regime?.replaceAll("_", " ") ?? "—";
-  if (id === "cta") return view.ctaProxy.signal ?? "—";
   if (id === "vol") return spy?.volMispricing?.signal ?? "—";
   if (id === "macro") return view.macroSummary?.label ?? view.macroLabel ?? "—";
   if (id === "event_gate") return view.eventGate?.state ?? "—";
@@ -59,8 +58,6 @@ function factorTone(id: string, signal: string) {
   if (id === "gamma" && value.includes("positive")) return "good";
   if (id === "breadth" && value.includes("weak")) return "bad";
   if (id === "breadth" && value.includes("strong")) return "good";
-  if (id === "cta" && value.includes("selling")) return "bad";
-  if (id === "cta" && value.includes("buying")) return "good";
   if (id === "vol" && value.includes("expensive")) return "bad";
   if (id === "vol" && value.includes("underpriced")) return "good";
   if (id === "event_gate" && !value.includes("clear")) return "bad";
@@ -299,7 +296,6 @@ export function MarketDetailPreview({
   const factorOrder = [
     ["breadth", "Breadth"],
     ["gamma", "Gamma"],
-    ["cta", "CTA Proxy"],
     ["vol", "Volatility"],
     ["macro", "Macro"],
     ["event_gate", "Event"],
