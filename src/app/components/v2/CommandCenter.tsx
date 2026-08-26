@@ -48,6 +48,11 @@ const copy = {
     ifThen: "If / then",
     invalidation: "Invalidation",
     tension: "Tension",
+    hiddenRisk: "Hidden risk",
+    reactionQuality: "Reaction quality",
+    crossAssetConflict: "Cross-asset conflict",
+    whatChanged: "What changed",
+    whatMattersNext: "What matters next",
     deterministicFallback: "Deterministic fallback",
     review: "Daily Review",
     reviewNote: "End-of-day comparison of the published command center snapshot vs session outcomes.",
@@ -156,6 +161,11 @@ const copy = {
     ifThen: "条件路径",
     invalidation: "失效条件",
     tension: "信号分歧",
+    hiddenRisk: "隐性风险",
+    reactionQuality: "反应质量",
+    crossAssetConflict: "跨资产冲突",
+    whatChanged: "较此前变化",
+    whatMattersNext: "下一步关注",
     deterministicFallback: "确定性回退摘要",
     review: "每日复盘",
     reviewNote: "对已发布指挥中心快照与当日结果的对照复盘。",
@@ -878,6 +888,26 @@ function AiStudySection({
           <div>
             <dt>{t.tension}</dt>
             <dd data-testid="v2-ai-study-tension">{aiStudy.tension}</dd>
+          </div>
+          <div>
+            <dt>{t.hiddenRisk}</dt>
+            <dd data-testid="v2-ai-study-hidden-risk">{aiStudy.hiddenRisk}</dd>
+          </div>
+          <div>
+            <dt>{t.reactionQuality}</dt>
+            <dd data-testid="v2-ai-study-reaction-quality">{aiStudy.reactionQuality}</dd>
+          </div>
+          <div>
+            <dt>{t.crossAssetConflict}</dt>
+            <dd data-testid="v2-ai-study-cross-asset-conflict">{aiStudy.crossAssetConflict}</dd>
+          </div>
+          <div>
+            <dt>{t.whatChanged}</dt>
+            <dd data-testid="v2-ai-study-what-changed">{aiStudy.whatChanged}</dd>
+          </div>
+          <div>
+            <dt>{t.whatMattersNext}</dt>
+            <dd data-testid="v2-ai-study-what-matters-next">{aiStudy.whatMattersNext}</dd>
           </div>
         </dl>
         {aiStudy.missingReason ? (

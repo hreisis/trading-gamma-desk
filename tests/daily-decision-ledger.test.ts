@@ -14,6 +14,7 @@ import {
 } from "@/desk/daily-decision-ledger";
 import type { RiskDecisionV1Result } from "@/desk/risk-decision-v1";
 import type { V2CommandCenterView } from "@/desk/v2-command-center";
+import { UNAVAILABLE_HYG_LQD_CREDIT } from "@/desk/hyg-lqd-credit";
 
 function readyDecision(): RiskDecisionV1Result {
   return {
@@ -208,6 +209,7 @@ function readyView(sessionDate: string): V2CommandCenterView {
       breadthSignalStatus: "unavailable",
       breadthContextLine: null,
     },
+    creditHygLqd: UNAVAILABLE_HYG_LQD_CREDIT,
   };
 }
 

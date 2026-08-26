@@ -41,6 +41,7 @@ import {
   type RiskTrendSnapshot,
   type RiskTrendV2Label,
 } from "@/desk/risk-trend-v2";
+import { deriveHygLqdCreditSignal, formatHygLqdPct } from "@/desk/hyg-lqd-credit";
 import { derivePositioningV2, type PositioningV2Label } from "@/desk/positioning-v2";
 import {
   RISK_HISTORY_BACKFILL_END,
@@ -108,6 +109,10 @@ export interface RiskHistoryReplayRow {
   readonly riskTrendPriorDate: string | null;
   readonly riskTrendReasons: readonly string[];
   readonly positioning: PositioningV2Label | null;
+  readonly hygLqdRatio: number | null;
+  readonly hygLqdChange1dPct: number | null;
+  readonly hygLqdTrend5dPct: number | null;
+  readonly hygLqdSignal: string | null;
   readonly notes: readonly string[];
 }
 
@@ -121,7 +126,7 @@ function sessionCloseGeneratedAt(sessionDate: string): string {
   return `${sessionDate}T16:00:00-04:00`;
 }
 
-function loadUniverseBars(dataRoot: string, symbol: "SPY" | "QQQ"): DailyBar[] {
+function loadUniverseBars(dataRoot: string, symbol: string): DailyBar[] {
   const path = join(dataRoot, "bars/spy-universe", `${symbol}.json`);
   if (!existsSync(path)) return [];
   const raw = JSON.parse(readFileSync(path, "utf8")) as {
@@ -466,6 +471,18 @@ export async function replayRiskHistoryForDate(
   const notes: string[] = [];
   const spyBars = loadUniverseBars(dataRoot, "SPY");
   const qqqBars = loadUniverseBars(dataRoot, "QQQ");
+  const hygBars = loadUniverseBars(dataRoot, "HYG");
+  const lqdBars = loadUniverseBars(dataRoot, "LQD");
+  const equityBarsBySymbol = new Map<string, readonly DailyBar[]>([
+    ["SPY", spyBars],
+    ["QQQ", qqqBars],
+    ["HYG", hygBars],
+    ["LQD", lqdBars],
+  ]);
+  const credit = deriveHygLqdCreditSignal({
+    equityBarsBySymbol,
+    targetSession: sessionDate,
+  });
 
   const driverResult = loadSessionDriver(sessionDate, dataRoot);
   const driver = driverResult.driver;
@@ -602,6 +619,10 @@ export async function replayRiskHistoryForDate(
     riskTrendPriorDate: null,
     riskTrendReasons: [],
     positioning: null,
+    hygLqdRatio: credit.ratio,
+    hygLqdChange1dPct: credit.change1dPct,
+    hygLqdTrend5dPct: credit.trend5dPct,
+    hygLqdSignal: credit.signal,
     notes,
   };
 }
@@ -914,6 +935,27 @@ export function formatPositioningReplayTable(
     row.opportunityScore === null ? "—" : String(row.opportunityScore),
     row.riskTrend ?? "—",
     row.positioning ?? "—",
+  ]);
+  const widths = cols.map((col, index) =>
+    Math.max(col.length, ...body.map((line) => line[index]!.length)),
+  );
+  const fmt = (cells: readonly string[]) =>
+    cells
+      .map((cell, index) => cell.padEnd(widths[index]!))
+      .join("  ");
+  return [fmt([...cols]), ...body.map((line) => fmt(line))].join("\n");
+}
+
+export function formatHygLqdReplayTable(
+  rows: readonly RiskHistoryReplayRow[],
+): string {
+  const cols = ["date", "hyg/lqd", "1d", "5d", "signal"] as const;
+  const body = rows.map((row) => [
+    row.date,
+    row.hygLqdRatio === null ? "—" : row.hygLqdRatio.toFixed(4),
+    formatHygLqdPct(row.hygLqdChange1dPct),
+    formatHygLqdPct(row.hygLqdTrend5dPct),
+    row.hygLqdSignal ?? "—",
   ]);
   const widths = cols.map((col, index) =>
     Math.max(col.length, ...body.map((line) => line[index]!.length)),

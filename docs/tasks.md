@@ -24,9 +24,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 Removed from this repo: Historical Study pipeline, Decide surface, Alpaca News panel, and related study fixtures/tests.
 
-**In progress:** Opportunity Score V2, Risk Trend V2, and Positioning V2 are replay-only (not UI/routes). Risk V1 scoring and AI Study are unchanged.
+**In progress:** AI Study qualitative sections include an Alpaca HYG/LQD credit signal in Hidden Risk, Cross-Asset Conflict, and What Changed only. Risk V1, Opportunity, Trend, Positioning, and market scoring are unchanged.
 
-**Queued (not started):** Market risk indicator UI remains deferred.
+**Queued (not started):** Market risk indicator UI redesign remains deferred.
 
 ### M1-6b calibration status (split)
 

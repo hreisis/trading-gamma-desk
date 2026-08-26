@@ -6,6 +6,7 @@
 import { join } from "node:path";
 import {
   OPPORTUNITY_V2_REPLAY_DATES,
+  formatHygLqdReplayTable,
   formatPositioningReplayTable,
   replayRiskHistory,
 } from "@/desk/replay-risk-history";
@@ -24,6 +25,10 @@ async function main(): Promise<void> {
   console.log("Positioning V2 (replay only; Risk / Opportunity / Trend unchanged)");
   console.log("");
   console.log(formatPositioningReplayTable(rows));
+  console.log("");
+  console.log("HYG/LQD credit (Alpaca daily bars; AI Study only — not in Risk score)");
+  console.log("");
+  console.log(formatHygLqdReplayTable(rows));
 }
 
 main().catch((error: unknown) => {

@@ -53,6 +53,11 @@ import {
   type VolMispricingSummary,
   type WallTouchProbability,
 } from "./format-gamma";
+import {
+  deriveHygLqdCreditSignal,
+  UNAVAILABLE_HYG_LQD_CREDIT,
+  type HygLqdCreditSignal,
+} from "./hyg-lqd-credit";
 
 export type V2Language = "en" | "zh";
 
@@ -234,6 +239,8 @@ export interface V2CommandCenterView {
   readonly riskDivergenceTrend: RiskDivergenceTrend | null;
   readonly componentDivergence: RiskComponentDivergence;
   readonly qqqBreadth: V2SpyBreadthSummary;
+  /** HYG/LQD from Alpaca daily bars — AI Study only, not a Risk V1 input. */
+  readonly creditHygLqd: HygLqdCreditSignal;
 }
 
 export type V2AiStudyConfidence = "high" | "moderate" | "limited";
@@ -248,6 +255,11 @@ export interface V2AiStudyInterpretation {
   readonly ifThen: string;
   readonly invalidation: string;
   readonly tension: string;
+  readonly hiddenRisk: string;
+  readonly reactionQuality: string;
+  readonly crossAssetConflict: string;
+  readonly whatChanged: string;
+  readonly whatMattersNext: string;
   readonly missingReason: string | null;
 }
 
@@ -1250,12 +1262,17 @@ export async function buildV2CommandCenterViewWithLedgerContext(
       riskDivergenceChange: 4,
       riskDivergenceTrend: "widening",
       componentDivergence: previewComponentDivergence,
+      creditHygLqd: UNAVAILABLE_HYG_LQD_CREDIT,
       },
       ledgerFreezeContext: null,
     };
   }
 
   const sectorRotation = summarizeSectorRotation(sectorRotationInput);
+  const creditHygLqd = deriveHygLqdCreditSignal({
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    targetSession,
+  });
   const eventGate = eventGateFromMarketInput(input.marketInputSnapshot);
   const publicationDate = resolveCurrentMarketSessionDate(now);
   const priorDivergence =
@@ -1353,6 +1370,7 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     missingInputs: [...marketMissing, ...riskMissing],
     spyBreadth,
     qqqBreadth,
+    creditHygLqd,
     ctaProxy,
     gamma: [spyGammaSummary, qqqGammaSummary],
     gammaCone: [spyGammaCone, qqqGammaCone],

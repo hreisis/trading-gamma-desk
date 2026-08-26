@@ -50,6 +50,11 @@ async function main(): Promise<void> {
   console.log("if_then:", aiStudy.ifThen);
   console.log("invalidation:", aiStudy.invalidation);
   console.log("tension:", aiStudy.tension);
+  console.log("hidden_risk:", aiStudy.hiddenRisk);
+  console.log("reaction_quality:", aiStudy.reactionQuality);
+  console.log("cross_asset_conflict:", aiStudy.crossAssetConflict);
+  console.log("what_changed:", aiStudy.whatChanged);
+  console.log("what_matters_next:", aiStudy.whatMattersNext);
 
   if (process.env.OPENAI_API_KEY) {
     const fresh = await generateV2CommandAiStudyInterpretation({
@@ -66,6 +71,11 @@ async function main(): Promise<void> {
     console.log("if_then:", fresh.ifThen);
     console.log("invalidation:", fresh.invalidation);
     console.log("tension:", fresh.tension);
+    console.log("hidden_risk:", fresh.hiddenRisk);
+    console.log("reaction_quality:", fresh.reactionQuality);
+    console.log("cross_asset_conflict:", fresh.crossAssetConflict);
+    console.log("what_changed:", fresh.whatChanged);
+    console.log("what_matters_next:", fresh.whatMattersNext);
   }
 
   console.log("\n--- Payload dataQuality ---");

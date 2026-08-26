@@ -38,6 +38,7 @@ import { loadAlpacaMarketPanel } from "@/alpaca";
 import { mergeMacroAlpacaWatchlist } from "@/desk/macro-display-returns";
 import { resolveAlpacaWatchlist } from "@/alpaca/config";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
+import { HYG_LQD_BAR_SYMBOLS } from "@/desk/hyg-lqd-credit";
 import type { DailyBar } from "@/desk/breadth/bars/types";
 import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
@@ -102,13 +103,30 @@ const V2_ZH_LOCALIZATION_SCHEMA = {
     aiStudy: {
       type: "object",
       additionalProperties: false,
-      required: ["regime", "baseCase", "ifThen", "invalidation", "tension", "dataLimitations"],
+      required: [
+        "regime",
+        "baseCase",
+        "ifThen",
+        "invalidation",
+        "tension",
+        "hiddenRisk",
+        "reactionQuality",
+        "crossAssetConflict",
+        "whatChanged",
+        "whatMattersNext",
+        "dataLimitations",
+      ],
       properties: {
         regime: { type: "string" },
         baseCase: { type: "string" },
         ifThen: { type: "string" },
         invalidation: { type: "string" },
         tension: { type: "string" },
+        hiddenRisk: { type: "string" },
+        reactionQuality: { type: "string" },
+        crossAssetConflict: { type: "string" },
+        whatChanged: { type: "string" },
+        whatMattersNext: { type: "string" },
         dataLimitations: { type: "array", items: { type: "string" } },
       },
     },
@@ -135,6 +153,11 @@ type V2ZhLocalization = {
     readonly ifThen: string;
     readonly invalidation: string;
     readonly tension: string;
+    readonly hiddenRisk: string;
+    readonly reactionQuality: string;
+    readonly crossAssetConflict: string;
+    readonly whatChanged: string;
+    readonly whatMattersNext: string;
     readonly dataLimitations: string[];
   };
   readonly dailyReview: {
@@ -162,6 +185,11 @@ function validZhLocalization(value: unknown): value is V2ZhLocalization {
       typeof ai.ifThen === "string" &&
       typeof ai.invalidation === "string" &&
       typeof ai.tension === "string" &&
+      typeof ai.hiddenRisk === "string" &&
+      typeof ai.reactionQuality === "string" &&
+      typeof ai.crossAssetConflict === "string" &&
+      typeof ai.whatChanged === "string" &&
+      typeof ai.whatMattersNext === "string" &&
       strings(ai.dataLimitations) &&
       typeof review.actualOutcome === "string" &&
       strings(review.whatWorked) &&
@@ -186,6 +214,11 @@ async function localizeV2NarrativesToChinese(
       ifThen: aiStudy.ifThen,
       invalidation: aiStudy.invalidation,
       tension: aiStudy.tension,
+      hiddenRisk: aiStudy.hiddenRisk,
+      reactionQuality: aiStudy.reactionQuality,
+      crossAssetConflict: aiStudy.crossAssetConflict,
+      whatChanged: aiStudy.whatChanged,
+      whatMattersNext: aiStudy.whatMattersNext,
       dataLimitations: [...aiStudy.dataLimitations],
     },
     dailyReview: {
@@ -223,7 +256,7 @@ async function localizeV2NarrativesToChinese(
       },
     },
     ...(reasoning ? { reasoning } : {}),
-    max_output_tokens: Math.max(1200, config.maxOutputTokens),
+    max_output_tokens: Math.max(1800, config.maxOutputTokens),
   };
 
   try {
@@ -254,6 +287,11 @@ async function localizeV2NarrativesToChinese(
           ifThen: parsed.aiStudy.ifThen,
           invalidation: parsed.aiStudy.invalidation,
           tension: parsed.aiStudy.tension,
+          hiddenRisk: parsed.aiStudy.hiddenRisk,
+          reactionQuality: parsed.aiStudy.reactionQuality,
+          crossAssetConflict: parsed.aiStudy.crossAssetConflict,
+          whatChanged: parsed.aiStudy.whatChanged,
+          whatMattersNext: parsed.aiStudy.whatMattersNext,
           dataLimitations: parsed.aiStudy.dataLimitations,
         },
         dailyReview: {
@@ -384,6 +422,7 @@ export async function loadV2HomePage(
           "QQQ",
           ...sectorRotationBarSymbols(),
           ...technologyUiBarSymbols(),
+          ...HYG_LQD_BAR_SYMBOLS,
         ]),
       ],
       env: runtimeEnv,
