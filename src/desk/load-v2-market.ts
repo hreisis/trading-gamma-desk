@@ -12,7 +12,7 @@ import {
   deriveRiskDecisionV1_1,
   gammaToRiskInput,
 } from "./risk-decision-v1-1";
-import { resolveRuntimeJsonStore } from "./runtime-store";
+import { resolveRuntimeJsonStore, type RuntimeJsonStore } from "./runtime-store";
 import {
   buildManualGammaSummary,
   listManualGammaSnapshots,
@@ -39,6 +39,14 @@ import type { DominantDriver } from "@/contracts";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import type { DailyBar } from "@/desk/breadth/bars/types";
 import type { V2GammaSummary, V2SpyBreadthSummary } from "./v2-command-center";
+import {
+  buildV2AiStudyFallback,
+  buildV2AiStudyPayload,
+  generateV2CommandAiStudyInterpretation,
+} from "@/ai-study/v2-command-interpret";
+import { loadAiStudyLlmConfig } from "@/ai-study/config";
+import { generateV2DailyReviewInterpretation } from "@/ai-study/v2-daily-review-interpret";
+import { buildDeterministicV2DailyReview } from "./command-center-v1";
 
 export type V2MarketPageModel = V2HomePageModel & {
   readonly manualGammaSnapshot: ManualGammaSnapshot | null;
@@ -169,6 +177,66 @@ async function computeMarketV2Policy(input: {
   };
 }
 
+async function withMarketDecisionNarratives(input: {
+  readonly view: V2HomePageModel["view"];
+  readonly policy: {
+    readonly opportunityScoreV2: number | null;
+    readonly riskTrend: RiskTrendV2Label;
+    readonly riskTrendReasons: readonly string[];
+    readonly positioning: PositioningV2Label;
+  };
+  readonly demo: boolean;
+  readonly dataRoot: string;
+  readonly now: Date;
+  readonly artifactStore?: RuntimeJsonStore;
+  readonly equityBarsBySymbol?: ReadonlyMap<string, readonly DailyBar[]>;
+}): Promise<V2HomePageModel["view"]> {
+  const historicalPolicy = {
+    positioning: input.policy.positioning,
+    riskTrend: input.policy.riskTrend,
+    trendReasons: input.policy.riskTrendReasons,
+  };
+  const payload = buildV2AiStudyPayload(
+    input.view,
+    input.view.eventGate,
+    historicalPolicy,
+  );
+  if (input.demo) {
+    return { ...input.view, aiStudy: buildV2AiStudyFallback(payload) };
+  }
+
+  const llmEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    AI_STUDY_LLM_MODEL: process.env.AI_STUDY_LLM_MODEL,
+  };
+  const llmConfig = loadAiStudyLlmConfig(llmEnv);
+  const aiStudy = await generateV2CommandAiStudyInterpretation({
+    payload,
+    config: llmConfig,
+    env: llmEnv,
+  });
+  const { review, context } = await buildDeterministicV2DailyReview({
+    now: input.now,
+    demo: false,
+    dataRoot: input.dataRoot,
+    artifactStore: input.artifactStore,
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    positioning: input.policy.positioning,
+  });
+  const dailyReview =
+    review.status !== "ready" || context === null
+      ? review
+      : await generateV2DailyReviewInterpretation({
+          review,
+          context,
+          view: input.view,
+          config: llmConfig,
+          env: llmEnv,
+        });
+  return { ...input.view, aiStudy, dailyReview };
+}
+
 export async function loadV2MarketPage(
   input: LoadV2HomePageInput & { readonly lang?: string },
 ): Promise<V2MarketPageModel> {
@@ -212,9 +280,16 @@ export async function loadV2MarketPage(
 
   if (input.demo) {
     const policy = await policyFromView([], { skipPrior: true });
+    const view = await withMarketDecisionNarratives({
+      view: withOpportunityV2(base.view, policy.opportunityScoreV2),
+      policy,
+      demo: true,
+      dataRoot,
+      now: new Date(),
+    });
     return {
       ...base,
-      view: withOpportunityV2(base.view, policy.opportunityScoreV2),
+      view,
       ...policy,
       manualGammaSnapshot: null,
       manualGammaHistoryDates: [],
@@ -239,9 +314,23 @@ export async function loadV2MarketPage(
     const policy = await policyFromView(spyBars, {
       sessionDate: base.view.sessionDate ?? targetSession,
     });
+    const equityBarsBySymbol = new Map<string, readonly DailyBar[]>();
+    const spyFull = barPanel?.seriesBySymbol?.get("SPY")?.bars;
+    const qqqFull = barPanel?.seriesBySymbol?.get("QQQ")?.bars;
+    if (spyFull) equityBarsBySymbol.set("SPY", spyFull);
+    if (qqqFull) equityBarsBySymbol.set("QQQ", qqqFull);
+    const view = await withMarketDecisionNarratives({
+      view: withOpportunityV2(base.view, policy.opportunityScoreV2),
+      policy,
+      demo: false,
+      dataRoot,
+      now,
+      artifactStore: store,
+      equityBarsBySymbol,
+    });
     return {
       ...base,
-      view: withOpportunityV2(base.view, policy.opportunityScoreV2),
+      view,
       ...policy,
       manualGammaSnapshot: null,
       manualGammaHistoryDates: history.map((row) => row.marketSessionDate),
@@ -343,33 +432,48 @@ export async function loadV2MarketPage(
     factorContributions: decision.factorContributions,
   });
 
+  const overlayed = {
+    ...base.view,
+    decisionStatus: (decision.status === "ready" ? "ready" : "awaiting_inputs") as
+      V2HomePageModel["view"]["decisionStatus"],
+    stance: decision.stance,
+    riskScore: decision.riskScore,
+    riskChange,
+    riskChangeReason,
+    riskSessionComparison: comparison,
+    opportunityScore: policy.opportunityScoreV2,
+    exposure: decision.exposure,
+    allocation: decision.allocation,
+    evidence: decision.evidence,
+    missingInputs:
+      decision.status === "withheld"
+        ? decision.withheldFactors
+        : base.view.missingInputs,
+    gamma: [spyGamma, qqqGamma] as const,
+    sessionDate: snapshot.marketSessionDate,
+    spyStructuralRiskScore: structural.spyStructuralRisk.riskScore,
+    qqqStructuralRiskScore: structural.qqqStructuralRisk.riskScore,
+    riskDivergence: structural.riskDivergence,
+    riskDivergenceChange: structural.riskDivergenceChange,
+    riskDivergenceTrend: structural.riskDivergenceTrend,
+    componentDivergence: structural.componentDivergence,
+  };
+  const reviewBars = new Map<string, readonly DailyBar[]>();
+  if (spyBarList) reviewBars.set("SPY", spyBarList);
+  if (qqqBarList) reviewBars.set("QQQ", qqqBarList);
+  const view = await withMarketDecisionNarratives({
+    view: overlayed,
+    policy,
+    demo: false,
+    dataRoot,
+    now,
+    artifactStore: store,
+    equityBarsBySymbol: reviewBars,
+  });
+
   return {
     ...base,
-    view: {
-      ...base.view,
-      decisionStatus: decision.status === "ready" ? "ready" : "awaiting_inputs",
-      stance: decision.stance,
-      riskScore: decision.riskScore,
-      riskChange,
-      riskChangeReason,
-      riskSessionComparison: comparison,
-      opportunityScore: policy.opportunityScoreV2,
-      exposure: decision.exposure,
-      allocation: decision.allocation,
-      evidence: decision.evidence,
-      missingInputs:
-        decision.status === "withheld"
-          ? decision.withheldFactors
-          : base.view.missingInputs,
-      gamma: [spyGamma, qqqGamma],
-      sessionDate: snapshot.marketSessionDate,
-      spyStructuralRiskScore: structural.spyStructuralRisk.riskScore,
-      qqqStructuralRiskScore: structural.qqqStructuralRisk.riskScore,
-      riskDivergence: structural.riskDivergence,
-      riskDivergenceChange: structural.riskDivergenceChange,
-      riskDivergenceTrend: structural.riskDivergenceTrend,
-      componentDivergence: structural.componentDivergence,
-    },
+    view,
     ...policy,
     manualGammaSnapshot: snapshot,
     manualGammaHistoryDates: history.map((row) => row.marketSessionDate),

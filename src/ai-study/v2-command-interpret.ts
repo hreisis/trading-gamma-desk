@@ -689,17 +689,18 @@ export function validateV2AiStudyLlmGrounding(
   }
 
   const positioning = payload.historicalPolicy?.positioning?.trim() ?? "";
+  if (
+    /\bmodel stance (?:buy|hold|reduce)\b/i.test(fullText) ||
+    /\b(buy|hold|reduce) stance\b/i.test(fullText) ||
+    /\bstance (?:is|to|remains|supports?) (?:buy|hold|reduce)\b/i.test(fullText) ||
+    /\b(?:buy|hold|reduce) thesis\b/i.test(fullText)
+  ) {
+    return {
+      ok: false,
+      reason: "Risk V1 stance must not be used as the recommended action",
+    };
+  }
   if (positioning) {
-    if (
-      /\b(buy|hold|reduce) stance\b/i.test(fullText) ||
-      /\bstance (?:is|to|remains|supports?) (?:buy|hold|reduce)\b/i.test(fullText) ||
-      /\b(?:buy|hold|reduce) thesis\b/i.test(fullText)
-    ) {
-      return {
-        ok: false,
-        reason: "Risk V1 stance must not be used as the recommended action",
-      };
-    }
     if (!fullText.toLowerCase().includes(positioning.toLowerCase())) {
       return {
         ok: false,
@@ -997,6 +998,7 @@ function qualitativeContextFromView(
 export function buildV2AiStudyPayload(
   view: V2CommandCenterView,
   eventGate: EventGateSnapshot | null,
+  historicalPolicy?: V2AiStudyPayload["historicalPolicy"],
 ): V2AiStudyPayload {
   const macro = macroPayload(view);
   const payload = {
@@ -1087,6 +1089,7 @@ export function buildV2AiStudyPayload(
 
   return {
     ...payload,
+    ...(historicalPolicy ? { historicalPolicy } : {}),
     dataQuality,
   } as V2AiStudyPayload;
 }
@@ -1603,8 +1606,9 @@ function buildRegimeFallback(payload: V2AiStudyPayload): string {
   if (leader) {
     parts.push(`${leader.label} leads 5D RS ${formatRsPct(leader.rs5d)}`);
   }
-  if (payload.decision?.stance) {
-    parts.push(`stance ${payload.decision.stance}`);
+  const positioning = payload.historicalPolicy?.positioning?.trim();
+  if (positioning) {
+    parts.push(`Positioning ${positioning}`);
   }
   if (payload.dataQuality.limitations.length > 0) {
     parts.push(`data: ${payload.dataQuality.limitations[0]}`);
@@ -1617,13 +1621,11 @@ function buildBaseCaseFallback(payload: V2AiStudyPayload): string {
   const limited = payload.dataQuality.interpretationConfidence === "limited";
   const spy = payload.spyGamma;
 
-  if (payload.decision?.stance) {
-    let line = `Model stance ${payload.decision.stance}`;
-    if (payload.decision.riskScore !== null && payload.decision.riskScore !== undefined) {
+  const positioning = payload.historicalPolicy?.positioning?.trim();
+  if (positioning) {
+    let line = `Positioning ${positioning}`;
+    if (payload.decision?.riskScore !== null && payload.decision?.riskScore !== undefined) {
       line += ` · risk ${payload.decision.riskScore}`;
-    }
-    if (payload.decision.exposure) {
-      line += ` · exposure ${payload.decision.exposure.min}–${payload.decision.exposure.max}%`;
     }
     parts.push(line);
   }

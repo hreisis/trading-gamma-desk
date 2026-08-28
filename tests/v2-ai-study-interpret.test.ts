@@ -167,6 +167,7 @@ describe("v2 command ai study", () => {
     expect(fallback.source).toBe("deterministic");
     expect(fallback.regime.length).toBeGreaterThan(0);
     expect(fallback.baseCase.length).toBeGreaterThan(0);
+    expect(fallback.baseCase).not.toMatch(/Model stance/i);
     expect(fallback.ifThen.length).toBeGreaterThan(0);
     expect(fallback.invalidation.length).toBeGreaterThan(0);
     expect(fallback.tension.length).toBeGreaterThan(0);
@@ -177,6 +178,16 @@ describe("v2 command ai study", () => {
     expect(fallback.whatMattersNext.length).toBeGreaterThan(0);
     expect(fallback.confidence).toBeDefined();
     expect(Array.isArray(fallback.dataLimitations)).toBe(true);
+
+    const withPolicy = buildV2AiStudyFallback(
+      buildV2AiStudyPayload(view, null, {
+        positioning: "TRIM / DEFENSIVE",
+        riskTrend: "deteriorating",
+      }),
+    );
+    expect(withPolicy.baseCase).toContain("TRIM / DEFENSIVE");
+    expect(withPolicy.baseCase).not.toMatch(/Model stance/i);
+    expect(withPolicy.regime).not.toMatch(/\bstance\b/i);
   });
 
   it("derives limited confidence when breadth is stale and gamma incomplete", async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { derivePositioningV2 } from "@/desk/positioning-v2";
+import { derivePositioningV2, positioningSessionAlignment } from "@/desk/positioning-v2";
 
 describe("derivePositioningV2", () => {
   it("maps low risk by opportunity band", () => {
@@ -47,5 +47,15 @@ describe("derivePositioningV2", () => {
     expect(
       derivePositioningV2({ riskScore: null, opportunityScore: 69, trend: "stable" }),
     ).toBe("HOLD / WAIT");
+  });
+});
+
+describe("positioningSessionAlignment", () => {
+  it("scores additive labels against session direction", () => {
+    expect(positioningSessionAlignment("ADD", "up")?.kind).toBe("worked");
+    expect(positioningSessionAlignment("SELECTIVE ADD", "down")?.line).toContain(
+      "conflicted",
+    );
+    expect(positioningSessionAlignment("HOLD", "up")).toBeNull();
   });
 });

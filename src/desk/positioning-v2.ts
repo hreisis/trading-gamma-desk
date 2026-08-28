@@ -43,3 +43,48 @@ export function derivePositioningV2(input: {
   if (opp >= 65) return "REDUCE CORE / TACTICAL REBOUND";
   return "REDUCE";
 }
+
+const ADDITIVE_POSITIONING = new Set<PositioningV2Label>([
+  "ADD",
+  "SELECTIVE ADD",
+  "TACTICAL ADD",
+]);
+
+const DEFENSIVE_POSITIONING = new Set<PositioningV2Label>([
+  "TRIM / DEFENSIVE",
+  "REDUCE CORE / TACTICAL REBOUND",
+  "REDUCE",
+]);
+
+/** Display/critique helper. Does not change Positioning V2 scoring. */
+export function positioningSessionAlignment(
+  positioning: PositioningV2Label | null | undefined,
+  direction: "up" | "down" | "flat" | null,
+): { readonly kind: "worked" | "failed"; readonly line: string } | null {
+  if (!positioning || (direction !== "up" && direction !== "down")) return null;
+  if (ADDITIVE_POSITIONING.has(positioning)) {
+    if (direction === "up") {
+      return {
+        kind: "worked",
+        line: `Positioning ${positioning} aligned with a positive SPY session close.`,
+      };
+    }
+    return {
+      kind: "failed",
+      line: `Positioning ${positioning} conflicted with a negative SPY session close.`,
+    };
+  }
+  if (DEFENSIVE_POSITIONING.has(positioning)) {
+    if (direction === "down") {
+      return {
+        kind: "worked",
+        line: `Positioning ${positioning} aligned with a weaker SPY session close.`,
+      };
+    }
+    return {
+      kind: "failed",
+      line: `Positioning ${positioning} conflicted with a positive SPY session close.`,
+    };
+  }
+  return null;
+}

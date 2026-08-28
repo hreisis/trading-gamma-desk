@@ -22,6 +22,10 @@ import type {
 import { formatSectorEtfLabel } from "./v2-command-center";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
 import { classifyEventSession } from "@/catalyst/market-context/session";
+import {
+  positioningSessionAlignment,
+  type PositioningV2Label,
+} from "./positioning-v2";
 
 export const COMMAND_CENTER_V1_SCHEMA_VERSION = "0.1.0";
 
@@ -123,6 +127,7 @@ export interface V2DailyReviewInterpretationContext {
   readonly qqqBar: DailyBar | null;
   readonly spyEval: V2DailyReviewSessionEval;
   readonly qqqEval: V2DailyReviewSessionEval;
+  readonly positioning?: PositioningV2Label | null;
 }
 
 function gammaSnapshotFromSummary(item: V2GammaSummary): CommandCenterV1GammaSnapshot {
@@ -437,6 +442,7 @@ export async function buildDeterministicV2DailyReview(input: {
   readonly dataRoot: string | null | undefined;
   readonly artifactStore?: RuntimeJsonStore;
   readonly equityBarsBySymbol?: ReadonlyMap<string, readonly DailyBar[]>;
+  readonly positioning?: PositioningV2Label | null;
 }): Promise<{
   readonly review: V2DailyReview;
   readonly context: V2DailyReviewInterpretationContext | null;
@@ -537,14 +543,14 @@ export async function buildDeterministicV2DailyReview(input: {
   const watch = [...spyEval.watch, ...qqqEval.watch];
 
   const spyDir = spyEval.direction ?? sessionDirection(spyBar.close, spyBar.open);
-  if (resolvedSnapshot.stance === "buy" && spyDir === "up") {
-    worked.push("Buy stance aligned with a positive SPY session");
-  } else if (resolvedSnapshot.stance === "buy" && spyDir === "down") {
-    failed.push("Buy stance conflicted with a negative SPY session");
-  } else if (resolvedSnapshot.stance === "reduce" && spyDir === "down") {
-    worked.push("Reduce stance aligned with a weaker SPY session");
-  } else if (resolvedSnapshot.stance === "reduce" && spyDir === "up") {
-    failed.push("Reduce stance conflicted with a positive SPY session");
+  const positioningAlign = positioningSessionAlignment(
+    input.positioning ?? null,
+    spyDir,
+  );
+  if (positioningAlign?.kind === "worked") {
+    worked.push(positioningAlign.line);
+  } else if (positioningAlign?.kind === "failed") {
+    failed.push(positioningAlign.line);
   }
 
   if (
@@ -630,6 +636,7 @@ export async function buildDeterministicV2DailyReview(input: {
       qqqBar,
       spyEval,
       qqqEval,
+      positioning: input.positioning ?? null,
     },
   };
 }
