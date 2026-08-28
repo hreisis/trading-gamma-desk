@@ -8,22 +8,24 @@ export const maxDuration = 60;
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string; gamma?: string; lang?: string }>;
+  searchParams: Promise<{ source?: string; gamma?: string }>;
 }) {
   const params = await searchParams;
-  const { view, lang, manualGammaSnapshot } = await loadV2MarketPage({
-    demo: false,
-    source: params.source,
-    forceFixture: params.gamma === "fixture",
-    lang: params.lang,
-  });
+  const { view, manualGammaSnapshot, opportunityScoreV2, riskTrend, positioning } =
+    await loadV2MarketPage({
+      demo: false,
+      source: params.source,
+      forceFixture: params.gamma === "fixture",
+    });
 
   return (
     <>
       <MarketDetailPreview
         view={view}
-        lang={lang}
         manualGammaSnapshot={manualGammaSnapshot}
+        opportunityScoreV2={opportunityScoreV2}
+        riskTrend={riskTrend}
+        positioning={positioning}
       />
       <RiskSnapshotScores
         spyScore={view.spyStructuralRiskScore}

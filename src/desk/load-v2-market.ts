@@ -24,19 +24,198 @@ import {
   type LoadV2HomePageInput,
   type V2HomePageModel,
 } from "./load-v2-home";
+import { deriveOpportunityScoreV2 } from "./opportunity-score-v2";
+import { derivePositioningV2, type PositioningV2Label } from "./positioning-v2";
+import {
+  deriveRiskTrendV2,
+  type RiskTrendSnapshot,
+  type RiskTrendV2Label,
+} from "./risk-trend-v2";
+import {
+  priorCompletedSession,
+  replayRiskHistoryForDate,
+} from "./replay-risk-history";
+import type { DominantDriver } from "@/contracts";
+import type { EventGateSnapshot } from "@/contracts/event-gate";
+import type { DailyBar } from "@/desk/breadth/bars/types";
+import type { V2GammaSummary, V2SpyBreadthSummary } from "./v2-command-center";
 
 export type V2MarketPageModel = V2HomePageModel & {
   readonly manualGammaSnapshot: ManualGammaSnapshot | null;
   readonly manualGammaHistoryDates: readonly string[];
+  readonly opportunityScoreV2: number | null;
+  readonly riskTrend: RiskTrendV2Label | null;
+  readonly riskTrendReasons: readonly string[];
+  readonly positioning: PositioningV2Label | null;
 };
+
+function withOpportunityV2(
+  view: V2HomePageModel["view"],
+  opportunityScoreV2: number | null,
+): V2HomePageModel["view"] {
+  return { ...view, opportunityScore: opportunityScoreV2 };
+}
+
+function contributionScore(
+  contributions: readonly { readonly id: string; readonly score: number }[] | undefined,
+  id: string,
+): number | null {
+  return contributions?.find((row) => row.id === id)?.score ?? null;
+}
+
+function macroDirectionOf(
+  driver: DominantDriver | null,
+  fallback: string | null,
+): RiskTrendSnapshot["macroDirection"] {
+  const value = driver?.riskDirection ?? fallback;
+  if (value === "risk_on" || value === "mixed" || value === "risk_off") {
+    return value;
+  }
+  return null;
+}
+
+function buildMarketRiskTrendSnapshot(input: {
+  readonly sessionDate: string;
+  readonly riskScore: number | null;
+  readonly spyBreadth: V2SpyBreadthSummary;
+  readonly macroScore: number | null;
+  readonly macroDirection: RiskTrendSnapshot["macroDirection"];
+  readonly spyGamma: V2GammaSummary | null;
+}): RiskTrendSnapshot {
+  const vol = input.spyGamma?.volMispricing;
+  return {
+    sessionDate: input.sessionDate,
+    riskScore: input.riskScore,
+    breadthSignal:
+      input.spyBreadth.breadthSignalStatus === "available"
+        ? input.spyBreadth.breadthSignal
+        : null,
+    advancingPct: input.spyBreadth.advancingPct ?? null,
+    macroScore: input.macroScore,
+    macroDirection: input.macroDirection,
+    gammaRegime: input.spyGamma?.regime ?? null,
+    volSignal:
+      vol?.status === "available" &&
+      (vol.signal === "vol_underpriced" ||
+        vol.signal === "balanced" ||
+        vol.signal === "vol_expensive")
+        ? vol.signal
+        : null,
+    volSpread: vol?.status === "available" ? vol.spreadVolPts : null,
+  };
+}
+
+async function computeMarketV2Policy(input: {
+  readonly dataRoot: string;
+  readonly sessionDate: string;
+  readonly riskScore: number | null;
+  readonly spyGamma: V2GammaSummary | null;
+  readonly qqqGamma: V2GammaSummary | null;
+  readonly spyBreadth: V2SpyBreadthSummary;
+  readonly eventGate: EventGateSnapshot | null;
+  readonly driver: DominantDriver | null;
+  readonly macroFallbackDirection: string | null;
+  readonly factorContributions:
+    | readonly { readonly id: string; readonly score: number }[]
+    | undefined;
+  readonly spyBars: readonly DailyBar[];
+  readonly skipPrior?: boolean;
+}): Promise<{
+  readonly opportunityScoreV2: number | null;
+  readonly riskTrend: RiskTrendV2Label;
+  readonly riskTrendReasons: readonly string[];
+  readonly positioning: PositioningV2Label;
+}> {
+  const opportunity = deriveOpportunityScoreV2({
+    spyGamma: input.spyGamma,
+    qqqGamma: input.qqqGamma,
+    breadth: {
+      breadthSignalStatus: input.spyBreadth.breadthSignalStatus,
+      breadthSignal: input.spyBreadth.breadthSignal,
+      advancingPct: input.spyBreadth.advancingPct ?? null,
+    },
+    eventGate: input.eventGate,
+  });
+  const current = buildMarketRiskTrendSnapshot({
+    sessionDate: input.sessionDate,
+    riskScore: input.riskScore,
+    spyBreadth: input.spyBreadth,
+    macroScore: contributionScore(input.factorContributions, "macro"),
+    macroDirection: macroDirectionOf(input.driver, input.macroFallbackDirection),
+    spyGamma: input.spyGamma,
+  });
+  const priorDate =
+    input.skipPrior === true
+      ? null
+      : priorCompletedSession(input.sessionDate, input.spyBars);
+  const priorRow =
+    priorDate === null
+      ? null
+      : await replayRiskHistoryForDate(priorDate, { dataRoot: input.dataRoot });
+  const trend = deriveRiskTrendV2({
+    current,
+    prior: priorRow?.trendSnapshot ?? null,
+    priorDate,
+  });
+  return {
+    opportunityScoreV2: opportunity.opportunityScore,
+    riskTrend: trend.trend,
+    riskTrendReasons: trend.reasons,
+    positioning: derivePositioningV2({
+      riskScore: input.riskScore,
+      opportunityScore: opportunity.opportunityScore,
+      trend: trend.trend,
+    }),
+  };
+}
 
 export async function loadV2MarketPage(
   input: LoadV2HomePageInput & { readonly lang?: string },
 ): Promise<V2MarketPageModel> {
   const base = await loadV2HomePage(input);
+  const dataRoot = resolveRuntimeDataRoot(process.env);
+  const policyFromView = async (
+    spyBars: readonly DailyBar[],
+    extras?: {
+      readonly spyGamma?: V2GammaSummary | null;
+      readonly qqqGamma?: V2GammaSummary | null;
+      readonly riskScore?: number | null;
+      readonly sessionDate?: string;
+      readonly driver?: DominantDriver | null;
+      readonly factorContributions?:
+        | readonly { readonly id: string; readonly score: number }[]
+        | undefined;
+      readonly skipPrior?: boolean;
+    },
+  ) =>
+    computeMarketV2Policy({
+      dataRoot,
+      sessionDate: extras?.sessionDate ?? base.view.sessionDate ?? "",
+      riskScore: extras?.riskScore ?? base.view.riskScore,
+      spyGamma: extras?.spyGamma ?? base.view.gamma[0] ?? null,
+      qqqGamma: extras?.qqqGamma ?? base.view.gamma[1] ?? null,
+      spyBreadth: base.view.spyBreadth,
+      eventGate: base.view.eventGate,
+      driver: extras?.driver ?? null,
+      macroFallbackDirection: base.view.macroSummary?.riskDirection ?? null,
+      factorContributions:
+        extras?.factorContributions ??
+        (base.view.riskSessionComparison?.factors ?? [])
+          .filter(
+            (row): row is typeof row & { todayScore: number } =>
+              row.todayScore != null,
+          )
+          .map((row) => ({ id: row.id, score: row.todayScore })),
+      spyBars,
+      skipPrior: extras?.skipPrior,
+    });
+
   if (input.demo) {
+    const policy = await policyFromView([], { skipPrior: true });
     return {
       ...base,
+      view: withOpportunityV2(base.view, policy.opportunityScoreV2),
+      ...policy,
       manualGammaSnapshot: null,
       manualGammaHistoryDates: [],
     };
@@ -44,7 +223,6 @@ export async function loadV2MarketPage(
 
   const now = new Date();
   const targetSession = resolveLastCompletedMarketSessionDate(now);
-  const dataRoot = resolveRuntimeDataRoot(process.env);
   const store = resolveRuntimeJsonStore(process.env);
   const [snapshot, history] = await Promise.all([
     loadManualGammaSnapshot(store, targetSession),
@@ -52,8 +230,19 @@ export async function loadV2MarketPage(
   ]);
 
   if (!snapshot) {
+    const barPanel = await loadAlpacaDailyBarPanel({
+      symbols: ["SPY", "QQQ"],
+      env: process.env,
+      dataRoot,
+    }).catch(() => null);
+    const spyBars = barPanel?.seriesBySymbol?.get("SPY")?.bars ?? [];
+    const policy = await policyFromView(spyBars, {
+      sessionDate: base.view.sessionDate ?? targetSession,
+    });
     return {
       ...base,
+      view: withOpportunityV2(base.view, policy.opportunityScoreV2),
+      ...policy,
       manualGammaSnapshot: null,
       manualGammaHistoryDates: history.map((row) => row.marketSessionDate),
     };
@@ -72,17 +261,18 @@ export async function loadV2MarketPage(
     }),
   ]);
 
-  const spyBars = barPanel?.seriesBySymbol?.get("SPY")?.bars;
-  const qqqBars = barPanel?.seriesBySymbol?.get("QQQ")?.bars;
+  const spyBarList = barPanel?.seriesBySymbol?.get("SPY")?.bars;
+  const qqqBarList = barPanel?.seriesBySymbol?.get("QQQ")?.bars;
+  const spyBars = spyBarList ?? [];
   const spyGamma = buildManualGammaSummary({
     snapshot,
     symbol: "SPY",
-    hv20Bars: spyBars,
+    hv20Bars: spyBarList,
   });
   const qqqGamma = buildManualGammaSummary({
     snapshot,
     symbol: "QQQ",
-    hv20Bars: qqqBars,
+    hv20Bars: qqqBarList,
   });
 
   const decision = deriveRiskDecisionV1({
@@ -98,8 +288,8 @@ export async function loadV2MarketPage(
     string,
     readonly { readonly sessionDate: string; readonly close: number }[]
   >();
-  if (spyBars) equityBarsBySymbol.set("SPY", spyBars);
-  if (qqqBars) equityBarsBySymbol.set("QQQ", qqqBars);
+  if (spyBarList) equityBarsBySymbol.set("SPY", spyBarList);
+  if (qqqBarList) equityBarsBySymbol.set("QQQ", qqqBarList);
 
   // Reuse the canonical SPY/QQQ structural-risk model, but swap in the
   // manual Gamma + IV snapshot. Other factors stay on their existing live
@@ -144,6 +334,15 @@ export async function loadV2MarketPage(
         )
       : null;
 
+  const policy = await policyFromView(spyBars, {
+    sessionDate: snapshot.marketSessionDate,
+    riskScore: decision.riskScore,
+    spyGamma,
+    qqqGamma,
+    driver: macro.driver,
+    factorContributions: decision.factorContributions,
+  });
+
   return {
     ...base,
     view: {
@@ -154,7 +353,7 @@ export async function loadV2MarketPage(
       riskChange,
       riskChangeReason,
       riskSessionComparison: comparison,
-      opportunityScore: decision.opportunityScore,
+      opportunityScore: policy.opportunityScoreV2,
       exposure: decision.exposure,
       allocation: decision.allocation,
       evidence: decision.evidence,
@@ -171,6 +370,7 @@ export async function loadV2MarketPage(
       riskDivergenceTrend: structural.riskDivergenceTrend,
       componentDivergence: structural.componentDivergence,
     },
+    ...policy,
     manualGammaSnapshot: snapshot,
     manualGammaHistoryDates: history.map((row) => row.marketSessionDate),
   };
