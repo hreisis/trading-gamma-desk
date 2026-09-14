@@ -1,5 +1,17 @@
 # Tasks
 
+## Dark bilingual homepage preview — 2026-09-14
+
+Branch: `codex/dark-ui-bilingual-fast-home` (base `ui-v2-preview`; not merged).
+
+- Implemented dark horizontal-navigation homepage, EN/中文 UI, full-page research sections and responsive AI/review rail.
+- Preserved provider dates, missing states, deterministic scoring and demo/live separation. 20-day breadth highs/lows are labeled honestly rather than the reference image's 52-week metrics.
+- Homepage streams its shell, then market view, then parallel AI/review narratives; Chinese narrative localization is deferred with AI. Deferred narrative requests use an 8s attempt budget and no retries.
+- Macro starts concurrently with market inputs. Existing stale Macro/Gamma/calendar snapshots can render while Next `after()` refreshes them. Cold cache/provider latency and durable breadth/ledger work still require measurement.
+- Validation pending CI: typecheck, tests, Next build and public-demo smoke. Browser visual review and live-provider latency remain pending.
+- Provider-origin prose/headlines retain their source language; EN/中文 applies to interface labels and the existing AI narrative translation layer. No fabricated translated news.
+
+
 > **V2 status:** For current phase, active milestone, and definition of done, see [`docs/v2-roadmap.md`](v2-roadmap.md). This file remains a historical living build log (M1–M9 and early V2 rows); it may lag the roadmap.
 
 ## GammaDesk V2 reset (current focus)
