@@ -1,6 +1,6 @@
 import { z } from 'zod';
 const bilingual = z.object({ en:z.string().min(1).max(1600), zh:z.string().min(1).max(1000) });
-const source = z.object({url:z.string().url().refine(u=>u.startsWith('https://')),title:z.string().min(1).max(250),publishedAt:z.string().nullable()});
+const source = z.object({url:z.string().regex(/^https:\/\/[^\s]+$/),title:z.string().min(1).max(250),publishedAt:z.string().nullable()});
 const section = z.object({kind:z.enum(['drivers','watch','invalidation']),title:bilingual,body:bilingual,sources:z.array(source).min(1).max(4)});
 export const ResearchContent = z.object({headline:bilingual,summary:bilingual,sections:z.array(section).length(3),limitations:bilingual});
 export const ResearchRecord = z.object({version:z.literal(1),slot:z.string(),generatedAt:z.string(),inputSession:z.string().nullable(),model:z.string(),content:ResearchContent});
