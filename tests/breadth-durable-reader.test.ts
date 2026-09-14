@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
 import {
+  ensureDurableSpyBreadthForMarketInput,
   evaluateDurableBreadthSessionFreshness,
   loadDurableSpyBreadthForMarketInput,
 } from "@/desk/breadth/read-durable-breadth";
@@ -232,4 +233,18 @@ describe("loadMarketInputSnapshot durable breadth integration", () => {
     expect(spyGamma).toBeDefined();
     expect(spyGamma?.status).not.toBe("missing");
   });
+});
+
+
+it("queues one stale refresh without withholding the published breadth", async () => {
+ const store=tempStore();
+ await publishBreadthSnapshot(store,sampleSnapshot("2026-08-06","2026-08-06T21:00:00.000Z"),"2026-08-06T21:00:00.000Z");
+ const deferRefresh=vi.fn();
+ const opts={store,targetMarketSessionDate:"2026-08-07",dataRoot:"stale-refresh-test",deferRefresh};
+ const result=await ensureDurableSpyBreadthForMarketInput(opts);
+ expect(result.snapshot?.marketSessionDate).toBe("2026-08-06");
+ expect(result.snapshot?.stale).toBe(true);
+ expect(deferRefresh).toHaveBeenCalledOnce();
+ await ensureDurableSpyBreadthForMarketInput(opts);
+ expect(deferRefresh).toHaveBeenCalledOnce();
 });

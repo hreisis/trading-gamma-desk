@@ -99,6 +99,7 @@ async function hasMacroDriverForSessionAsync(
   return true;
 }
 
+const macroAttemptAt = new Map<string, number>();
 const macroRefreshByRoot = new Map<string, Promise<{ ok: boolean; error?: string }>>();
 
 export async function ensureMacroDriverArtifact(options: {
@@ -128,6 +129,8 @@ export async function ensureMacroDriverArtifact(options: {
   const refreshKey = `${artifactStore.rootLabel}:${sessionDate}`;
   let pending = macroRefreshByRoot.get(refreshKey);
   if (!pending) {
+    if (Date.now() - (macroAttemptAt.get(refreshKey) ?? 0) < 15 * 60_000) return { refreshed: false, ok: false, error: "Macro refresh cooldown; retaining published inputs." };
+    macroAttemptAt.set(refreshKey, Date.now());
     pending = (async () => {
       try {
         await runDailyPipeline({
@@ -180,7 +183,8 @@ export async function resolveDeskRequestAsync(
     sync.status !== "empty" &&
     options.source !== "live" &&
     !macroSessionStale &&
-    !sync.sessionStale
+    !sync.sessionStale &&
+    sync.driver?.primaryRegime !== "insufficient_data"
   ) {
     return sync;
   }

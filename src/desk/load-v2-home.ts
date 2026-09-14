@@ -393,6 +393,7 @@ export async function loadV2HomePage(
           missingReason: "SPY breadth is not computed on the public demo path.",
         })
       : ensureDurableSpyBreadthForMarketInput({
+          deferRefresh,
           targetMarketSessionDate,
           publicDemo: false,
           dataRoot,
@@ -412,6 +413,7 @@ export async function loadV2HomePage(
           missingReason: "QQQ breadth is not computed on the public demo path.",
         })
       : ensureDurableQqqBreadthForMarketInput({
+          deferRefresh,
           targetMarketSessionDate,
           publicDemo: false,
           dataRoot,

@@ -3,7 +3,7 @@ import { DarkCommandCenter } from "@/app/components/v2/DarkCommandCenter";
 import { loadV2HomePage } from "@/desk/load-v2-home";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300; // Allow deferred breadth refresh to finish after the response.
 
 async function MarketHome({
   searchParams,

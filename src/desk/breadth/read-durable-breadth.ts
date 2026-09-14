@@ -26,6 +26,7 @@ export interface LoadDurableSpyBreadthOptions {
   readonly env?: Record<string, string | undefined>;
   readonly dataRoot?: string;
   readonly publicDemo?: boolean;
+  readonly deferRefresh?: (task: () => Promise<void>) => void;
   /** Explicit store for hermetic tests and local filesystem dev. */
   readonly store?: BreadthSnapshotStore;
 }
@@ -187,16 +188,30 @@ function isBreadthPointerMissing(missingReason: string | null): boolean {
   );
 }
 
+const refreshAttemptAt = new Map<string, number>();
+
 async function ensureDurableBreadthForFund(
   fundSymbol: "SPY" | "QQQ",
   options: LoadDurableSpyBreadthOptions,
+  refreshing = false,
 ): Promise<DurableBreadthReadOutcome> {
   const outcome = await loadDurableBreadthForFund(fundSymbol, options);
-  if (outcome.snapshot || options.publicDemo) {
+  if (options.publicDemo) return outcome;
+  if (outcome.snapshot && !refreshing) {
+    if (outcome.snapshot.stale && outcome.snapshot.marketSessionDate < options.targetMarketSessionDate && options.deferRefresh) {
+      const key = `${options.dataRoot ?? "data"}:${fundSymbol}:${options.targetMarketSessionDate}`;
+      if (Date.now() - (refreshAttemptAt.get(key) ?? 0) > 15 * 60_000) {
+        refreshAttemptAt.set(key, Date.now());
+        options.deferRefresh(async () => {
+          try { await ensureDurableBreadthForFund(fundSymbol, options, true); }
+          catch { /* Keep the published snapshot; retry after the cooldown. */ }
+        });
+      }
+    }
     return outcome;
   }
 
-  if (!isBreadthPointerMissing(outcome.missingReason)) {
+  if (!refreshing && !isBreadthPointerMissing(outcome.missingReason)) {
     return outcome;
   }
 
