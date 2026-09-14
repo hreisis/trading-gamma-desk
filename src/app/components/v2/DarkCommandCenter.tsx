@@ -33,8 +33,10 @@ function label(value: string | null | undefined, lang: V2Language) {
 function Panel({ title, children, id, note }: { title: string; children: ReactNode; id?: string; note?: string }) {
   return <section className={styles.panel} id={id}><header className={styles.panelHead}><h2>{title}</h2>{note && <small>{note}</small>}</header>{children}</section>;
 }
-function LevelCard({ g, lang }: { g: V2GammaSummary; lang: V2Language }) {
+function LevelCard({ g, lang, cone }: { g: V2GammaSummary; lang: V2Language; cone: V2CommandCenterPageView["gammaCone"][number] | undefined }) {
   const t = (en: string, zh: string) => lang === "zh" ? zh : en;
+  const range = cone?.restOfDay.status === "available" ? cone.restOfDay : cone?.fullSession;
+  const rangeLabel = cone?.restOfDay.status === "available" ? t("Rest of day", "剩余交易时段") : t("Full session", "完整交易日");
   const levels = [g.spot, g.callWall, g.gammaFlip, g.putWall].filter((n): n is number => n != null && Number.isFinite(n));
   const min = Math.min(...levels), max = Math.max(...levels);
   const pct = (n: number) => 4 + 92 * (max === min ? .5 : (n - min) / (max - min));
@@ -49,7 +51,7 @@ function LevelCard({ g, lang }: { g: V2GammaSummary; lang: V2Language }) {
     <div className={styles.metricsThree}><div><small>{t("Dealer Flow", "做市商对冲")}</small><b>{label(g.dealerFlowRegime, lang)}</b></div><div><small>IV − HV</small><b>{number(g.volMispricing.spreadVolPts, 1)} vol</b></div><div><small>ROD ({number(g.restOfDayRange.confidencePct)}%)</small><b>{g.restOfDayRange.status === "available" ? `${number(g.restOfDayRange.lower)} – ${number(g.restOfDayRange.upper)}` : t("Unavailable / closed", "暂无数据／已收盘")}</b></div></div>
     <p className={styles.meta}>{t("Options as of", "期权数据日期")} {g.sessionDate ?? "—"} · {t("Expiry", "到期")} {g.expiration ?? "—"} · {g.isFixture ? t("Illustrative", "示意数据") : label(g.status, lang)} {g.freshness ? `· ${label(g.freshness, lang)}` : ""}</p>
     <details className={styles.details}><summary>{t("Positioning & range details", "持仓与区间详情")}</summary>
-      <dl className={styles.rows}><div><dt>Net GEX</dt><dd>{number(g.netGex, 0)}</dd></div><div><dt>{t("Call wall touch", "触及 Call Wall")}</dt><dd>{number(g.callWallTouch.percent)}%</dd></div><div><dt>{t("Put wall touch", "触及 Put Wall")}</dt><dd>{number(g.putWallTouch.percent)}%</dd></div></dl>
+      <p>{rangeLabel}</p><dl className={styles.rows}><div><dt>{t("90% expected range", "90% 预期区间")}</dt><dd>{range?.expectedRange90 ? `${number(range.expectedRange90.lower)} – ${number(range.expectedRange90.upper)}` : "—"}</dd></div><div><dt>{t("50% core range", "50% 核心区间")}</dt><dd>{range?.coreRange50 ? `${number(range.coreRange50.lower)} – ${number(range.coreRange50.upper)}` : "—"}</dd></div><div><dt>Net GEX</dt><dd>{number(g.netGex, 0)}</dd></div><div><dt>{t("Call wall touch", "触及 Call Wall")}</dt><dd>{number(g.callWallTouch.percent)}%</dd></div><div><dt>{t("Put wall touch", "触及 Put Wall")}</dt><dd>{number(g.putWallTouch.percent)}%</dd></div></dl>
       {g.contextLines.map((line, i) => <p key={i}>{line}</p>)}
       <p>{t("Gamma describes volatility amplification or compression, not price direction.", "Gamma 描述波动的放大或抑制，不单独预测涨跌方向。")}</p>
     </details>
@@ -60,8 +62,8 @@ function Breadth({ data, symbol, lang }: { data: V2SpyBreadthSummary; symbol: st
   const p = data.percentAboveMA20;
   const rows = [[t("Above MA20", "高于 MA20"), p, "%"], [t("Above MA50", "高于 MA50"), data.percentAboveMA50, "%"],
     [t("Advancing", "上涨家数"), data.advance, ""], [t("Declining", "下跌家数"), data.decline, ""],
-    [t("New 20D closing high", "20日收盘新高"), data.new20DayClosingHigh, ""],
-    [t("New 20D closing low", "20日收盘新低"), data.new20DayClosingLow, ""]] as const;
+    [t("New 20D closing high", "20日收盘新高"), data.new20DayClosingHigh, "%"],
+    [t("New 20D closing low", "20日收盘新低"), data.new20DayClosingLow, "%"]] as const;
   return <div><h3>{symbol} <small>{label(data.breadthSignal, lang)}</small></h3><div className={styles.breadth}>
     <div className={styles.ring} style={{ background: `conic-gradient(#278cff ${Math.max(0, Math.min(100, p ?? 0))}%, #203246 0)` }}><div><strong>{number(p)}{p != null ? "%" : ""}</strong><small>{t("Above MA20", "高于 MA20")}</small></div></div>
     <dl className={styles.rows}>{rows.map(([name, n, unit]) => <div key={name}><dt>{name}</dt><dd>{number(n)}{n == null ? "" : unit}</dd></div>)}</dl>
@@ -114,7 +116,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
   const news = feed ? selectNewsFeedCatalysts(feed.catalysts, { now: new Date() }) : [];
   const status = resolveAiStudyMarketStatus(new Date());
   const marketLabel = status === "regular_session_open" ? t("Market Open", "交易时段") : status === "premarket" ? t("Premarket", "盘前") : t("Market Closed", "已收盘");
-  return <div className={styles.app} lang={lang === "zh" ? "zh-CN" : "en"}>
+  return <div data-testid="market-workspace" className={styles.app} lang={lang === "zh" ? "zh-CN" : "en"}>
     <div className={styles.tape}>{["SPY", "QQQ", "BTC/USD", "GLD", "USO", "UUP"].map(symbol => {
       const q = view.marketQuotes.find(row => row.symbol === symbol);
       return <span key={symbol}><b>{symbol}</b> {number(q?.latestPrice, 2)} <em className={q?.dailyChangePct == null ? "" : tone(q.dailyChangePct)}>{signed(q?.dailyChangePct, 2)}</em></span>;
@@ -134,7 +136,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
           <div><small>{t("Event Risk", "事件风险")}</small><strong>{label(view.eventGate?.state, lang)}</strong><small>{view.eventGate?.stale ? t("Stale data", "数据已过期") : view.eventGate?.marketSessionDate ?? "—"}</small></div>
         </div>
       </section>
-      <div className={styles.twoColumns} id="structure">{view.gamma.map(g => <LevelCard key={g.symbol} g={g} lang={lang} />)}</div>
+      <div className={styles.twoColumns} id="structure">{view.gamma.map(g => <LevelCard key={g.symbol} g={g} lang={lang} cone={view.gammaCone.find(item => item.symbol === g.symbol)} />)}</div>
       <div className={styles.twoColumns}>
         <Panel title={t("Market Breadth", "市场宽度")}><Breadth data={view.spyBreadth} symbol="SPY" lang={lang} /></Panel>
         <Panel title={t("Sector Performance (1D)", "板块表现（1日）")} note={view.sectorRotation.sessionDate ?? "—"}><Bars rows={rotation.map(r => ({ symbol: r.symbol, value: r.return1d }))} lang={lang} /></Panel>
