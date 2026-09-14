@@ -115,7 +115,7 @@ describe("public demo production build", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
-    expect(html).toContain('class="v2-app"');
+    expect(html).toContain('data-testid="market-workspace"');
     expect(html).not.toContain('data-testid="banner-illustrative-demo"');
     expect(html).not.toContain('data-testid="demo-route-banner"');
 
@@ -146,7 +146,7 @@ describe("public demo production build", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
 
-    expect(html).toContain('class="v2-app"');
+    expect(html).toContain('data-testid="market-workspace"');
     expect(html).toContain('data-testid="demo-route-banner"');
     expect(html).toContain("Synthetic fixtures only via");
     expect(html).toContain('data-testid="banner-illustrative-demo"');
@@ -156,6 +156,22 @@ describe("public demo production build", () => {
     expect(html).toContain('data-testid="v2-gamma-QQQ"');
     expect(html).not.toContain("fixture missing or invalid");
     expect(html).not.toContain("ENOENT");
+  });
+
+  it("renders Chinese interface and full research sections on the demo route", async () => {
+    const response = await fetch(baseUrl + "/demo?lang=zh", {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('data-testid="market-workspace"');
+    expect(html).toContain('lang="zh-CN"');
+    for (const heading of ["市场结构", "科技内部轮动", "宏观驱动", "每日复盘"]) {
+      expect(html).toContain(heading);
+    }
+    expect(html).toContain('href="/demo?lang=en"');
+    expect(html).toContain('data-testid="banner-illustrative-demo"');
+    expect(html).not.toContain("52W");
   });
 
   it("redirects legacy /v2 routes to / and /demo while preserving lang", async () => {
