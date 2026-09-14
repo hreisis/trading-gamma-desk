@@ -1,4 +1,4 @@
-import { CommandCenterPreview } from "@/app/components/v2/CommandCenterPreview";
+import { DarkCommandCenter } from "@/app/components/v2/DarkCommandCenter";
 import { loadV2HomePage } from "@/desk/load-v2-home";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export default async function DemoHomePage({
       </span>
       <span hidden data-testid="v2-gamma-SPY">SPY gamma</span>
       <span hidden data-testid="v2-gamma-QQQ">QQQ gamma</span>
-      <CommandCenterPreview view={view} lang={lang} demoMode={demoMode} />
+      <DarkCommandCenter view={view} lang={lang} demoMode={demoMode} />
     </>
   );
 }
