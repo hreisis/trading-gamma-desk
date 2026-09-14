@@ -14,6 +14,7 @@ export function WebResearchPanel({research,lang}:{research:WebResearch|null;lang
   <a className={styles.jump} href="#study-drivers">{t('Evidence & sources ↓','查看依据与来源 ↓')}</a>
   {content.sections.map((section,i)=><section className={styles.section} id={`study-${section.kind}`} key={section.kind}>
    <div className={styles.kicker}>{String(i+1).padStart(2,'0')} · {titles[section.kind]}</div><h3>{section.title[lang]}</h3><p>{section.body[lang]}</p>
+   {section.kind==='watch' && research.event && <p className={styles.event}><b>{research.event.headline}</b> · {research.event.et}<br/><a href={research.event.sourceUrl} target="_blank" rel="noopener noreferrer">{t('Official calendar ↗','官方日历 ↗')}</a></p>}
    <div className={styles.sources}>{section.sources.map(source=><a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer">{source.title} ↗{source.publishedAt&&<small> · {source.publishedAt}</small>}</a>)}</div>
   </section>)}
   <details className={styles.limits}><summary>{t('Research context','研究口径')}</summary><p>{content.limitations[lang]}</p><p>{t('Daily data session','日频数据日期')}: {research.inputSession??'—'}</p></details>

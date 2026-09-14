@@ -24,14 +24,14 @@ it('shares a published bilingual cache and does not search on subsequent reads',
  const store=createFilesystemRuntimeJsonStore({dataRoot:mkdtempSync(join(tmpdir(),'research-'))});
  const draft={status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({...content,sections:content.sections.map((s,i)=>({...s,sources:[{id:`S${i%2+1}`,publishedAt:null}]}))})}]}]};
  const fetchImpl=vi.fn(async(_url:unknown,_init?:RequestInit)=>new Response(JSON.stringify(_init?.body&&JSON.parse(String(_init.body)).tools?response():draft)));
- const args={store,config,now:new Date('2026-09-14T21:00:00Z'),payload:{},inputSession:'2026-09-14',fetchImpl};
- const first=await loadWebResearch(args);expect(first?.content.summary.zh).toBe(text.zh);
+ const args={store,config,now:new Date('2026-09-14T21:00:00Z'),payload:{nextEvent:{kind:'fomc_decision',occurredAt:'2026-09-16T18:00:00Z'}},inputSession:'2026-09-14',fetchImpl};
+ const first=await loadWebResearch(args);expect(first?.content.summary.zh).toBe(text.zh);expect(first?.event?.et).toContain("14:00");
  await loadWebResearch(args);expect(fetchImpl).toHaveBeenCalledTimes(2);
  const body=JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body));expect(body.tools[0].type).toBe('web_search');
 });
 it('serves previous research immediately, retains it on failed refresh, and records failure without secrets',async()=>{
  const store=createFilesystemRuntimeJsonStore({dataRoot:mkdtempSync(join(tmpdir(),'research-'))});
- const old={version:1,slot:'2026-09-14-pre',generatedAt:'2026-09-14T14:00:00Z',model:'test',inputSession:'2026-09-11',content};
+ const old={version:2,event:null,slot:'2026-09-14-pre',generatedAt:'2026-09-14T14:00:00Z',model:'test',inputSession:'2026-09-11',content};
  await writeJson(store,'research/web-v1/latest.json',old);
  let task:(()=>Promise<void>)|undefined;
  const fetchImpl=vi.fn(async()=>new Response('secret upstream body',{status:403}));

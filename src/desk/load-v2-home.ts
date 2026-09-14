@@ -565,7 +565,7 @@ export async function loadV2HomePage(
 
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
   const payload = buildV2AiStudyPayload(baseView, eventGate);
-  const webResearch = input.demo ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:llmConfig,payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
+  const webResearch = input.demo ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"},payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
   const pendingAi: V2AiStudyInterpretation = {
     status: "unavailable", source: "unavailable", confidence: "limited",
     regime: "", baseCase: "", ifThen: "", invalidation: "", tension: "",
