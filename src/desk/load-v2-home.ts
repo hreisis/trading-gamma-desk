@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { join } from "node:path";
 import {
   buildV2AiStudyPayload,
@@ -73,6 +74,8 @@ export interface LoadV2HomePageInput {
   readonly demo: boolean;
   readonly source?: DeskSourceQuery | string | null;
   readonly forceFixture?: boolean;
+  /** Stream optional AI narratives after the deterministic market view. */
+  readonly deferNarratives?: boolean;
 }
 
 export type V2CommandCenterPageView = V2CommandCenterView & {
@@ -85,7 +88,10 @@ export type V2CommandCenterPageView = V2CommandCenterView & {
   readonly techLeadersLaggards: V2TechLeadersLaggardsSummary;
 };
 
+export type V2HomeNarratives = Pick<V2CommandCenterPageView, "aiStudy" | "dailyReview">;
+
 export interface V2HomePageModel {
+  readonly narratives?: Promise<V2HomeNarratives>;
   readonly view: V2CommandCenterPageView;
   readonly lang: V2Language;
   readonly demoMode: boolean;
@@ -319,6 +325,7 @@ async function loadGamma(
   runtime: {
     readonly dataRoot: string;
     readonly gammaDataRoot: string;
+    readonly deferRefresh?: (task: () => Promise<void>) => void;
     readonly now: Date;
     readonly env: NodeJS.ProcessEnv;
   },
@@ -337,6 +344,7 @@ async function loadGamma(
     dataRoot: runtime.gammaDataRoot,
     env: runtime.env,
     now: runtime.now,
+    deferRefresh: runtime.deferRefresh,
   });
 }
 
@@ -350,26 +358,30 @@ export async function loadV2HomePage(
   const dataRoot = resolveRuntimeDataRoot(process.env);
   const runtimeEnv = process.env;
   const artifactStore = resolveRuntimeJsonStore(runtimeEnv);
+  const deferRefresh = input.deferNarratives ? (task: () => Promise<void>) => after(task) : undefined;
   const gammaDataRoot = join(dataRoot, "gamma", "providers", "marketdata-app");
 
-  const macro = input.demo
+  const macroPromise = input.demo
     ? resolveDeskRequest({ demoPath: true, publicDemo: true })
-    : await resolveDeskRequestAsync({
+    : resolveDeskRequestAsync({
         source: input.source,
+        deferRefresh,
         publicDemo: false,
         dataRoot,
       });
 
   const gammaOptions = { forceFixture, publicDemo: input.demo } as const;
   const gammaRuntime = {
+    deferRefresh,
     dataRoot,
     gammaDataRoot,
     now,
     env: runtimeEnv,
   };
 
-  const [spyGamma, qqqGamma, spyBreadthLoad, qqqBreadthLoad, marketPanel, equityBars, catalystFeed] =
+  const [macro, spyGamma, qqqGamma, spyBreadthLoad, qqqBreadthLoad, marketPanel, equityBars, catalystFeed] =
     await Promise.all([
+    macroPromise,
     loadGamma("SPY", gammaOptions, input.demo, gammaRuntime),
     loadGamma("QQQ", gammaOptions, input.demo, gammaRuntime),
     input.demo
@@ -431,6 +443,7 @@ export async function loadV2HomePage(
     input.demo
       ? Promise.resolve(null)
       : loadCatalystFeedAsync({}, {
+          deferRefresh,
           publicDemo: false,
           now,
           dataRoot,
@@ -521,7 +534,9 @@ export async function loadV2HomePage(
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     AI_STUDY_LLM_MODEL: process.env.AI_STUDY_LLM_MODEL,
   };
-  const llmConfig = loadAiStudyLlmConfig(llmEnv);
+  const llmConfig = loadAiStudyLlmConfig(llmEnv, input.deferNarratives
+    ? { timeoutMs: 8000, maxRetries: 0, parseRetries: 0 }
+    : {});
 
   const { review: deterministicReview, context: dailyReviewContext } =
     await buildDeterministicV2DailyReview({
@@ -532,31 +547,38 @@ export async function loadV2HomePage(
       equityBarsBySymbol,
     });
 
-  const dailyReviewRaw =
-    input.demo || deterministicReview.status !== "ready" || !dailyReviewContext
-      ? deterministicReview
-      : await generateV2DailyReviewInterpretation({
-          review: deterministicReview,
-          context: dailyReviewContext,
-          view: baseView,
-          config: llmConfig,
-          env: llmEnv,
-        });
-
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
   const payload = buildV2AiStudyPayload(baseView, eventGate);
-  const aiStudyRaw = input.demo
-    ? previewV2AiStudyInterpretation()
-    : await generateV2CommandAiStudyInterpretation({
-        payload,
-        config: llmConfig,
-        env: llmEnv,
-      });
-
-  const localized =
-    lang === "zh" && !input.demo
-      ? await localizeV2NarrativesToChinese(aiStudyRaw, dailyReviewRaw, llmConfig)
+  const pendingAi: V2AiStudyInterpretation = {
+    status: "unavailable", source: "unavailable", confidence: "limited",
+    regime: "", baseCase: "", ifThen: "", invalidation: "", tension: "",
+    hiddenRisk: "", reactionQuality: "", crossAssetConflict: "",
+    whatChanged: "", whatMattersNext: "", dataLimitations: [],
+    missingReason: "AI narrative pending",
+  };
+  async function generateNarratives(): Promise<V2HomeNarratives> {
+    const [dailyReviewRaw, aiStudyRaw] = await Promise.all([
+      input.demo || deterministicReview.status !== "ready" || !dailyReviewContext
+        ? Promise.resolve(deterministicReview)
+        : generateV2DailyReviewInterpretation({
+            review: deterministicReview, context: dailyReviewContext,
+            view: baseView, config: llmConfig, env: llmEnv,
+          }).catch(() => deterministicReview),
+      input.demo
+        ? Promise.resolve(previewV2AiStudyInterpretation())
+        : generateV2CommandAiStudyInterpretation({
+            payload, config: llmConfig, env: llmEnv,
+          }).catch(() => ({ ...pendingAi, missingReason: "AI narrative unavailable" })),
+    ]);
+    return lang === "zh" && !input.demo
+      ? localizeV2NarrativesToChinese(aiStudyRaw, dailyReviewRaw, llmConfig)
       : { aiStudy: aiStudyRaw, dailyReview: dailyReviewRaw };
+  }
+  // No unobserved background task: the page awaits this promise inside Suspense.
+  const narratives = generateNarratives();
+  const localized = input.deferNarratives
+    ? { aiStudy: pendingAi, dailyReview: deterministicReview }
+    : await narratives;
 
   const view: V2CommandCenterPageView = {
     ...baseView,
@@ -569,5 +591,5 @@ export async function loadV2HomePage(
     techLeadersLaggards,
   };
 
-  return { view, lang, demoMode: input.demo };
+  return { view, lang, demoMode: input.demo, ...(input.deferNarratives ? { narratives } : {}) };
 }
