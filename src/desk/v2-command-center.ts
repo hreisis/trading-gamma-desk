@@ -1,3 +1,4 @@
+import { deriveOpportunityV3, type OpportunityV3 } from "./opportunity-score-v3";
 import { loadPriorRiskSpread, saveRiskSpread } from "./risk-spread-history";
 import type { DominantDriver } from "@/contracts";
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
@@ -212,6 +213,8 @@ export interface V2CommandCenterView {
   readonly riskChangeReason: string | null;
   readonly riskSessionComparison: RiskSessionComparison | null;
   readonly opportunityScore: number | null;
+  readonly opportunity?: OpportunityV3;
+  readonly optionSensitivity?: { riskWithoutOptions: number | null; spreadWithoutOptions: number | null; factors: RiskDecisionV1Result["factorContributions"] };
   readonly exposure: { readonly min: number; readonly max: number } | null;
   readonly allocation:
     | {
@@ -1307,6 +1310,13 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     priorDivergence,
   });
   const decision = riskV1_1.marketRisk;
+  const opportunity = deriveOpportunityV3({sessionDate: targetSession, bars: input.equityBarsBySymbol, breadth: spyBreadth,
+    eventBlocked: !eventGate || eventGate.stale || eventGate.state !== 'clear'});
+  const withoutOptions = (g: V2GammaSummary): V2GammaSummary => ({...g, status:'unavailable', regime:null,
+    volMispricing:{...g.volMispricing,status:'unavailable',signal:null,spreadVolPts:null}});
+  const sensitivity = deriveRiskDecisionV1_1({driver:input.driver,spyBreadth,qqqBreadth,
+    spyGamma:withoutOptions(spyGammaSummary),qqqGamma:withoutOptions(qqqGammaSummary),eventGate,sectorRotation,targetSession});
+
 
   const driverEvidence = deriveEvidenceFromDriver(input.driver);
   const evidence =
@@ -1380,7 +1390,9 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     riskChange: dayOverDay.riskChange,
     riskChangeReason: dayOverDay.riskChangeReason,
     riskSessionComparison,
-    opportunityScore: decision.opportunityScore,
+    opportunityScore: opportunity.score,
+    opportunity,
+    optionSensitivity: {riskWithoutOptions:sensitivity.marketRisk.riskScore,spreadWithoutOptions:sensitivity.riskDivergence,factors:decision.factorContributions},
     exposure: decision.exposure,
     allocation: decision.allocation,
     evidence,

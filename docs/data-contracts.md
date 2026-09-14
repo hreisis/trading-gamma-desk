@@ -959,3 +959,11 @@ Automatic runtime ingestion omits `date`; sessionDate is derived from vendor upd
 ### Web-backed AI Study
 
 Research record schema v2 provides one bilingual edition with sourced drivers, watch, and invalidation sections. See [Web research integration](web-research.md) for generation, cache paths, refresh behavior, and the file map.
+
+### Daily Opportunity V3 (homepage)
+
+Independent of Risk: distance below prior MA20 normalized by prior daily return volatility (40%), SPY breadth washout (30%), and daily decline normalized by prior volatility (30%). Both SPY and QQQ need 21 valid distinct dated closes ending at the target session; SPY breadth must be fresh and same-session. Missing inputs withhold the score instead of renormalizing. Historical V2 replay remains unchanged.
+
+Confirmation is separate: mean index recovery strength combines positive daily recovery and location within five-session closing range; below 50 is unconfirmed, otherwise recovering, with advancing breadth >=60% classified as broadening. Event restrictions remain a separate flag and never alter the numerical opportunity. All weights and thresholds are provisional heuristics, not calibrated probabilities. Daily closes cannot capture intraday V reversals.
+
+Homepage stance/exposure remain Risk-based. Option sensitivity recomputes Risk and Spread without Gamma/IV for diagnostics only, preserving the existing coverage gate. It is not an estimate of what current options would show. Research/AI receives the homepage independent opportunity score.

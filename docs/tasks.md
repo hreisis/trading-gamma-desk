@@ -269,3 +269,8 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 ### Overview restoration
 - Restored all five overview information groups in dark bilingual cards, with truthful dates, risk spread and original high-beta tilt.
 - Added durable prior-input-session spread history and missing-history handling; retained all lower-page research sections.
+
+### Homepage opportunity and hierarchy (2026-09-14)
+- Added daily Opportunity V3 independent of Risk, with separate recovery confirmation and event condition. Historical V2 replay retained.
+- Overview now leads with model stance, paired scores, compact Market Consider, then exposure/spread/drivers. Methodology and option sensitivity are expandable.
+- Current APIs retained; intraday updates and empirical calibration remain future work.
