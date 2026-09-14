@@ -1,3 +1,4 @@
+import { OverviewCards } from "./OverviewCards";
 import { HomeManualGammaInput } from "./MarketDetailPreview";
 import { Suspense, type ReactNode } from "react";
 import type { V2CommandCenterPageView, V2HomeNarratives } from "@/desk/load-v2-home";
@@ -131,7 +132,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
     {demoMode && <div className={styles.notice}>{t("Illustrative methodology preview — not live market data", "方法演示：示意数据，并非实时行情")}</div>}
     <main className={styles.layout}><div className={styles.center}>
       <section className={styles.overview} id="overview"><p className={styles.eyebrow}>{t("MARKET DECISION", "市场决策")} · {view.sessionDate ?? t("No aligned session", "暂无对齐交易日")}</p>
-        <div className={styles.hero}><div><h1>{state.toUpperCase()} <span>· {t("Risk", "风险")} {number(view.riskScore)}</span></h1><p>{view.macroSummary?.label ?? t("Waiting for aligned market inputs", "等待对齐的市场数据")}</p></div><div className={styles.heroNote}>{view.macroSummary?.interpretation ?? t("Use gamma levels together with breadth and event risk.", "结合 Gamma 价位、市场宽度和事件风险判断。")}</div></div>
+        <OverviewCards view={view} lang={lang} />
         <div className={styles.summaryStrip}>
           <div><small>{t("Suggested Exposure", "建议仓位")}</small><strong>{view.exposure ? `${view.exposure.min}–${view.exposure.max}%` : "—"}</strong><div className={styles.exposure}><i style={{ width: `${view.exposure ? Math.min(100, view.exposure.max / 150 * 100) : 0}%` }} /></div><small>{t("Scale 0–150%", "刻度 0–150%")}</small></div>
           {view.gamma.map(g => <div key={g.symbol}><small>{g.symbol} Gamma</small><strong>{label(g.regime, lang)}</strong><small>{label(g.dealerFlowRegime, lang)}</small></div>)}

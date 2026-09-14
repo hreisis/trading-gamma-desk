@@ -948,3 +948,10 @@ Deterministic shock gate from the official catalyst calendar only. Zod: `src/con
 
 ### Current bounded-chain sampling (2026-09-14)
 Automatic runtime ingestion omits `date`; sessionDate is derived from vendor updated, not request time. The runtime samples at most 30 contracts per symbol, $5 strike spacing, next Friday expiration. Durable attempt records limit retries to the next 09:30 ET credit cycle. `usableGammaCount` excludes null/non-finite/negative gamma and suspect Greeks; it is not the full GEX/OI eligibility count. No-usable-Gamma outcomes fail without replacing latest.
+
+### Restored overview risk snapshot
+- Overview exposes stance, structural risk gauge, QQQ minus SPY structural risk, exposure range and evidence-based drivers in both languages. Screenshot figures are not defaults.
+- Risk uses dated daily inputs plus the event gate's as-of window; it is not an intraday score. Options dates are separately visible.
+- High-beta target preserves the former market snapshot allocation tilt: spread >=5/15 subtracts 2/5 points; spread <=-5/-15 adds 2/5, clamped to 0–100. Missing spread/allocations withhold the action.
+- Durable `risk-spread/bounded-overview-v1/<input-session>.json` saves the first complete observation. Comparison requires the immediately prior trading session and identical source basis; missing/malformed/unavailable history withholds the trend. This baseline is an observation, not an official closing risk fix. Older full-chain history is not mixed into this series.
+- Input confidence is model coverage (effective weight out of 90), not predicted probability of success.

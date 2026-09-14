@@ -265,3 +265,7 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 - Unusable results no longer replace latest; Gamma coverage excludes null Greeks.
 - Removed /market route. Homepage accepts current-session manual Gamma for Risk and AI and exposes the input form. Automatic cones withheld for manual overlays.
 - Small bounded sample is not full-chain walls; a flip may legitimately remain unavailable.
+
+### Overview restoration
+- Restored all five overview information groups in dark bilingual cards, with truthful dates, risk spread and original high-beta tilt.
+- Added durable prior-input-session spread history and missing-history handling; retained all lower-page research sections.

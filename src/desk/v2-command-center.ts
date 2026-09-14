@@ -1,3 +1,4 @@
+import { loadPriorRiskSpread, saveRiskSpread } from "./risk-spread-history";
 import type { DominantDriver } from "@/contracts";
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
 import {
@@ -204,6 +205,7 @@ export interface V2MacroSummary {
 
 export interface V2CommandCenterView {
   readonly decisionStatus: V2DecisionStatus;
+  readonly riskCoverage?: RiskDecisionV1Result["coverage"];
   readonly stance: V2DecisionStance | null;
   readonly riskScore: number | null;
   readonly riskChange: number | null;
@@ -1276,8 +1278,10 @@ export async function buildV2CommandCenterViewWithLedgerContext(
   });
   const eventGate = eventGateFromMarketInput(input.marketInputSnapshot);
   const publicationDate = resolveCurrentMarketSessionDate(now);
-  const priorDivergence =
-    input.dataRoot !== null && input.dataRoot !== undefined
+  const spreadBasis = JSON.stringify([spyGammaSummary.source, qqqGammaSummary.source]);
+  const priorDivergence = input.artifactStore
+    ? await loadPriorRiskSpread(input.artifactStore, targetSession, spreadBasis)
+    : input.dataRoot !== null && input.dataRoot !== undefined
       ? loadPriorPublishedRiskDivergence(input.dataRoot, publicationDate)
       : null;
 
@@ -1348,7 +1352,8 @@ export async function buildV2CommandCenterViewWithLedgerContext(
         })
       : null;
 
-  resolveRiskDivergenceDayOverDay({
+  if (input.artifactStore) await saveRiskSpread(input.artifactStore, targetSession, spreadBasis, riskV1_1);
+  else resolveRiskDivergenceDayOverDay({
     dataRoot: input.dataRoot,
     publicationDate,
     decisionSessionDate: targetSession,
@@ -1359,6 +1364,7 @@ export async function buildV2CommandCenterViewWithLedgerContext(
 
   const view: V2CommandCenterView = {
     decisionStatus: decision.status === "ready" ? "ready" : "awaiting_inputs",
+    riskCoverage: decision.coverage,
     stance: decision.stance,
     riskScore: decision.riskScore,
     riskChange: dayOverDay.riskChange,
