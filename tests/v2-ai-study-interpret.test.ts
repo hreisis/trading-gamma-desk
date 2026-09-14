@@ -704,8 +704,8 @@ describe("v2 command ai study", () => {
       }
       expect(alignment.ok).toBe(true);
 
-      expect(view.aiStudy.status).toBe("ready");
-      expect(view.aiStudy.source).toBe("openai");
+      expect(view.webResearch?.content.sections).toHaveLength(3);
+      expect(view.webResearch?.content.summary.en).toBeTruthy();
 
       const spy = view.gamma[0];
       console.log(

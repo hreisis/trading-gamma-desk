@@ -955,3 +955,11 @@ Automatic runtime ingestion omits `date`; sessionDate is derived from vendor upd
 - High-beta target preserves the former market snapshot allocation tilt: spread >=5/15 subtracts 2/5 points; spread <=-5/-15 adds 2/5, clamped to 0–100. Missing spread/allocations withhold the action.
 - Durable `risk-spread/bounded-overview-v1/<input-session>.json` saves the first complete observation. Comparison requires the immediately prior trading session and identical source basis; missing/malformed/unavailable history withholds the trend. This baseline is an observation, not an official closing risk fix. Older full-chain history is not mixed into this series.
 - Input confidence is model coverage (effective weight out of 90), not predicted probability of success.
+
+### Web-backed AI Study (v1)
+- Responses API hosted `web_search`, required, maximum 3 tool calls, 90s timeout and no automatic retry within the edition. Uses the existing configured AI Study model and deployment key.
+- One bilingual fact set, compact summary plus drivers / watch / invalidation sections. Every section has clickable sources. Source URLs must occur in returned search sources or citation annotations; this is provenance validation, not proof of every claim.
+- `research/web-v1/latest.json` and immutable `history/<slot>.json` retain successful research. Attempts are reserved before paid calls and record sanitized failures. Each New York pre/post edition permits one attempt, shared across language switches. Before 09:00 uses the previous post edition; 09:00–16:00 pre; thereafter post.
+- Refresh is demand-triggered after the home response, not an installed clock-based scheduler. First load shows a preparation state; later page visits use the successful cached edition. A failed update preserves older research with its publication time.
+- Market Consider summarizes the same cached research, while numerical Risk/exposure calculations remain independent. Daily Review retains its existing pipeline; historical research is saved for a later review integration.
+- Official API reference: https://developers.openai.com/api/docs/guides/tools-web-search

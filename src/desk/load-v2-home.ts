@@ -1,3 +1,5 @@
+import { loadWebResearch, readResearchAttempt } from "@/ai-study/web-research";
+import type { WebResearch } from "@/ai-study/web-research-contract";
 import { loadManualGammaSnapshot, buildManualGammaSummary, type ManualGammaSnapshot } from "./manual-gamma";
 import { after } from "next/server";
 import { join } from "node:path";
@@ -80,6 +82,8 @@ export interface LoadV2HomePageInput {
 }
 
 export type V2CommandCenterPageView = V2CommandCenterView & {
+  readonly webResearch?: WebResearch | null;
+  readonly researchAttempt?: {status:string;error?:string} | null;
   readonly aiStudy: V2AiStudyInterpretation;
   readonly dailyReview: V2DailyReview;
   readonly eventGate: EventGateSnapshot | null;
@@ -561,6 +565,7 @@ export async function loadV2HomePage(
 
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
   const payload = buildV2AiStudyPayload(baseView, eventGate);
+  const webResearch = input.demo ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:llmConfig,payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
   const pendingAi: V2AiStudyInterpretation = {
     status: "unavailable", source: "unavailable", confidence: "limited",
     regime: "", baseCase: "", ifThen: "", invalidation: "", tension: "",
@@ -576,11 +581,7 @@ export async function loadV2HomePage(
             review: deterministicReview, context: dailyReviewContext,
             view: baseView, config: llmConfig, env: llmEnv,
           }).catch(() => deterministicReview),
-      input.demo
-        ? Promise.resolve(previewV2AiStudyInterpretation())
-        : generateV2CommandAiStudyInterpretation({
-            payload, config: llmConfig, env: llmEnv,
-          }).catch(() => ({ ...pendingAi, missingReason: "AI narrative unavailable" })),
+      input.demo ? Promise.resolve(previewV2AiStudyInterpretation()) : Promise.resolve(pendingAi),
     ]);
     return lang === "zh" && !input.demo
       ? localizeV2NarrativesToChinese(aiStudyRaw, dailyReviewRaw, llmConfig)
@@ -595,6 +596,8 @@ export async function loadV2HomePage(
   const view: V2CommandCenterPageView = {
     ...baseView,
     manualGammaSnapshot,
+    webResearch,
+    researchAttempt: input.demo ? null : await readResearchAttempt(artifactStore,now),
     aiStudy: localized.aiStudy,
     dailyReview: localized.dailyReview,
     eventGate,

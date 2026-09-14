@@ -1,3 +1,4 @@
+import { WebResearchPanel } from "./WebResearchPanel";
 import { MarketConsider } from "./MarketConsider";
 import { OverviewCards } from "./OverviewCards";
 import { HomeManualGammaInput } from "./MarketDetailPreview";
@@ -84,11 +85,11 @@ function Bars({ rows, lang }: { rows: readonly { symbol: string; value: number }
 export function NarrativePending({ lang }: { lang: V2Language }) {
   return <div className={styles.narratives} aria-live="polite"><Panel title={lang === "zh" ? "AI 研究" : "AI STUDY"}><p>{lang === "zh" ? "正在生成分析，市场数据可先查看。" : "Preparing analysis. Market data is ready to explore."}</p><div className={styles.skeleton} /></Panel><Panel title={lang === "zh" ? "每日复盘" : "DAILY REVIEW"}><p>{lang === "zh" ? "正在准备复盘…" : "Preparing review…"}</p></Panel></div>;
 }
-export async function NarrativeRail({ promise, lang }: { promise: Promise<V2HomeNarratives>; lang: V2Language }) {
+export async function NarrativeRail({ promise, lang, showStudy = true }: { promise: Promise<V2HomeNarratives>; lang: V2Language; showStudy?: boolean }) {
   const { aiStudy: ai, dailyReview: review } = await promise;
   const t = (en: string, zh: string) => lang === "zh" ? zh : en;
   return <div className={styles.narratives}>
-    <Panel title={t("AI STUDY", "AI 研究")} id="ai-study" note={label(ai.confidence, lang)}>
+    {showStudy && <Panel title={t("AI STUDY", "AI 研究")} id="ai-study" note={label(ai.confidence, lang)}>
       <h3 className={styles.aiHeadline}>{ai.regime || t("Market interpretation", "市场解读")}</h3>
       <p>{ai.baseCase || t("Analysis unavailable. Market data remains available.", "分析暂不可用，可继续查看市场数据。")}</p>
       <h4>{t("KEY THINGS TO WATCH", "重点关注")}</h4><p>{ai.whatMattersNext || "—"}</p>
@@ -98,7 +99,7 @@ export async function NarrativeRail({ promise, lang }: { promise: Promise<V2Home
         {[[t("What changed", "发生了什么变化"), ai.whatChanged], [t("Tension", "信号分歧"), ai.tension], [t("Hidden risk", "潜在风险"), ai.hiddenRisk], [t("Reaction quality", "市场反应"), ai.reactionQuality], [t("Cross-asset conflict", "跨资产分歧"), ai.crossAssetConflict]].map(([title, value]) => <div key={title}><h4>{title}</h4><p>{value || "—"}</p></div>)}
         <ul>{ai.dataLimitations.map((line, i) => <li key={i}>{line}</li>)}</ul>
       </details>
-    </Panel>
+    </Panel>}
     <Panel title={t("DAILY REVIEW", "每日复盘")} id="daily-review">
       <h3>{t("Outcome", "实际结果")}</h3><p>{review.actualOutcome || t("Pending close validation", "等待收盘验证")}</p>
       <h4>{t("WHAT WORKED", "有效部分")}</h4><ul>{review.whatWorked.map((line, i) => <li key={i}>{line}</li>)}</ul>
@@ -165,7 +166,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
       <Panel title={t("News & Market Events", "新闻与市场事件")} note={feed?.generatedAt ?? "—"} id="news">
         {news.length ? <ul className={styles.news}>{news.map(item => <li key={item.id}><time>{item.occurredAt.replace("T", " ").slice(0, 16)} UTC</time><span>{item.headline}</span><small>{label(item.importance, lang)}</small></li>)}</ul> : <p>{feed ? t("No events in the selected window.", "所选时间窗口内暂无事件。") : t("Event feed unavailable.", "事件数据暂不可用。")}</p>}
       </Panel>
-    </div><aside className={styles.rail}><Suspense fallback={<NarrativePending lang={lang} />}><NarrativeRail promise={narratives ?? Promise.resolve({ aiStudy: view.aiStudy, dailyReview: view.dailyReview })} lang={lang} /></Suspense></aside></main>
+    </div><aside className={styles.rail}>{!demoMode && <WebResearchPanel research={view.webResearch ?? null} lang={lang} />}<Suspense fallback={demoMode ? <NarrativePending lang={lang} /> : <p className={styles.meta}>{t("Preparing daily review…", "正在准备每日复盘…")}</p>}><NarrativeRail showStudy={demoMode} promise={narratives ?? Promise.resolve({ aiStudy: view.aiStudy, dailyReview: view.dailyReview })} lang={lang} /></Suspense></aside></main>
     <footer className={styles.footer}><b>GammaDesk</b><span>{t("Options flow. Market structure. Clearer decisions.", "期权结构 · 市场研究 · 清晰决策")}</span><small>{t("Market data for information only. Not investment advice.", "市场信息仅供参考，不构成投资建议。")}</small></footer>
   </div>;
 }
