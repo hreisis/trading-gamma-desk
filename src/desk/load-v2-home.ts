@@ -456,7 +456,7 @@ export async function loadV2HomePage(
   const equityBarsBySymbol = new Map<string, readonly DailyBar[]>();
   if (equityBars?.seriesBySymbol) {
     for (const [symbol, series] of equityBars.seriesBySymbol.entries()) {
-      equityBarsBySymbol.set(symbol, series.bars);
+      equityBarsBySymbol.set(symbol, series.bars.filter(bar => bar.sessionDate <= targetMarketSessionDate));
     }
   }
 

@@ -276,6 +276,7 @@ const NASDAQ_BREADTH_MISSING = "Breadth: Nasdaq / high-beta / semis";
 
 export function deriveMissingInputsFromMarketSnapshot(
   snapshot: MarketInputSnapshot | null | undefined,
+  coverage?: { rotation: boolean; creditProxy: boolean; qqqBreadth: boolean },
 ): readonly string[] {
   if (!snapshot) {
     return [NASDAQ_BREADTH_MISSING, ...STATIC_MISSING_INPUTS];
@@ -289,7 +290,15 @@ export function deriveMissingInputsFromMarketSnapshot(
         : field.label,
     );
 
-  missing.push(NASDAQ_BREADTH_MISSING);
+  if (coverage?.rotation) {
+    const index = missing.findIndex(line => line.startsWith("Relative leadership / rotation:"));
+    if (index >= 0) missing.splice(index, 1);
+  }
+  if (coverage?.creditProxy) {
+    const index = missing.findIndex(line => line.startsWith("Credit stress:"));
+    if (index >= 0) missing[index] = "Credit stress: HYG/LQD ETF proxy available; direct credit-spread series unavailable.";
+  }
+  missing.push(coverage?.qqqBreadth ? "Breadth: high-beta / semis constituent coverage unavailable (QQQ available)." : NASDAQ_BREADTH_MISSING);
 
   return missing;
 }
@@ -1307,6 +1316,7 @@ export async function buildV2CommandCenterViewWithLedgerContext(
 
   const marketMissing = deriveMissingInputsFromMarketSnapshot(
     input.marketInputSnapshot,
+    { rotation: sectorRotation.status === "available" && !sectorRotation.stale, creditProxy: creditHygLqd.status === "available", qqqBreadth: qqqBreadth.status === "available" && !qqqBreadth.stale },
   );
   const riskMissing =
     decision.status === "withheld"
