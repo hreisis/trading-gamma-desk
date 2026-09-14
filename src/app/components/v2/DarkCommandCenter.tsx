@@ -133,10 +133,14 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
     </header>
     {demoMode && <div className={styles.notice}>{t("Illustrative methodology preview — not live market data", "方法演示：示意数据，并非实时行情")}</div>}
     <main className={styles.layout}><div className={styles.center}>
+      <section className={styles.marketDecision} aria-label={t("Market decision", "市场决策")}>
+        <div className={styles.decisionHeading}><h1>MARKET DECISION <span>{t("Today's view", "今日决策")}</span></h1><span>{view.sessionDate ?? "—"}</span></div>
+        <div className={styles.stanceLine}><strong>{state}</strong><small>{t("Market stance · daily inputs", "市场立场 · 日频数据")}</small></div>
+        <MarketConsider view={view} lang={lang} />
+      </section>
       <section className={styles.overview} id="overview">
-        <div className={styles.sectionHeading}><span>01</span><h2>{t("Decision overview", "决策总览")}</h2><small>{t("The numbers behind the view", "判断背后的关键指标")}</small></div>
-        <div className={styles.stanceLine}><span>{t("MARKET STANCE", "市场立场")}</span><strong>{state}</strong><small>{t("Risk-based · daily inputs", "基于 Risk · 日频数据")}</small></div>
-        <OverviewCards view={view} lang={lang} introduction={<MarketConsider view={view} lang={lang} />} />
+        <div className={styles.sectionHeading}><span>01</span><h2>{t("Decision overview", "决策总览")}</h2><small>{t("Risk, opportunity & exposure", "风险、机会与仓位")}</small></div>
+        <OverviewCards view={view} lang={lang} />
       </section>
       <div className={styles.sectionHeading} id="structure"><span>02</span><h2>{t("Market structure", "市场结构")}</h2><small>{t("Positioning, price levels & participation", "持仓结构、价格关键位与市场参与度")}</small></div>
       {!demoMode && <HomeManualGammaInput view={view} lang={lang} />}
