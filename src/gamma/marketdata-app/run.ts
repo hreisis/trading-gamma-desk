@@ -402,6 +402,10 @@ export async function runBoundedGammaProvider(
     },
   });
 
+  if (snapshot.status === "unavailable" || snapshot.coverage.contractsUsed === 0) {
+    return { ok: false, code: "no_usable_greeks", error: `No usable Gamma contracts: ${JSON.stringify(snapshot.coverage.skipReasons)}`, path: null, wrote: false };
+  }
+
   const serialized = JSON.stringify(snapshot);
   if (containsSecret(serialized, token)) {
     return {

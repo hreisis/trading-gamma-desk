@@ -1,3 +1,4 @@
+import { HomeManualGammaInput } from "./MarketDetailPreview";
 import { Suspense, type ReactNode } from "react";
 import type { V2CommandCenterPageView, V2HomeNarratives } from "@/desk/load-v2-home";
 import type { V2Language, V2GammaSummary, V2SpyBreadthSummary } from "@/desk/v2-command-center";
@@ -43,13 +44,15 @@ function LevelCard({ g, lang, cone }: { g: V2GammaSummary; lang: V2Language; con
   const entries = [[t("Spot", "现价"), g.spot], ["Call Wall", g.callWall], ["Gamma Flip", g.gammaFlip], ["Put Wall", g.putWall]] as const;
   return <Panel title={`${g.symbol} ${t("Market Structure", "市场结构")}`} note={label(g.regime, lang)}>
     <div className={styles.metrics}>{entries.map(([name, value]) => <div key={name}><small>{name}</small><strong>{number(value, 2)}</strong></div>)}</div>
-    <div className={styles.levelMap} aria-label={t("Option levels on a price scale", "期权价位分布")}>
+    {levels.length > 1 && max > min ? <div className={styles.levelMap} aria-label={t("Option levels on a price scale", "期权价位分布")}>
       <div className={styles.levelTrack} />
       {entries.map(([name, value], i) => value == null ? null : <span key={name} className={i === 0 ? styles.spotMarker : styles.levelMarker} style={{ left: `${pct(value)}%` }} title={`${name}: ${number(value, 2)}`} />)}
       <div className={styles.scale}><span>{levels.length ? number(min, 2) : "—"}</span><span>{t("Spot", "现价")} {number(g.spot, 2)}</span><span>{levels.length ? number(max, 2) : "—"}</span></div>
     </div>
+    : <p>{t("Option levels unavailable", "期权价位暂不可用")}</p>}
     <div className={styles.metricsThree}><div><small>{t("Dealer Flow", "做市商对冲")}</small><b>{label(g.dealerFlowRegime, lang)}</b></div><div><small>IV − HV</small><b>{number(g.volMispricing.spreadVolPts, 1)} vol</b></div><div><small>ROD ({number(g.restOfDayRange.confidencePct)}%)</small><b>{g.restOfDayRange.status === "available" ? `${number(g.restOfDayRange.lower)} – ${number(g.restOfDayRange.upper)}` : t("Unavailable / closed", "暂无数据／已收盘")}</b></div></div>
     <p className={styles.meta}>{t("Options as of", "期权数据日期")} {g.sessionDate ?? "—"} · {t("Expiry", "到期")} {g.expiration ?? "—"} · {g.isFixture ? t("Illustrative", "示意数据") : label(g.status, lang)} {g.freshness ? `· ${label(g.freshness, lang)}` : ""}</p>
+    <p className={styles.meta}>{g.quality}</p>
     <details className={styles.details}><summary>{t("Positioning & range details", "持仓与区间详情")}</summary>
       <p>{rangeLabel}</p><dl className={styles.rows}><div><dt>{t("90% expected range", "90% 预期区间")}</dt><dd>{range?.expectedRange90 ? `${number(range.expectedRange90.lower)} – ${number(range.expectedRange90.upper)}` : "—"}</dd></div><div><dt>{t("50% core range", "50% 核心区间")}</dt><dd>{range?.coreRange50 ? `${number(range.coreRange50.lower)} – ${number(range.coreRange50.upper)}` : "—"}</dd></div><div><dt>Net GEX</dt><dd>{number(g.netGex, 0)}</dd></div><div><dt>{t("Call wall touch", "触及 Call Wall")}</dt><dd>{number(g.callWallTouch.percent)}%</dd></div><div><dt>{t("Put wall touch", "触及 Put Wall")}</dt><dd>{number(g.putWallTouch.percent)}%</dd></div></dl>
       {g.contextLines.map((line, i) => <p key={i}>{line}</p>)}
@@ -136,6 +139,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
           <div><small>{t("Event Risk", "事件风险")}</small><strong>{label(view.eventGate?.state, lang)}</strong><small>{view.eventGate?.stale ? t("Stale data", "数据已过期") : view.eventGate?.marketSessionDate ?? "—"}</small></div>
         </div>
       </section>
+      {!demoMode && <HomeManualGammaInput view={view} lang={lang} />}
       <div className={styles.twoColumns} id="structure">{view.gamma.map(g => <LevelCard key={g.symbol} g={g} lang={lang} cone={view.gammaCone.find(item => item.symbol === g.symbol)} />)}</div>
       <div className={styles.twoColumns}>
         <Panel title={t("Market Breadth", "市场宽度")}><Breadth data={view.spyBreadth} symbol="SPY" lang={lang} /></Panel>

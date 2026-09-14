@@ -681,7 +681,7 @@ function summarizeGammaFromSnapshot(
     putWall: showFlow ? wallStrikeWhenAvailable(snapshot.boundedPutWall) : null,
     callWall: showFlow ? wallStrikeWhenAvailable(snapshot.boundedCallWall) : null,
     regime: showFlow ? snapshot.gammaRegime : null,
-    quality: `${snapshot.status} · bounded single expiry · ${snapshot.coverage.contractsUsed}/${snapshot.coverage.contractsIn} contracts used`,
+    quality: `${snapshot.status} · bounded single expiry · ${snapshot.coverage.contractsUsed}/${snapshot.coverage.contractsIn} contracts used${view.error ? ` · ${view.error.message}` : ""}${snapshot.status === "unavailable" ? ` · ${JSON.stringify(snapshot.coverage.skipReasons)}` : ""}`,
     source: view.sourceLabel,
     isFixture: view.isFixture,
   };
@@ -1147,6 +1147,7 @@ export type V2CommandCenterBuildInput = {
   readonly barPanelLatestSession?: string | null;
   readonly artifactStore?: RuntimeJsonStore;
   readonly forceRiskDecisionDaily?: boolean;
+  readonly gammaOverrides?: readonly V2GammaSummary[];
 };
 
 export async function buildV2CommandCenterView(
@@ -1181,8 +1182,8 @@ export async function buildV2CommandCenterViewWithLedgerContext(
       false,
     );
 
-  const spyGammaSummary = summarizeGamma("SPY", input.spyGamma, gammaOptions);
-  const qqqGammaSummary = summarizeGamma("QQQ", input.qqqGamma, gammaOptions);
+  const spyGammaSummary = input.gammaOverrides?.find(g => g.symbol === "SPY") ?? summarizeGamma("SPY", input.spyGamma, gammaOptions);
+  const qqqGammaSummary = input.gammaOverrides?.find(g => g.symbol === "QQQ") ?? summarizeGamma("QQQ", input.qqqGamma, gammaOptions);
   const ctaProxy = summarizeCtaProxyFromInputs({
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
@@ -1200,14 +1201,14 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     );
   const spyGammaCone = buildGammaCone({
     symbol: "SPY",
-    view: input.spyGamma,
+    view: input.gammaOverrides ? { ...input.spyGamma, snapshot: null, withheldSnapshot: null } : input.spyGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
   });
   const qqqGammaCone = buildGammaCone({
     symbol: "QQQ",
-    view: input.qqqGamma,
+    view: input.gammaOverrides ? { ...input.qqqGamma, snapshot: null, withheldSnapshot: null } : input.qqqGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,

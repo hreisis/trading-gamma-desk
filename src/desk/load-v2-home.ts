@@ -1,3 +1,4 @@
+import { loadManualGammaSnapshot, buildManualGammaSummary, type ManualGammaSnapshot } from "./manual-gamma";
 import { after } from "next/server";
 import { join } from "node:path";
 import {
@@ -83,6 +84,7 @@ export type V2CommandCenterPageView = V2CommandCenterView & {
   readonly dailyReview: V2DailyReview;
   readonly eventGate: EventGateSnapshot | null;
   readonly catalystFeed: CatalystFeedResponse | null;
+  readonly manualGammaSnapshot?: ManualGammaSnapshot | null;
   readonly marketQuotes: readonly AlpacaMarketQuote[];
   readonly technologyInternal: V2TechnologyInternalSummary;
   readonly techLeadersLaggards: V2TechLeadersLaggardsSummary;
@@ -477,9 +479,12 @@ export async function loadV2HomePage(
     },
   });
 
-  const { view: baseView, ledgerFreezeContext } =
+  const manualGammaSnapshot = input.demo ? null : await loadManualGammaSnapshot(artifactStore, targetMarketSessionDate);
+  const gammaOverrides = manualGammaSnapshot ? (["SPY", "QQQ"] as const).map(symbol => buildManualGammaSummary({ snapshot: manualGammaSnapshot, symbol, hv20Bars: equityBarsBySymbol.get(symbol) })) : undefined;
+  const { view: computedView, ledgerFreezeContext } =
     await buildV2CommandCenterViewWithLedgerContext({
     driver: macro.driver,
+    gammaOverrides,
     spyGamma,
     qqqGamma,
     methodologyPreview: input.demo,
@@ -496,6 +501,11 @@ export async function loadV2HomePage(
       runtimeEnv.GAMMADESK_FORCE_RISK_DECISION_DAILY === "1" ||
       runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
   });
+
+  const baseView = gammaOverrides ? {
+    ...computedView,
+    missingInputs: computedView.missingInputs.filter(line => !/^SPY bounded gamma|^QQQ bounded gamma/.test(line)),
+  } : computedView;
 
   if (!input.demo && ledgerFreezeContext && baseView.decisionStatus === "ready") {
     await maybeFreezeDailyDecisionLedgerPrediction({
@@ -582,6 +592,7 @@ export async function loadV2HomePage(
 
   const view: V2CommandCenterPageView = {
     ...baseView,
+    manualGammaSnapshot,
     aiStudy: localized.aiStudy,
     dailyReview: localized.dailyReview,
     eventGate,

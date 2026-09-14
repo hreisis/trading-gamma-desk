@@ -1,3 +1,6 @@
+import { loadAlpacaMarketPanel } from "@/alpaca";
+import { nextMarketDataCreditResetAt } from "@/gamma/marketdata-app/credits";
+import { currentGammaSample } from "@/gamma/marketdata-app/current-sample";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalystQuery, CatalystFeedResponse } from "@/catalyst/types";
@@ -10,13 +13,13 @@ import {
   markMarketDataCreditsExhausted,
   shouldDeferMarketDataGammaRefresh,
 } from "@/gamma/marketdata-app/credits";
-import { resolveBoundedGammaExpiration } from "@/gamma/marketdata-app/resolve-expiration";
 import { runBoundedGammaProvider } from "@/gamma/marketdata-app/run";
 import { boundedGammaArtifactRelativePath, boundedGammaLatestPath } from "@/gamma/marketdata-app/paths";
 import {
   artifactSourceLabel,
   createFilesystemRuntimeJsonStore,
   readJson,
+  writeJson,
   resolveEphemeralDataRoot,
   resolveRuntimeJsonStore,
   type RuntimeJsonStore,
@@ -290,31 +293,6 @@ export async function loadCatalystFeedAsync(
   return sync;
 }
 
-function parseOptionalNumber(raw: string | undefined): number | null {
-  const trimmed = (raw ?? "").trim();
-  if (!trimmed) return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? n : null;
-}
-
-function resolveGammaStrikeParams(
-  symbol: string,
-  env: NodeJS.ProcessEnv,
-): {
-  readonly strikeMin: number;
-  readonly strikeMax: number;
-} {
-  const envMin = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MIN);
-  const envMax = parseOptionalNumber(env.GAMMA_BOUNDED_STRIKE_MAX);
-  if (envMin !== null && envMax !== null) {
-    return { strikeMin: envMin, strikeMax: envMax };
-  }
-  if (symbol === "QQQ") {
-    return { strikeMin: 660, strikeMax: 780 };
-  }
-  return { strikeMin: 700, strikeMax: 820 };
-}
-
 function boundedGammaNeedsRefresh(
   view: BoundedGammaDeskView,
   targetSession: string,
@@ -362,42 +340,38 @@ async function ensureBoundedGammaSnapshot(options: {
     };
   }
 
-  const params = resolveGammaStrikeParams(options.symbol, options.env);
-  const sessionDate = options.targetSession;
-
-  let expiration: Awaited<ReturnType<typeof resolveBoundedGammaExpiration>>;
-  try {
-    expiration = await resolveBoundedGammaExpiration({
-      symbol: options.symbol,
-      sessionDate,
-      configuredExpiration: options.env.GAMMA_BOUNDED_EXPIRATION,
-      token,
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (isMarketDataCreditLimitExhausted({ message })) {
-      markMarketDataCreditsExhausted();
-    }
-    return { ok: false, error: message };
-  }
-
   let pending = gammaRefreshByKey.get(key);
   if (!pending) {
     pending = (async () => {
+      const cycle = nextMarketDataCreditResetAt().toISOString().slice(0, 10);
+      const attemptPath = `gamma/attempts/${options.symbol}-${cycle}.json`;
+      if (await options.artifactStore.exists(attemptPath)) return;
+      const cached = await readJson(options.artifactStore, artifactRelativePath) as { spot?: number } | null;
+      let spot = cached?.spot;
+      if (!spot || !Number.isFinite(spot)) {
+        const panel = await loadAlpacaMarketPanel({ symbols: [options.symbol], env: options.env, publicDemo: false });
+        spot = panel.quotes.find(q => q.symbol === options.symbol)?.latestPrice ?? undefined;
+      }
+      if (!spot) throw new Error("No reference spot for credit-bounded gamma sampling");
+      const sample = currentGammaSample(spot, resolveCurrentMarketSessionDate());
+      // Reserve before any paid call. Failed attempts also wait until the next credit cycle.
+      if (!await writeJson(options.artifactStore, attemptPath, { attemptedAt: new Date().toISOString(), sample })) return;
       ensureDir(options.dataRoot);
       const result = await runBoundedGammaProvider({
         symbol: options.symbol,
-        expiration: expiration.expiration,
-        strikeMin: params.strikeMin,
-        strikeMax: params.strikeMax,
-        strikeStep: 1,
+        expiration: sample.expiration,
+        strikeMin: sample.strikeMin,
+        strikeMax: sample.strikeMax,
+        strikeStep: 5,
+        maxExpectedContracts: 30,
         write: true,
         dataRoot: options.dataRoot,
         token,
         env: options.env,
-        sessionDate,
+        // No date: historical chain requests contain no Greeks.
         artifactStore: options.artifactStore,
       });
+      await writeJson(options.artifactStore, attemptPath, { attemptedAt: new Date().toISOString(), sample, ok: result.ok, error: result.ok ? null : result.error }, { allowOverwrite: true });
       if (!result.ok) {
         if (
           result.code === "credit_limit" ||

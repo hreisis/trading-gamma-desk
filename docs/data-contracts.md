@@ -944,3 +944,7 @@ Deterministic shock gate from the official catalyst calendar only. Zod: `src/con
 7. Snapshots must persist `methodology.signatureVersion` and `methodology.methodologyVersion`, so a past conclusion can be reproduced after weights change.
 8. Proxy inputs must carry `instrument` and `isProxy` end to end, matching the registry. Never display a proxy under the name of the thing it proxies without naming the instrument (e.g. a UUP series is `USD via UUP`, never bare `DXY`).
 9. While `confidenceParams.calibrated` is `false`, no surface may render band labels (`high` / `medium` / `low`). Show the numeric score and its component breakdown instead.
+
+
+### Current bounded-chain sampling (2026-09-14)
+Automatic runtime ingestion omits `date`; sessionDate is derived from vendor updated, not request time. The runtime samples at most 30 contracts per symbol, $5 strike spacing, next Friday expiration. Durable attempt records limit retries to the next 09:30 ET credit cycle. `usableGammaCount` excludes null/non-finite/negative gamma and suspect Greeks; it is not the full GEX/OI eligibility count. No-usable-Gamma outcomes fail without replacing latest.

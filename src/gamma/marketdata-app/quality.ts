@@ -119,7 +119,8 @@ export function buildChainDataQuality(
   const suspectVendorGreeksCount = audits.filter((a) =>
     a.issueCodes.includes(SUSPECT_VENDOR_GREEKS),
   ).length;
-  const usableGammaCount = contractsIn - suspectVendorGreeksCount;
+  const excluded = new Set(audits.filter(a => a.excludedFromGex).map(a => a.symbol));
+  const usableGammaCount = contracts.filter(c => c.gamma !== null && Number.isFinite(c.gamma) && c.gamma >= 0 && !excluded.has(c.symbol)).length;
 
   return {
     nonNullGammaCount,

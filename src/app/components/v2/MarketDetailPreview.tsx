@@ -318,6 +318,12 @@ function inputDefault(value: number | null | undefined, digits = 2) {
   return value == null || !Number.isFinite(value) ? "" : value.toFixed(digits);
 }
 
+export function HomeManualGammaInput({ view, lang }: { view: V2CommandCenterPageView; lang: V2Language }) {
+  const [open, setOpen] = useState(false);
+  const copy = lang === "zh" ? ZH : EN;
+  return <div className="home-manual"><style>{`.home-manual{padding:12px;border:1px solid #203246;border-radius:8px}.home-manual button{padding:8px 12px;cursor:pointer}.home-manual form{display:grid;gap:12px}.home-manual label{display:grid;grid-template-columns:160px 1fr 1fr;gap:12px}.home-manual input,.home-manual select,.home-manual textarea{min-width:0;padding:8px}.home-manual .mk-manual-symbols{display:flex;justify-content:space-evenly}.home-manual .mk-manual-head{display:flex;justify-content:space-between}`}</style>{open ? <ManualGammaPanel view={view} snapshot={view.manualGammaSnapshot ?? null} copy={copy} onClose={() => setOpen(false)} /> : <button onClick={() => setOpen(true)}>{copy.openManual}</button>}</div>;
+}
+
 function ManualGammaPanel({
   view,
   snapshot,

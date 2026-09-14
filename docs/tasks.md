@@ -258,3 +258,10 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 1. Mark task rows done in place (strike or ✅).
 2. Move **Current focus** to the active phase.
 3. Do not expand MVP scope here without updating `product.md`.
+
+## 2026-09-14 Gamma current-chain repair
+- Automatic chain requests omit historical `date` (historical Greeks/IV are null). Vendor timestamps remain authoritative.
+- Automatic sample: 15 strikes at $5 spacing around cached/Alpaca spot, next Friday expiry, maximum 30 contracts per symbol; one durable attempt per symbol per credit-reset cycle. Errors persist under gamma/attempts.
+- Unusable results no longer replace latest; Gamma coverage excludes null Greeks.
+- Removed /market route. Homepage accepts current-session manual Gamma for Risk and AI and exposes the input form. Automatic cones withheld for manual overlays.
+- Small bounded sample is not full-chain walls; a flip may legitimately remain unavailable.
