@@ -22,10 +22,11 @@ it('uses New York publication windows including overnight and winter offsets',()
 });
 it('shares a published bilingual cache and does not search on subsequent reads',async()=>{
  const store=createFilesystemRuntimeJsonStore({dataRoot:mkdtempSync(join(tmpdir(),'research-'))});
- const fetchImpl=vi.fn(async(_url:unknown,_init?:RequestInit)=>new Response(JSON.stringify(response())));
+ const draft={status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({...content,sections:content.sections.map((s,i)=>({...s,sources:[{id:`S${i%2+1}`,publishedAt:null}]}))})}]}]};
+ const fetchImpl=vi.fn(async(_url:unknown,_init?:RequestInit)=>new Response(JSON.stringify(_init?.body&&JSON.parse(String(_init.body)).tools?response():draft)));
  const args={store,config,now:new Date('2026-09-14T21:00:00Z'),payload:{},inputSession:'2026-09-14',fetchImpl};
  const first=await loadWebResearch(args);expect(first?.content.summary.zh).toBe(text.zh);
- await loadWebResearch(args);expect(fetchImpl).toHaveBeenCalledOnce();
+ await loadWebResearch(args);expect(fetchImpl).toHaveBeenCalledTimes(2);
  const body=JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body));expect(body.tools[0].type).toBe('web_search');
 });
 it('serves previous research immediately, retains it on failed refresh, and records failure without secrets',async()=>{
