@@ -153,7 +153,7 @@ function ensureDir(path: string): void {
 }
 
 export async function resolveDeskRequestAsync(
-  options: ResolveDeskRequestOptions = {},
+  options: ResolveDeskRequestOptions & { readonly deferRefresh?: (task: () => Promise<void>) => void } = {},
 ): Promise<MacroDeskView> {
   const env = process.env;
   const publicDemo = options.publicDemo === true || options.demoPath === true;
@@ -179,6 +179,11 @@ export async function resolveDeskRequestAsync(
     !macroSessionStale &&
     !sync.sessionStale
   ) {
+    return sync;
+  }
+
+  if (options.deferRefresh && sync.status !== "empty" && options.source !== "live") {
+    options.deferRefresh(async () => { await ensureMacroDriverArtifact({ dataRoot, env, artifactStore }); });
     return sync;
   }
 
@@ -239,6 +244,7 @@ export async function loadCatalystFeedAsync(
     readonly now?: Date;
     readonly dataRoot?: string;
     readonly forceSynthetic?: boolean;
+    readonly deferRefresh?: (task: () => Promise<void>) => void;
     readonly env?: NodeJS.ProcessEnv;
   } = {},
 ): Promise<CatalystFeedResponse> {
@@ -255,6 +261,11 @@ export async function loadCatalystFeedAsync(
     options.forceSynthetic ||
     sync.mode === "official_calendar"
   ) {
+    return sync;
+  }
+
+  if (sync.mode === "stale_calendar" && options.deferRefresh) {
+    options.deferRefresh(() => ensureCatalystCaches(dataRoot, env));
     return sync;
   }
 
@@ -412,7 +423,7 @@ async function ensureBoundedGammaSnapshot(options: {
 }
 
 export async function loadBoundedGammaDeskViewAsync(
-  options: LoadBoundedGammaOptions = {},
+  options: LoadBoundedGammaOptions & { readonly deferRefresh?: (task: () => Promise<void>) => void } = {},
 ): Promise<BoundedGammaDeskView> {
   const env = options.env ?? process.env;
   const symbol = (options.symbol ?? "SPY").toUpperCase();
@@ -456,6 +467,13 @@ export async function loadBoundedGammaDeskViewAsync(
         },
       };
     }
+    return sync;
+  }
+
+  if (options.deferRefresh && (sync.snapshot !== null || sync.withheldSnapshot !== null)) {
+    options.deferRefresh(async () => {
+      await ensureBoundedGammaSnapshot({ symbol, dataRoot, env, artifactStore, targetSession });
+    });
     return sync;
   }
 
