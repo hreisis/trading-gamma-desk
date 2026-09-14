@@ -131,7 +131,9 @@ const previewLanguageScript = `
       ['Unavailable', '不可用'],
     ]);
 
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const previewRoot = document.querySelector(".pv-app");
+    if (!previewRoot) return;
+    const walker = document.createTreeWalker(previewRoot, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
