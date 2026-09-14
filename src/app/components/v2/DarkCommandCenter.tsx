@@ -1,3 +1,4 @@
+import { MarketConsider } from "./MarketConsider";
 import { OverviewCards } from "./OverviewCards";
 import { HomeManualGammaInput } from "./MarketDetailPreview";
 import { Suspense, type ReactNode } from "react";
@@ -131,32 +132,26 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
     </header>
     {demoMode && <div className={styles.notice}>{t("Illustrative methodology preview — not live market data", "方法演示：示意数据，并非实时行情")}</div>}
     <main className={styles.layout}><div className={styles.center}>
-      <section className={styles.overview} id="overview"><p className={styles.eyebrow}>{t("MARKET DECISION", "市场决策")} · {view.sessionDate ?? t("No aligned session", "暂无对齐交易日")}</p>
+      <section className={styles.overview} id="overview">
+        <MarketConsider view={view} lang={lang} />
+        <div className={styles.sectionHeading}><span>01</span><h2>{t("Decision overview", "决策总览")}</h2><small>{t("The numbers behind the view", "判断背后的关键指标")}</small></div>
         <OverviewCards view={view} lang={lang} />
-        <div className={styles.summaryStrip}>
-          <div><small>{t("Suggested Exposure", "建议仓位")}</small><strong>{view.exposure ? `${view.exposure.min}–${view.exposure.max}%` : "—"}</strong><div className={styles.exposure}><i style={{ width: `${view.exposure ? Math.min(100, view.exposure.max / 150 * 100) : 0}%` }} /></div><small>{t("Scale 0–150%", "刻度 0–150%")}</small></div>
-          {view.gamma.map(g => <div key={g.symbol}><small>{g.symbol} Gamma</small><strong>{label(g.regime, lang)}</strong><small>{label(g.dealerFlowRegime, lang)}</small></div>)}
-          <div><small>{t("Market Breadth", "市场宽度")}</small><strong>{label(view.spyBreadth.breadthSignal, lang)}</strong><small>SPY {number(view.spyBreadth.percentAboveMA20)}% &gt; MA20</small></div>
-          <div><small>{t("Event Risk", "事件风险")}</small><strong>{label(view.eventGate?.state, lang)}</strong><small>{view.eventGate?.stale ? t("Stale data", "数据已过期") : view.eventGate?.marketSessionDate ?? "—"}</small></div>
-        </div>
       </section>
+      <div className={styles.sectionHeading} id="structure"><span>02</span><h2>{t("Market structure", "市场结构")}</h2><small>{t("Positioning, price levels & participation", "持仓结构、价格关键位与市场参与度")}</small></div>
       {!demoMode && <HomeManualGammaInput view={view} lang={lang} />}
-      <div className={styles.twoColumns} id="structure">{view.gamma.map(g => <LevelCard key={g.symbol} g={g} lang={lang} cone={view.gammaCone.find(item => item.symbol === g.symbol)} />)}</div>
+      <div className={styles.twoColumns}>{view.gamma.map(g => <LevelCard key={g.symbol} g={g} lang={lang} cone={view.gammaCone.find(item => item.symbol === g.symbol)} />)}</div>
       <div className={styles.twoColumns}>
         <Panel title={t("Market Breadth", "市场宽度")}><Breadth data={view.spyBreadth} symbol="SPY" lang={lang} /></Panel>
         <Panel title={t("Sector Performance (1D)", "板块表现（1日）")} note={view.sectorRotation.sessionDate ?? "—"}><Bars rows={rotation.map(r => ({ symbol: r.symbol, value: r.return1d }))} lang={lang} /></Panel>
       </div>
-      <Panel title={t("News & Market Events", "新闻与市场事件")} note={feed?.generatedAt ?? "—"} id="news">
-        {news.length ? <ul className={styles.news}>{news.map(item => <li key={item.id}><time>{item.occurredAt.replace("T", " ").slice(0, 16)} UTC</time><span>{item.headline}</span><small>{label(item.importance, lang)}</small></li>)}</ul> : <p>{feed ? t("No events in the selected window.", "所选时间窗口内暂无事件。") : t("Event feed unavailable.", "事件数据暂不可用。")}</p>}
-      </Panel>
-      <div className={styles.sectionHeading} id="rotation"><span>02</span><h2>{t("Rotation & participation", "轮动与市场参与度")}</h2><small>{t("Relative performance, not reported fund flows", "相对表现，不代表已确认资金流向")}</small></div>
+      <div className={styles.sectionHeading} id="rotation"><span>03</span><h2>{t("Rotation & participation", "轮动与市场参与度")}</h2><small>{t("Relative performance, not reported fund flows", "相对表现，不代表已确认资金流向")}</small></div>
       <div className={styles.twoColumns}>
         <Panel title={t("Sector Rotation", "板块轮动")} note={t("5D vs SPY · percentage points", "5日相对 SPY · 百分点")}><Bars rows={[...view.sectorRotation.sectors].sort((a, b) => b.rs5d - a.rs5d).map(r => ({ symbol: r.symbol, value: r.rs5d }))} lang={lang} /><p className={styles.meta}>{view.sectorRotation.sessionDate ?? "—"} · {view.sectorRotation.stale ? t("Stale", "已过期") : label(view.sectorRotation.status, lang)}</p></Panel>
         <Panel title={t("Technology Internal", "科技内部轮动")} note={t("5D vs XLK · percentage points", "5日相对 XLK · 百分点")}><Bars rows={view.technologyInternal.rows.map(r => ({ symbol: r.symbol, value: r.rs5dVsXlk }))} lang={lang} /><p className={styles.meta}>{view.technologyInternal.sessionDate ?? "—"} · {label(view.technologyInternal.status, lang)}</p></Panel>
       </div>
       <div className={styles.twoColumns}><Panel title={t("Nasdaq Participation", "纳斯达克参与度")}><Breadth data={view.qqqBreadth} symbol="QQQ" lang={lang} /></Panel>
         <Panel title={t("Technology Leaders & Laggards", "科技领涨与领跌")} note={view.techLeadersLaggards.sessionDate ?? "—"}><Bars rows={[...view.techLeadersLaggards.leaders, ...view.techLeadersLaggards.laggards].map(r => ({ symbol: r.symbol, value: r.return1dPct }))} lang={lang} /></Panel></div>
-      <div className={styles.sectionHeading} id="macro"><span>03</span><h2>{t("Macro & risk context", "宏观与风险背景")}</h2></div>
+      <div className={styles.sectionHeading} id="macro"><span>04</span><h2>{t("Macro & risk context", "宏观与风险背景")}</h2></div>
       <div className={styles.twoColumns}><Panel title={t("Macro Drivers", "宏观驱动")} note={view.macroSummary?.marketSessionDate ?? "—"}><h3>{view.macroSummary?.label ?? "—"}</h3><p>{view.macroSummary?.interpretation ?? t("No aligned macro snapshot.", "暂无对齐的宏观快照。")}</p><ul>{view.macroSummary?.evidence.map((line, i) => <li key={i}>{line}</li>)}</ul></Panel>
         <Panel title={t("Risk & Allocation", "风险与配置")}><dl className={styles.rows}>
           <div><dt>{t("SPY structural risk", "SPY 结构风险")}</dt><dd>{number(view.spyStructuralRiskScore)}</dd></div><div><dt>{t("QQQ structural risk", "QQQ 结构风险")}</dt><dd>{number(view.qqqStructuralRiskScore)}</dd></div>
@@ -165,6 +160,10 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
         </dl><p className={styles.meta}>{view.riskChangeReason}</p></Panel></div>
       <Panel title={t("Decision Evidence & Data Coverage", "决策依据与数据覆盖")}><ul>{view.evidence.map((line, i) => <li key={i}>{line}</li>)}</ul>
         {view.missingInputs.length > 0 && <details className={styles.details}><summary>{t("Unavailable inputs", "缺失数据")} ({view.missingInputs.length})</summary><ul>{view.missingInputs.map((line, i) => <li key={i}>{line}</li>)}</ul></details>}
+      </Panel>
+      <div className={styles.sectionHeading}><span>05</span><h2>{t("News & events", "新闻与事件")}</h2><small>{t("The latest context to monitor", "需要跟踪的新变化")}</small></div>
+      <Panel title={t("News & Market Events", "新闻与市场事件")} note={feed?.generatedAt ?? "—"} id="news">
+        {news.length ? <ul className={styles.news}>{news.map(item => <li key={item.id}><time>{item.occurredAt.replace("T", " ").slice(0, 16)} UTC</time><span>{item.headline}</span><small>{label(item.importance, lang)}</small></li>)}</ul> : <p>{feed ? t("No events in the selected window.", "所选时间窗口内暂无事件。") : t("Event feed unavailable.", "事件数据暂不可用。")}</p>}
       </Panel>
     </div><aside className={styles.rail}><Suspense fallback={<NarrativePending lang={lang} />}><NarrativeRail promise={narratives ?? Promise.resolve({ aiStudy: view.aiStudy, dailyReview: view.dailyReview })} lang={lang} /></Suspense></aside></main>
     <footer className={styles.footer}><b>GammaDesk</b><span>{t("Options flow. Market structure. Clearer decisions.", "期权结构 · 市场研究 · 清晰决策")}</span><small>{t("Market data for information only. Not investment advice.", "市场信息仅供参考，不构成投资建议。")}</small></footer>
