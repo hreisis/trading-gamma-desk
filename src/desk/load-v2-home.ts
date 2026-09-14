@@ -5,7 +5,6 @@ import { after } from "next/server";
 import { join } from "node:path";
 import {
   buildV2AiStudyPayload,
-  generateV2CommandAiStudyInterpretation,
   previewV2AiStudyInterpretation,
 } from "@/ai-study/v2-command-interpret";
 import {

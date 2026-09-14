@@ -4,15 +4,19 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createFilesystemRuntimeJsonStore,writeJson,readJson} from '@/desk/runtime-store';
 import {researchSlot} from '@/ai-study/web-research-contract';
-import {loadWebResearch,validateResearchResponse} from '@/ai-study/web-research';
+import {loadWebResearch,searchSources} from '@/ai-study/web-research';
 const text={en:'Interpretation, subject to confirmation.',zh:'这是需要验证的市场判断。'};
 const content={headline:text,summary:text,sections:['drivers','watch','invalidation'].map((kind,i)=>({kind,title:text,body:text,sources:[{url:`https://example.com/${i%2}`,title:'Source',publishedAt:null}]})),limitations:text};
 const response=()=>({status:'completed',output:[{type:'web_search_call',status:'completed',action:{sources:[{url:'https://example.com/0'},{url:'https://example.com/1'}]}},{type:'message',content:[{type:'output_text',text:JSON.stringify(content)}]}]});
 const config={apiKey:'test',model:'gpt-4.1-mini',timeoutMs:1000,maxRetries:0,maxOutputTokens:1000,parseRetries:0};
-it('rejects invented citations and non-search completions',()=>{
- expect(validateResearchResponse(response()).sections).toHaveLength(3);
- const r=response();r.output.shift();expect(()=>validateResearchResponse(r)).toThrow();
- const bad=response();bad.output[0]!.action!.sources=[];expect(()=>validateResearchResponse(bad)).toThrow();
+it('accepts native citations but never treats model-written URLs as evidence',()=>{
+ const raw={status:'completed',output:[{type:'message',content:[{
+  type:'output_text',text:JSON.stringify({url:'https://invented.example/story'}),
+  annotations:[{type:'url_citation',url:'https://example.com/verified',title:'Verified source'}],
+ }]}]};
+ expect(searchSources(raw)).toEqual([{id:'S1',url:'https://example.com/verified',title:'Verified source'}]);
+ raw.output[0]!.content[0]!.annotations=[];
+ expect(searchSources(raw)).toEqual([]);
 });
 it('uses New York publication windows including overnight and winter offsets',()=>{
  expect(researchSlot(new Date('2026-09-14T12:00:00Z'))).toBe('2026-09-13-post');

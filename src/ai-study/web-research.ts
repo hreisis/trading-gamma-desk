@@ -7,19 +7,6 @@ import { readJson, writeJson, type RuntimeJsonStore } from '@/desk/runtime-store
 const ROOT='research/web-v1';
 const REQUEST_VERSION='6';
 function canonical(url:string):string {try {const u=new URL(url);for(const key of [...u.searchParams.keys()])if(key.startsWith('utm_')||key==='gclid')u.searchParams.delete(key);u.hash='';return u.href.replace(/\/$/,'');}catch{return '';}}
-export function validateResearchResponse(raw:unknown): z.infer<typeof ResearchContent> {
- const r=raw as {status?:string;output?:Array<Record<string,unknown>>};
- if(r.status!=='completed'||!r.output?.some(x=>x.type==='web_search_call'&&x.status==='completed'))throw new Error('Research did not complete a web search');
- const urls=new Set<string>();
- function collect(x:unknown){if(Array.isArray(x)){x.forEach(collect);return;}if(!x||typeof x!=='object')return;const o=x as Record<string,unknown>;if(typeof o.url==='string'&&o.url.startsWith('https://'))urls.add(canonical(o.url));Object.values(o).forEach(collect);}
- // Only trust URLs returned by tool sources or citation annotations, never model text.
- for(const item of r.output){if(item.type==='web_search_call')collect(item.action);if(item.type==='message')for(const c of (item.content??[]) as Array<Record<string,unknown>>)collect(c.annotations);}
- const content=ResearchContent.parse(JSON.parse(extractOutputText(raw)??''));
- if(new Set(content.sections.map(s=>s.kind)).size!==3)throw new Error('Research sections incomplete');
- for(const section of content.sections)for(const source of section.sources)if(!canonical(source.url)||!urls.has(canonical(source.url)))throw new Error('Research cites an unverified URL');
- if(new Set(content.sections.flatMap(s=>s.sources.map(x=>canonical(x.url)))).size<2)throw new Error('Insufficient independent source pages');
- return content;
-}
 type ResearchInput={now:Date;payload:unknown;inputSession:string|null;config:AiStudyLlmRuntimeConfig;fetchImpl?:typeof fetch};
 type ApiOutput={status?:string;output?:Array<Record<string,unknown>>};
 export function searchSources(raw:ApiOutput):Array<{id:string;url:string;title:string}>{
