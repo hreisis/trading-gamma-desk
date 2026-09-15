@@ -989,3 +989,7 @@ SELL requires downtrend and negative RS at both horizons. BUY requires opportuni
 
 ### Relative pair displays
 SMH/IGV and IBIT/QQQ use 21 identical session dates ending at the displayed input session, based on QQQ's equity-session calendar. Curves are left/right price ratios rebased to 100; tables show each ETF's 1/5/20-session close return and arithmetic return difference in percentage points. Five-session differences within 0.25 pp are displayed as similar performance. This is descriptive, not a BUY/SELL or pair-trade model. Both-down days explicitly distinguish relative leadership from absolute gains. IBIT is an ETF proxy, excludes weekend crypto moves, and uses the existing split-adjusted equity feed rather than direct BTC prices. Missing series are withheld.
+
+
+### ZeroGEX external reference
+Homepage requests fetch SPY/QQQ from the free public MCP once per symbol (no timer/TTL gate, 10s timeout, no retries). Independent Suspense section; demo/fixture excluded. Validated structured responses persist separately under gamma/zerogex; failed or regressing responses retain the prior snapshot with fallback labeling. Missing levels remain null. Provider computation timestamp is not claimed as underlying options time. This reference does not replace MarketData IV or enter deterministic scores.

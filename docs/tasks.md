@@ -290,3 +290,7 @@ Added isolated SMH/IGV/MAG7 experimental table to preview workflow, using existi
 
 ### Open relative-comparison layout
 Added unboxed SMH/IGV and IBIT/QQQ comparisons with ratio charts, aligned return tables and bilingual conclusions. Added IBIT to the existing equity-bar request; experimental theme actions/replay moved into collapsed details. No portfolio model changes.
+
+
+### ZeroGEX external reference
+Homepage requests fetch SPY/QQQ from the free public MCP once per symbol (no timer/TTL gate, 10s timeout, no retries). Independent Suspense section; demo/fixture excluded. Validated structured responses persist separately under gamma/zerogex; failed or regressing responses retain the prior snapshot with fallback labeling. Missing levels remain null. Provider computation timestamp is not claimed as underlying options time. This reference does not replace MarketData IV or enter deterministic scores.

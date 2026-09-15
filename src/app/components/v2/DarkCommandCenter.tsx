@@ -1,3 +1,4 @@
+import { ZeroGexPanel } from "./ZeroGexPanel";
 import {RelativePairs} from "./RelativePairs";
 import {ResearchReviewPanel} from "./ResearchReviewPanel";
 import { WebResearchPanel } from "./WebResearchPanel";
@@ -145,6 +146,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
         <OverviewCards view={view} lang={lang} />
       </section>
       <div className={styles.sectionHeading} id="structure"><span>02</span><h2>{t("Market structure", "市场结构")}</h2><small>{t("Positioning, price levels & participation", "持仓结构、价格关键位与市场参与度")}</small></div>
+      {!demoMode && !forceFixture && <Suspense fallback={<p className={styles.meta}>{t("Fetching delayed Gamma levels…", "正在获取延迟 Gamma 数据…")}</p>}><ZeroGexPanel lang={lang} /></Suspense>}
       {!demoMode && <HomeManualGammaInput view={view} lang={lang} />}
       <div className={styles.twoColumns}>{view.gamma.map(g => <LevelCard key={g.symbol} g={g} lang={lang} cone={view.gammaCone.find(item => item.symbol === g.symbol)} />)}</div>
       <div className={styles.twoColumns}>
