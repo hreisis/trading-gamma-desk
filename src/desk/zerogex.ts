@@ -35,8 +35,14 @@ export async function loadZeroGex(symbol: ZeroGex["symbol"], store: RuntimeJsonS
     const payload = await response.json();
     if (payload.error || payload.result?.isError) throw new Error("Provider error");
     const data = parseZeroGex(payload.result?.structuredContent, symbol);
-    if (previous && Date.parse(data.as_of) < Date.parse(previous.as_of)) return { data: previous, fallback: true };
-    try { await writeJson(store, path, data, { allowOverwrite: true }); } catch { /* Display valid response even if persistence fails. */ }
+    const incomingAt = Date.parse(data.as_of);
+    const previousAt = previous ? Date.parse(previous.as_of) : null;
+    if (previousAt !== null && incomingAt < previousAt) return { data: previous, fallback: true };
+    // The provider is queried on every page request, but an unchanged delayed
+    // snapshot must not consume another Blob write operation.
+    if (previousAt === null || incomingAt > previousAt) {
+      try { await writeJson(store, path, data, { allowOverwrite: true }); } catch { /* Display valid response even if persistence fails. */ }
+    }
     return { data, fallback: false };
   } catch { return { data: previous, fallback: true }; }
 }
