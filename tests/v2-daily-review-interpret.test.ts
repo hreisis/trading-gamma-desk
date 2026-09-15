@@ -254,23 +254,29 @@ describe("v2 daily review thesis critique", () => {
     expect(error.source).toBe("none");
   });
 
-  it("adequate data + buy stance vs down session → model", () => {
+  it("adequate data + ADD positioning vs down session → model", () => {
     const snapshot = { ...baseSnapshot(), stance: "buy" as const };
-    const context = makeContext(snapshot, {
-      open: 771,
-      high: 772,
-      low: 768,
-      close: 769,
-    }, { rodInside: true, direction: "down" });
+    const context = {
+      ...makeContext(snapshot, {
+        open: 771,
+        high: 772,
+        low: 768,
+        close: 769,
+      }, { rodInside: true, direction: "down" as const }),
+      positioning: "ADD" as const,
+    };
     const critique = deriveDailyReviewThesisCritique(context);
     const error = classifyDailyReviewErrorSource(critique, {
       interpretationConfidence: "high",
       limitations: [],
       missingTopics: [],
     });
-    expect(critique.failed.some((line) => /Buy stance conflicted/i.test(line))).toBe(
-      true,
-    );
+    expect(
+      critique.failed.some((line) =>
+        /Positioning ADD conflicted with a negative SPY session close/i.test(line),
+      ),
+    ).toBe(true);
+    expect(critique.failed.some((line) => /Buy stance/i.test(line))).toBe(false);
     expect(error.source).toBe("model");
   });
 
@@ -488,6 +494,7 @@ describe("v2 daily review interpret", () => {
       sessionDate: "2026-08-12",
       morningThesis: {
         stance: "hold",
+        positioning: null,
         stabilizingDealerFlow: true,
         amplifyingDealerFlow: false,
         rodPublished: true,

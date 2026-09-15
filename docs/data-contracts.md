@@ -745,6 +745,7 @@ Credit-bounded, single-expiry MarketData.app → Gamma Engine derived snapshot f
 | `gammaFlip` | Spot-shock modeled flip + `scope: bounded_single_expiry`; `method: spot_shock_bs_gamma` when available |
 | `status` | Same engine semantics: `available` \| `incomplete` \| `partial` \| `unavailable` |
 | Credits | `credits.consumed` / `credits.remaining` from vendor rate-limit headers when present |
+| Credit reset | MarketData.app daily credits reset at **9:30 AM ET** (6:30 AM PT). On HTTP 429 / credit-limit exhaustion, `loadBoundedGammaDeskViewAsync` defers further homepage refresh until reset (`src/gamma/marketdata-app/credits.ts`), does not overwrite blob artifacts, and serves the latest valid persisted snapshot with its real `sessionDate` / vendor as-of when present; otherwise gamma stays unavailable. |
 | Persistence | `data/gamma/providers/marketdata-app/{SYMBOL}-bounded-latest.json` (gitignored); write only on success |
 
 Env: `MARKETDATA_API_TOKEN` (alias `MARKETDATA_APP_TOKEN`). Default safety cap: estimated contracts `strikeCount × 2` ≤ **250** unless `--allow-above-cap`.
@@ -943,3 +944,54 @@ Deterministic shock gate from the official catalyst calendar only. Zod: `src/con
 7. Snapshots must persist `methodology.signatureVersion` and `methodology.methodologyVersion`, so a past conclusion can be reproduced after weights change.
 8. Proxy inputs must carry `instrument` and `isProxy` end to end, matching the registry. Never display a proxy under the name of the thing it proxies without naming the instrument (e.g. a UUP series is `USD via UUP`, never bare `DXY`).
 9. While `confidenceParams.calibrated` is `false`, no surface may render band labels (`high` / `medium` / `low`). Show the numeric score and its component breakdown instead.
+
+
+### Current bounded-chain sampling (2026-09-14)
+Automatic runtime ingestion omits `date`; sessionDate is derived from vendor updated, not request time. The runtime samples at most 30 contracts per symbol, $5 strike spacing, next Friday expiration. Durable attempt records limit retries to the next 09:30 ET credit cycle. `usableGammaCount` excludes null/non-finite/negative gamma and suspect Greeks; it is not the full GEX/OI eligibility count. No-usable-Gamma outcomes fail without replacing latest.
+
+### Restored overview risk snapshot
+- Overview exposes stance, structural risk gauge, QQQ minus SPY structural risk, exposure range and evidence-based drivers in both languages. Screenshot figures are not defaults.
+- Risk uses dated daily inputs plus the event gate's as-of window; it is not an intraday score. Options dates are separately visible.
+- High-beta target preserves the former market snapshot allocation tilt: spread >=5/15 subtracts 2/5 points; spread <=-5/-15 adds 2/5, clamped to 0–100. Missing spread/allocations withhold the action.
+- Durable `risk-spread/bounded-overview-v1/<input-session>.json` saves the first complete observation. Comparison requires the immediately prior trading session and identical source basis; missing/malformed/unavailable history withholds the trend. This baseline is an observation, not an official closing risk fix. Older full-chain history is not mixed into this series.
+- Input confidence is model coverage (effective weight out of 90), not predicted probability of success.
+
+### Web-backed AI Study
+
+Research record schema v2 provides one bilingual edition with sourced drivers, watch, and invalidation sections. See [Web research integration](web-research.md) for generation, cache paths, refresh behavior, and the file map.
+
+### Daily Opportunity V3 (homepage)
+
+Independent of Risk: distance below prior MA20 normalized by prior daily return volatility (40%), SPY breadth washout (30%), and daily decline normalized by prior volatility (30%). Both SPY and QQQ need 21 valid distinct dated closes ending at the target session; SPY breadth must be fresh and same-session. Missing inputs withhold the score instead of renormalizing. Historical V2 replay remains unchanged.
+
+Confirmation is separate: mean index recovery strength combines positive daily recovery and location within five-session closing range; below 50 is unconfirmed, otherwise recovering, with advancing breadth >=60% classified as broadening. Event restrictions remain a separate flag and never alter the numerical opportunity. All weights and thresholds are provisional heuristics, not calibrated probabilities. Daily closes cannot capture intraday V reversals.
+
+Homepage stance/exposure remain Risk-based. Option sensitivity recomputes Risk and Spread without Gamma/IV for diagnostics only, preserving the existing coverage gate. It is not an estimate of what current options would show. Research/AI receives the homepage independent opportunity score.
+
+### Market action V1
+Homepage `marketAction` is independent of legacy risk-classification `stance`. Priority: unavailable Risk -> no action; Risk >65 -> SELL; event blocked/unknown -> HOLD; missing opportunity -> HOLD; Risk <=40 + Opportunity >=65 + unconfirmed -> early BUY; Risk <=40 + Opportunity >=45 + recovery -> BUY; Risk 41–65 + Opportunity >=65 + recovery -> tactical BUY; otherwise HOLD. Recovery means `recovering` or `broadening`. Unknown confirmation cannot unlock BUY. Scores and exposure sizing are unchanged; SELL means reduce exposure, not necessarily liquidate. Thresholds are provisional, not backtest-calibrated.
+
+The command-center snapshot optionally stores the complete versioned action, input scores, confirmation, event flag, rule ID and bilingual reason. Old snapshots remain readable and are not relabeled with today's policy. Review's recorded stance uses the saved action when present; legacy Risk classification remains available separately. Missing a historical action cannot be reconstructed as a forecast.
+
+### Research-linked daily review V1
+`review/research-v1/theses/<targetSession>.json` freezes the first prospective action and research edition (including original sources). Before the open targets today; at/after the open targets the next trading session. Research must have been published no later than capture. Old command-center snapshots are not retroactively promoted into this evidence set.
+
+Review requires both SPY/QQQ daily bars for the last completed session, at least 30 minutes after calendar close. Eligible thesis predates that session's open; evaluation uses open-to-close returns, never the full day's high/low against a later forecast. No eligible thesis produces a closing summary only. Direction is a descriptive check, not PnL; timing and realized portfolio risk cannot be scored from daily bars. Research sector/news conditions remain unverified without corresponding evidence.
+
+A bilingual deterministic baseline is published before optional single-attempt LLM commentary. Direction, timing and risk-control bounds remain deterministic; AI may explain the archived thesis in summary/watch text using only supplied evidence. Immutable editions and generation reservations prevent repeated language-switch charges. Latest success stays visible while newer data is unavailable; interrupted generation leaves its baseline available. Original research sources remain linked, not represented as newly searched evidence.
+
+`/api/cron/research-review` uses the existing CRON_SECRET guard, requests only SPY/QQQ equity bars, and runs at 22:15 UTC daily (18:15 ET summer / 17:15 ET winter). Missing data can be retried on subsequent homepage visits without reserving an AI attempt. Vercel Cron runs only on production deployments; preview uses demand-triggered background generation. This does not schedule new forecast capture; forecasts freeze on homepage publication.
+
+### Theme policy pilot
+Experimental SMH, IGV and fixed seven-member MAG7 research basket; not a portfolio decision input. Requires 55 matching daily sessions for SPY and all theme members, with the requested ending session. MAG7 compounds daily equal-weight member returns (daily rebalancing, no costs). Trend uses MA20/MA50 and MA20's five-session slope; relative strength is 5/20-session return minus SPY. Price-only opportunity is 60% normalized distance below prior MA20 plus 40% normalized daily selloff, using prior return volatility. It is not comparable to the breadth-based market score.
+
+SELL requires downtrend and negative RS at both horizons. BUY requires opportunity >=45, non-downtrend, positive daily return and recovery to the upper half of the five-session closing range. Other cases HOLD. High/unknown overall Risk or gated events convert candidate BUY to HOLD; no forced theme SELL from the overall score alone. Rules are uncalibrated. Missing data is withheld, not substituted. BTC, custom AI infrastructure and defense/aerospace remain disconnected pending universe/data verification. AIQ is labeled broad AI/technology, not a miners-to-HPC basket.
+
+### Relative pair displays
+SMH/IGV and IBIT/QQQ use 21 identical session dates ending at the displayed input session, based on QQQ's equity-session calendar. Curves are left/right price ratios rebased to 100; tables show each ETF's 1/5/20-session close return and arithmetic return difference in percentage points. Five-session differences within 0.25 pp are displayed as similar performance. This is descriptive, not a BUY/SELL or pair-trade model. Both-down days explicitly distinguish relative leadership from absolute gains. IBIT is an ETF proxy, excludes weekend crypto moves, and uses the existing split-adjusted equity feed rather than direct BTC prices. Missing series are withheld.
+
+
+### ZeroGEX primary Gamma source
+Live home loads SPY/QQQ ZeroGEX once per request in parallel with other inputs. It replaces structure levels, net GEX and regimes before risk/divergence/action/narrative computation. The external reference and manual entry sections are removed. Opportunity v3 remains price/breadth based. MarketData remains IV-only for this view; independent volFreshness prevents stale IV from receiving fresh Gamma weighting. No old MarketData Gamma fallback: ZeroGEX failure retains its last snapshot, marked stale by session/age, or returns unavailable. Delayed computation timestamp is not claimed as underlying options time. Demo/fixture paths remain isolated. Old source-derived cones/touch estimates are withheld. Successful snapshots overwrite the same provider-specific latest artifact.
+
+HV20 ranges restored for ZeroGEX: latest completed-session close plus/minus normal quantiles (50%/90%) times close*HV20/sqrt(252). Requires latest-session bars and 21 closes. Explicit one-session closing-price horizon, reference close/date and HV20 shown; not intraday extremes. ZeroGEX walls are overlays only. Intraday touch/ROD remain unavailable rather than fabricated; scores unchanged.

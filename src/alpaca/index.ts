@@ -4,4 +4,3 @@ export * from "./fetch-quotes";
 export * from "./load-market-panel";
 export * from "./demo-fixtures";
 export * from "./errors";
-export * from "./format";

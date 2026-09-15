@@ -26,6 +26,10 @@
     "catalyst:integration:smoke": "tsx --env-file=.env scripts/catalyst-integration-smoke.ts",
     "catalyst:update": "tsx --env-file=.env scripts/update-catalyst.ts",
     "gamma:fetch": "tsx --env-file=.env scripts/fetch-gamma-marketdata.ts",
+    "import:gextool-history": "tsx scripts/import-gextool-history.ts",
+    "replay:risk-history": "tsx scripts/replay-risk-history.ts",
+    "backfill:risk-history-inputs": "tsx scripts/backfill-risk-history-inputs.ts",
+    "backfill:spy-universe-bars": "tsx --env-file=.env scripts/backfill-spy-universe-bars.ts",
     "smoke:demo": "vitest run tests/deploy-smoke.test.ts tests/public-demo.test.ts",
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },

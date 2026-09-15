@@ -300,6 +300,22 @@ describe("MarketInputSnapshot durable breadth field", () => {
 });
 
 describe("loadV2HomePage durable breadth", () => {
+  it("excludes unfinished daily bars from technology returns", async () => {
+    ensureDurableSpyBreadthForMarketInput.mockResolvedValue({snapshot:null,sourceArtifact:null,missingReason:"missing"});
+    ensureDurableQqqBreadthForMarketInput.mockResolvedValue({snapshot:null,sourceArtifact:null,missingReason:"missing"});
+    const bars = ["2026-09-03","2026-09-04","2026-09-08","2026-09-09","2026-09-10","2026-09-11","2026-09-14"].map((sessionDate,i)=>({sessionDate,open:100,high:200,low:100,close:i===6?200:100,volume:1000}));
+    loadAlpacaDailyBarPanel.mockResolvedValueOnce({seriesBySymbol:new Map(["XLK","SMH","NVDA"].map(symbol=>[symbol,{symbol,bars}])),provenance:{latestSessionDate:"2026-09-14"}} as never);
+    const {loadV2HomePage}=await import("@/desk/load-v2-home");
+    vi.useFakeTimers({toFake:["Date"]});
+    vi.setSystemTime(new Date("2026-09-14T18:00:00Z"));
+    const {view}=await loadV2HomePage({demo:false,forceFixture:true});
+    vi.useRealTimers();
+    loadAlpacaDailyBarPanel.mockClear();
+    expect(view.technologyInternal.sessionDate).toBe("2026-09-11");
+    expect(view.technologyInternal.rows.find(row=>row.symbol==="SMH")?.rs5dVsXlk).toBe(0);
+    expect(view.techLeadersLaggards.sessionDate).toBe("2026-09-11");
+  });
+
   it("loads SPY/QQQ daily bars for vol context without universe producers", async () => {
     ensureDurableSpyBreadthForMarketInput.mockImplementation(async (opts) =>
       loadDurableSpyBreadthForMarketInput(opts),

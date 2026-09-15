@@ -7,6 +7,7 @@ import type {
   V2DailyReviewInterpretationContext,
 } from "@/desk/command-center-v1";
 import type { V2AiStudyConfidence, V2CommandCenterView } from "@/desk/v2-command-center";
+import { positioningSessionAlignment } from "@/desk/positioning-v2";
 import type { AiStudyLlmRuntimeConfig } from "./config";
 import {
   describeAiStudyLlmModelSource,
@@ -57,7 +58,7 @@ export const V2_DAILY_REVIEW_SYSTEM_PROMPT = `You are GammaDesk Daily Review —
 
 Output five fields (1–2 short sentences each):
 - what_worked: morning thesis elements validated by session close/high/low and level-touch flags — not raw touch events alone.
-- what_failed: morning thesis elements contradicted by close vs walls/flip/ROD and stance alignment — wall touch alone is NOT a failure.
+- what_failed: morning thesis elements contradicted by close vs walls/flip/ROD and Positioning V2 alignment — wall touch alone is NOT a failure.
 - error_source: exactly one of data | model | regime | none (enum only).
 - error_explanation: brief grounded reason for that classification.
 - tomorrow_watch: 1–2 observable follow-ups already in the payload.
@@ -70,12 +71,13 @@ Output five fields (1–2 short sentences each):
 - ROD outside band only challenges thesis when a published ROD band existed in the morning snapshot.
 - Gamma flip touch alone does not prove regime failure unless close crosses flip versus morning spot side; intraday cross order is NOT available from daily OHLC.
 - data: only when stale/incomplete/missing inputs materially impair the miss discussed.
-- model: adequate inputs but an explicit recorded morning expectation (stance, stabilizing wall hold, published ROD) was contradicted.
+- model: adequate inputs but an explicit recorded morning expectation (Positioning V2, stabilizing wall hold, published ROD) was contradicted.
 - regime: observable gamma-flip regime transition only.
 - none: morning thesis broadly consistent with outcome; no explicit expectation invalidated.
 
 Rules:
 - Use ONLY payload fields. Never invent intraday sequence, probabilities, prices, sectors, or catalysts.
+- Never treat Risk V1 buy/hold/reduce stance as the action. Action alignment uses morningThesis.positioning (Positioning V2) only.
 - sessionOutcome provides daily OHLC and touch flags only.
 - Do not recalculate touches or outcome strings.
 - dataQuality.interpretationConfidence is pre-computed — do NOT output confidence.
@@ -92,6 +94,7 @@ export interface V2DailyReviewPayload {
   readonly sessionDate: string;
   readonly morningThesis: {
     readonly stance: string | null;
+    readonly positioning: string | null;
     readonly stabilizingDealerFlow: boolean;
     readonly amplifyingDealerFlow: boolean;
     readonly rodPublished: boolean;
@@ -336,17 +339,14 @@ export function deriveDailyReviewThesisCritique(
   }
 
   const spyDir = eval_.direction;
-  const stance = snapshot.stance;
-  if (spyDir && stance) {
-    if (stance === "buy" && spyDir === "up") {
-      worked.push("Buy stance aligned with a positive SPY session close.");
-    } else if (stance === "buy" && spyDir === "down") {
-      failed.push("Buy stance conflicted with a negative SPY session close.");
-    } else if (stance === "reduce" && spyDir === "down") {
-      worked.push("Reduce stance aligned with a weaker SPY session close.");
-    } else if (stance === "reduce" && spyDir === "up") {
-      failed.push("Reduce stance conflicted with a positive SPY session close.");
-    }
+  const positioningAlign = positioningSessionAlignment(
+    context.positioning ?? null,
+    spyDir,
+  );
+  if (positioningAlign?.kind === "worked") {
+    worked.push(positioningAlign.line);
+  } else if (positioningAlign?.kind === "failed") {
+    failed.push(positioningAlign.line);
   }
 
   if (
@@ -434,7 +434,9 @@ export function classifyDailyReviewErrorSource(
     };
   }
 
-  const hasStance = critique.failed.some((line) => /stance conflicted/i.test(line));
+  const hasPositioningMiss = critique.failed.some((line) =>
+    /Positioning .+ conflicted/i.test(line),
+  );
   const hasSignal = critique.failed.some((line) =>
     /breadth|CTA proxy conflicted/i.test(line),
   );
@@ -444,8 +446,8 @@ export function classifyDailyReviewErrorSource(
   );
   return {
     source: "model",
-    explanation: hasStance
-      ? "Recorded morning stance expectation was contradicted by session close."
+    explanation: hasPositioningMiss
+      ? "Recorded Positioning V2 expectation was contradicted by session close."
       : hasRod
         ? "Published morning ROD range expectation was contradicted by session close."
         : hasStabilizingWall
@@ -564,6 +566,7 @@ export function buildV2DailyReviewPayload(
     sessionDate: review.sessionDate ?? snapshot.sessionDate,
     morningThesis: {
       stance: snapshot.stance,
+      positioning: context.positioning ?? null,
       stabilizingDealerFlow: isStabilizingDealerFlow(spy.dealerFlow),
       amplifyingDealerFlow: isAmplifyingDealerFlow(spy.dealerFlow),
       rodPublished: rodWasPublished(spy.restOfDayRange),
@@ -691,6 +694,16 @@ export function validateV2DailyReviewLlmGrounding(
     if (!allowedSectors.has(symbol)) {
       return { ok: false, reason: `unsupported sector symbol ${symbol}` };
     }
+  }
+
+  if (
+    /\b(buy|reduce) stance\b/i.test(fullText) ||
+    /\bmodel stance (?:buy|hold|reduce)\b/i.test(fullText)
+  ) {
+    return {
+      ok: false,
+      reason: "Risk V1 stance must not be used as Daily Review action language",
+    };
   }
 
   return { ok: true };

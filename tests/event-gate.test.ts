@@ -100,6 +100,50 @@ function feed(
   };
 }
 
+function independentObservationCatalyst(overrides: {
+  readonly family: "cpi" | "employment_situation";
+  readonly occurredAt: string;
+  readonly referencePeriod: string;
+}): Catalyst {
+  const headline =
+    overrides.family === "cpi"
+      ? `Consumer Price Index — ${overrides.referencePeriod} (independent observation)`
+      : `Employment Situation — ${overrides.referencePeriod} (independent observation)`;
+  return Catalyst.parse({
+    schemaVersion: "0.1.0",
+    id: `cat_obs_${overrides.family}_${overrides.referencePeriod}`,
+    occurredAt: overrides.occurredAt,
+    observedAt: overrides.occurredAt,
+    sourceType: "calendar",
+    sourceName: "BLS Public Data API",
+    sourceUrl: "https://www.bls.gov/",
+    headline,
+    summary: "Official BLS series observation (unmatched to schedule).",
+    category: overrides.family === "cpi" ? "inflation" : "labor",
+    importance: "high",
+    status: "released",
+    affectedAssets: ["US2Y"],
+    macroChannels: overrides.family === "cpi" ? ["inflation"] : ["growth"],
+    direction: "unclear",
+    confidence: {
+      score: 70,
+      calibrated: false,
+      note: "classification clarity only — not a market direction probability",
+    },
+    evidence: [
+      {
+        id: "obs_ev1",
+        statement: `Independent BLS observation ${overrides.family} ${overrides.referencePeriod} (no_matching_schedule): actuals`,
+        basis: "official_bls_series",
+      },
+    ],
+    dedupeKey: `ext:bls-result-${overrides.family}-${overrides.referencePeriod}`,
+    synthetic: false,
+    releaseFamily: overrides.family,
+    referencePeriod: overrides.referencePeriod,
+  });
+}
+
 describe("classifyHighImpactEvent", () => {
   it("keeps FOMC decision and press conference distinct", () => {
     const decision = catalyst({
@@ -115,6 +159,21 @@ describe("classifyHighImpactEvent", () => {
     });
     expect(classifyHighImpactEvent(decision)).toBe("fomc_decision");
     expect(classifyHighImpactEvent(press)).toBe("fomc_press_conference");
+  });
+
+  it("does not treat unmatched BLS series observations as payrolls or CPI events", () => {
+    const payrollsObs = independentObservationCatalyst({
+      family: "employment_situation",
+      occurredAt: "2026-08-17T21:15:23.575Z",
+      referencePeriod: "2026-07",
+    });
+    const cpiObs = independentObservationCatalyst({
+      family: "cpi",
+      occurredAt: "2026-08-17T21:15:23.575Z",
+      referencePeriod: "2026-07",
+    });
+    expect(classifyHighImpactEvent(payrollsObs)).toBeNull();
+    expect(classifyHighImpactEvent(cpiObs)).toBeNull();
   });
 });
 
@@ -316,6 +375,42 @@ describe("buildEventGate", () => {
     expect(gate.state).toBe("clear");
     expect(gate.nextEvent?.kind).toBe("cpi");
     expect(gate.activeEvents).toHaveLength(0);
+  });
+
+  it("does not open scheduled_risk or active_shock from a fetch-stamped independent NFP observation", () => {
+    const observation = independentObservationCatalyst({
+      family: "employment_situation",
+      occurredAt: "2026-08-17T21:15:23.575Z",
+      referencePeriod: "2026-07",
+    });
+    const asOf = "2026-08-17T21:16:00.000Z";
+    const gate = buildEventGate({
+      feed: feed([observation], { generatedAt: asOf }),
+      targetMarketSessionDate: "2026-08-17",
+      generatedAt: asOf,
+      publicDemo: false,
+    });
+    expect(gate.state).toBe("clear");
+    expect(gate.activeEvents).toHaveLength(0);
+    expect(gate.nextEvent).toBeNull();
+  });
+
+  it("still opens payrolls scheduled_risk from an official Employment Situation schedule row", () => {
+    const gate = buildEventGate({
+      feed: feed([
+        catalyst({
+          externalId: "payrolls-scheduled",
+          headline: "Employment Situation scheduled release",
+          releaseFamily: "employment_situation",
+          occurredAt: "2026-08-07T08:30:00-04:00",
+        }),
+      ]),
+      targetMarketSessionDate: "2026-08-06",
+      generatedAt: "2026-08-06T20:00:00-04:00",
+      publicDemo: false,
+    });
+    expect(gate.state).toBe("scheduled_risk");
+    expect(gate.activeEvents[0]?.kind).toBe("payrolls");
   });
 
   it("returns clear after all configured windows have ended", () => {

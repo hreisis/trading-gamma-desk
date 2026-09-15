@@ -11,6 +11,7 @@ import {
   deriveSpyGammaSpotPosition,
   deriveV2AiStudyDataQuality,
   generateV2CommandAiStudyInterpretation,
+  V2_COMMAND_AI_STUDY_SYSTEM_PROMPT,
   validateV2AiStudyLlmGrounding,
   verifyV2AiStudyPayloadAlignsWithView,
   type V2AiStudyPayload,
@@ -39,7 +40,7 @@ function minimalSpyPayload(
   interpretationConfidence: "high" | "moderate" | "limited" = "moderate",
 ): V2AiStudyPayload {
   return {
-    promptVersion: "0.2.0",
+    promptVersion: "0.4.3",
     sessionDate: "2026-08-13",
     decision: {
       stance: "hold",
@@ -47,6 +48,7 @@ function minimalSpyPayload(
       riskChange: 6,
       exposure: { min: 68, max: 84 },
       opportunityScore: 45,
+      riskChangeReason: null,
     },
     spyGamma,
     breadth: {
@@ -92,10 +94,59 @@ describe("v2 command ai study", () => {
     expect(payload.spyGamma).toBeTruthy();
     expect(payload.qqqGamma).toBeUndefined();
     expect(JSON.stringify(payload.spyGamma).includes("option")).toBe(false);
-    expect(payload.dataQuality.interpretationConfidence).toBeDefined();
+    expect(payload.qualitativeContext).toBeDefined();
+    expect(payload.promptVersion).toBe("0.4.3");
   });
 
-  it("produces a deterministic fallback with five copilot sections", async () => {
+  it("requires relational desk-note reasoning without changing output fields", () => {
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Select ONE dominant conflict or confirmation",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Never treat every weakening print as full confirmation",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Elevated/dislocation opportunity may come from washout",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "do not invent intraday ordering",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "confirmation and invalidation conditions",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "NOT a credit-spread series",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Never invent numeric thresholds",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "use its sign for the equity leg",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "The recommended action is ONLY historicalPolicy.positioning",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "<45 = limited tactical opportunity",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Final draft audit before returning JSON",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "For TRIM / DEFENSIVE, REDUCE, and REDUCE CORE",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "the rally/improvement is NOT credit-confirmed",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Never imply a risk-on or easing macro shift caused Risk to rise",
+    );
+    expect(V2_COMMAND_AI_STUDY_SYSTEM_PROMPT).toContain(
+      "Recovery is never a TRIM confirmation",
+    );
+  });
+
+  it("produces a deterministic fallback with ten copilot sections", async () => {
     const spy = loadBoundedGammaDeskView({ forceFixture: true });
     const view = await buildV2CommandCenterView({
       driver: null,
@@ -116,11 +167,27 @@ describe("v2 command ai study", () => {
     expect(fallback.source).toBe("deterministic");
     expect(fallback.regime.length).toBeGreaterThan(0);
     expect(fallback.baseCase.length).toBeGreaterThan(0);
+    expect(fallback.baseCase).not.toMatch(/Model stance/i);
     expect(fallback.ifThen.length).toBeGreaterThan(0);
     expect(fallback.invalidation.length).toBeGreaterThan(0);
     expect(fallback.tension.length).toBeGreaterThan(0);
+    expect(fallback.hiddenRisk.length).toBeGreaterThan(0);
+    expect(fallback.reactionQuality.length).toBeGreaterThan(0);
+    expect(fallback.crossAssetConflict.length).toBeGreaterThan(0);
+    expect(fallback.whatChanged.length).toBeGreaterThan(0);
+    expect(fallback.whatMattersNext.length).toBeGreaterThan(0);
     expect(fallback.confidence).toBeDefined();
     expect(Array.isArray(fallback.dataLimitations)).toBe(true);
+
+    const withPolicy = buildV2AiStudyFallback(
+      buildV2AiStudyPayload(view, null, {
+        positioning: "TRIM / DEFENSIVE",
+        riskTrend: "deteriorating",
+      }),
+    );
+    expect(withPolicy.baseCase).toContain("TRIM / DEFENSIVE");
+    expect(withPolicy.baseCase).not.toMatch(/Model stance/i);
+    expect(withPolicy.regime).not.toMatch(/\bstance\b/i);
   });
 
   it("derives limited confidence when breadth is stale and gamma incomplete", async () => {
@@ -188,6 +255,11 @@ describe("v2 command ai study", () => {
         if_then: "No trigger.",
         invalidation: "None.",
         tension: "None.",
+        hidden_risk: "None.",
+        reaction_quality: "None.",
+        cross_asset_conflict: "None.",
+        what_changed: "None.",
+        what_matters_next: "None.",
       },
       payload,
     );
@@ -223,10 +295,313 @@ describe("v2 command ai study", () => {
         if_then: "If SPY holds → more upside.",
         invalidation: "None.",
         tension: "None.",
+        hidden_risk: "None.",
+        reaction_quality: "None.",
+        cross_asset_conflict: "None.",
+        what_changed: "None.",
+        what_matters_next: "None.",
       },
       limitedPayload,
     );
     expect(result.ok).toBe(false);
+  });
+
+  it("enforces credit field isolation and HYG/LQD terminology", () => {
+    const payload: V2AiStudyPayload = {
+      ...minimalSpyPayload({
+        symbol: "SPY",
+        spot: 770,
+        gammaFlip: 772,
+        putWall: 768,
+        callWall: 775,
+      }),
+      creditHygLqd: {
+        ratio: 0.75,
+        change1dPct: -0.2,
+        trend5dPct: -0.4,
+        signal: "weakening",
+        spyChange1dPct: -0.3,
+        sessionDate: "2026-08-13",
+      },
+    };
+    const base = {
+      regime: "Negative gamma with HYG/LQD weakening.",
+      base_case: "Hold.",
+      if_then: "If breadth improves from Mixed to Strong, participation broadens.",
+      invalidation: "SPY reclaims gamma flip 772.",
+      tension: "Negative gamma vs mixed breadth.",
+      hidden_risk: "HYG/LQD weakening signals deteriorating credit risk appetite.",
+      reaction_quality: "Mixed breadth does not confirm the structure.",
+      cross_asset_conflict: "Equity stress is confirmed by HYG/LQD weakening.",
+      what_changed: "HYG/LQD weakened 0.4% over 5D.",
+      what_matters_next: "SPY reclaiming gamma flip 772 would confirm stabilization.",
+    };
+
+    expect(validateV2AiStudyLlmGrounding(base, payload)).toEqual({
+      ok: false,
+      reason:
+        "HYG/LQD credit evidence is restricted to hidden_risk, cross_asset_conflict, and what_changed",
+    });
+    expect(
+      validateV2AiStudyLlmGrounding(
+        {
+          ...base,
+          regime: "Negative gamma with mixed breadth.",
+          hidden_risk: "Credit spreads widened.",
+        },
+        payload,
+      ),
+    ).toEqual({
+      ok: false,
+      reason: "HYG/LQD is a ratio proxy, not a credit-spread series",
+    });
+  });
+
+  it("rejects future conditions already true at current spot", () => {
+    const payload = minimalSpyPayload({
+      symbol: "SPY",
+      spot: 767,
+      gammaFlip: 772,
+      putWall: 768,
+      callWall: 775,
+    });
+    const result = validateV2AiStudyLlmGrounding(
+      {
+        regime: "Negative gamma with mixed breadth.",
+        base_case: "Hold.",
+        if_then: "If breadth improves from Mixed to Strong, participation broadens.",
+        invalidation: "If SPY falls below put wall 768, downside risk rises.",
+        tension: "Negative gamma vs mixed breadth.",
+        hidden_risk: "Amplifying structure may deepen moves.",
+        reaction_quality: "Mixed breadth does not confirm the structure.",
+        cross_asset_conflict: "No cross-asset conflict flagged.",
+        what_changed: "No prior-session change evidence.",
+        what_matters_next: "SPY reclaiming gamma flip 772 would confirm stabilization.",
+      },
+      payload,
+    );
+    expect(result).toEqual({
+      ok: false,
+      reason: "put-wall condition is already true at current spot",
+    });
+  });
+
+  it("rejects Risk V1 stance as the action when Positioning V2 is present", () => {
+    const payload: V2AiStudyPayload = {
+      ...minimalSpyPayload({
+        symbol: "SPY",
+        spot: 770,
+        gammaFlip: 772,
+        putWall: 768,
+        callWall: 775,
+      }),
+      historicalPolicy: { positioning: "HOLD / WAIT" },
+    };
+    const result = validateV2AiStudyLlmGrounding(
+      {
+        regime: "Positive gamma with mixed breadth.",
+        base_case: "The buy stance is supported by stabilizing dealer flow.",
+        if_then: "If breadth improves from Mixed to Strong, participation broadens.",
+        invalidation: "If breadth deteriorates from Mixed to Weak, participation thins.",
+        tension: "Stabilizing flow vs mixed breadth.",
+        hidden_risk: "No off-model hidden risk is flagged.",
+        reaction_quality: "Mixed breadth does not confirm the structure.",
+        cross_asset_conflict: "No cross-asset conflict is flagged.",
+        what_changed: "Risk ticked higher vs the prior session.",
+        what_matters_next: "Breadth Mixed to Strong would confirm HOLD / WAIT.",
+      },
+      payload,
+    );
+    expect(result).toEqual({
+      ok: false,
+      reason: "Risk V1 stance must not be used as the recommended action",
+    });
+  });
+
+  it("rejects high Opportunity wording below 65 and full credit confirmation on mild HYG/LQD", () => {
+    const payload: V2AiStudyPayload = {
+      ...minimalSpyPayload({
+        symbol: "SPY",
+        spot: 770,
+        gammaFlip: 772,
+        putWall: 768,
+        callWall: 775,
+      }),
+      decision: {
+        stance: "hold",
+        riskScore: 55,
+        riskChange: 5,
+        exposure: { min: 68, max: 84 },
+        opportunityScore: 67,
+        riskChangeReason: null,
+      },
+      historicalPolicy: { positioning: "HOLD" },
+      creditHygLqd: {
+        ratio: 0.7506,
+        change1dPct: -0.13,
+        trend5dPct: -0.35,
+        signal: "weakening",
+        spyChange1dPct: -0.28,
+        sessionDate: "2026-08-13",
+      },
+    };
+    const result = validateV2AiStudyLlmGrounding(
+      {
+        regime: "Negative gamma with mixed breadth.",
+        base_case: "HOLD remains appropriate; elevated dislocation opportunity is not low Risk.",
+        if_then: "If breadth improves from Mixed to Strong, participation broadens.",
+        invalidation: "SPY reclaims gamma flip 772.",
+        tension: "Negative gamma vs mixed breadth.",
+        hidden_risk: "HYG/LQD weakening is a hidden credit-appetite risk.",
+        reaction_quality: "Mixed breadth does not confirm the structure.",
+        cross_asset_conflict:
+          "Equity stress is confirmed by HYG/LQD weakening, a full credit confirmation.",
+        what_changed: "HYG/LQD 1D -0.13% and 5D -0.35%.",
+        what_matters_next: "SPY reclaiming gamma flip 772 would confirm stabilization.",
+      },
+      payload,
+    );
+    expect(result).toEqual({
+      ok: false,
+      reason: "HYG/LQD move is only mild/early confirmation, not full confirmation",
+    });
+
+    const limitedOpp = {
+      ...payload,
+      decision: { ...payload.decision!, opportunityScore: 39 },
+      historicalPolicy: { positioning: "HOLD / WAIT" },
+      creditHygLqd: undefined,
+    };
+    expect(
+      validateV2AiStudyLlmGrounding(
+        {
+          regime: "Positive gamma with mixed breadth.",
+          base_case:
+            "HOLD / WAIT is the action; high Opportunity does not justify adding.",
+          if_then: "If breadth improves from Mixed to Strong, participation broadens.",
+          invalidation: "If breadth deteriorates from Mixed to Weak, participation thins.",
+          tension: "Stabilizing flow vs mixed breadth.",
+          hidden_risk: "No off-model hidden risk is flagged.",
+          reaction_quality: "Mixed breadth does not confirm the structure.",
+          cross_asset_conflict: "No cross-asset conflict is flagged.",
+          what_changed: "Risk ticked higher vs the prior session.",
+          what_matters_next: "Breadth Mixed to Strong would confirm HOLD / WAIT.",
+        },
+        limitedOpp,
+      ),
+    ).toEqual({
+      ok: false,
+      reason: "Opportunity is not in the elevated band",
+    });
+  });
+
+  it("rejects credit-weakening as support for SELECTIVE ADD when equities rose", () => {
+    const payload: V2AiStudyPayload = {
+      ...minimalSpyPayload({
+        symbol: "SPY",
+        spot: 773,
+        gammaFlip: 772,
+        putWall: 768,
+        callWall: 775,
+      }),
+      decision: {
+        stance: "buy",
+        riskScore: 35,
+        riskChange: 0,
+        exposure: { min: 68, max: 84 },
+        opportunityScore: 47,
+        riskChangeReason: "Breadth weak → mixed",
+      },
+      historicalPolicy: { positioning: "SELECTIVE ADD" },
+      creditHygLqd: {
+        ratio: 0.7478,
+        change1dPct: -0.49,
+        trend5dPct: -0.32,
+        signal: "weakening",
+        spyChange1dPct: 0.22,
+        sessionDate: "2026-08-13",
+      },
+    };
+    expect(
+      validateV2AiStudyLlmGrounding(
+        {
+          regime: "Positive gamma with mixed breadth.",
+          base_case: "SELECTIVE ADD is supported by positive gamma.",
+          if_then: "If breadth improves from Mixed to Strong, participation broadens.",
+          invalidation: "If breadth deteriorates from Mixed to Weak, participation thins.",
+          tension: "Mixed breadth vs stabilizing flow.",
+          hidden_risk: "HYG/LQD weakening is a hidden credit-appetite risk.",
+          reaction_quality: "Stabilizing flow aligns with mixed breadth.",
+          cross_asset_conflict:
+            "Mild early credit confirmation supports SELECTIVE ADD positioning.",
+          what_changed: "Breadth improved Weak to Mixed.",
+          what_matters_next: "Breadth Mixed to Strong would confirm SELECTIVE ADD.",
+        },
+        payload,
+      ),
+    ).toEqual({
+      ok: false,
+      reason:
+        "equity up with HYG/LQD weakening means the rally is not credit-confirmed",
+    });
+  });
+
+  it("rejects Risk-rise attribution to risk-on macro and TRIM recovery-as-confirmation", () => {
+    const payload: V2AiStudyPayload = {
+      ...minimalSpyPayload({
+        symbol: "SPY",
+        spot: 770,
+        gammaFlip: 772,
+        putWall: 768,
+        callWall: 775,
+      }),
+      historicalPolicy: { positioning: "TRIM / DEFENSIVE" },
+    };
+    expect(
+      validateV2AiStudyLlmGrounding(
+        {
+          regime: "Negative gamma with weak breadth.",
+          base_case: "TRIM / DEFENSIVE remains the action.",
+          if_then:
+            "If breadth improves from Weak to Strong, the TRIM / DEFENSIVE confirmation is reinforced.",
+          invalidation: "If breadth stays Weak, the thesis is unchanged.",
+          tension: "Negative gamma vs weak breadth.",
+          hidden_risk: "No off-model hidden risk is flagged.",
+          reaction_quality: "Amplifying flow aligns with weak breadth.",
+          cross_asset_conflict: "No cross-asset conflict is flagged.",
+          what_changed: "Risk rose as macro shifted mixed to risk_on.",
+          what_matters_next: "Flip reclaim would confirm TRIM / DEFENSIVE.",
+        },
+        payload,
+      ),
+    ).toEqual({
+      ok: false,
+      reason: "do not attribute a Risk rise to a risk-on or easing factor",
+    });
+
+    expect(
+      validateV2AiStudyLlmGrounding(
+        {
+          regime: "Negative gamma with weak breadth.",
+          base_case: "TRIM / DEFENSIVE remains the action.",
+          if_then:
+            "If breadth stays Weak with amplifying flow, TRIM / DEFENSIVE is confirmed.",
+          invalidation: "If breadth improves from Weak to Mixed, the trim weakens.",
+          tension: "Negative gamma vs weak breadth.",
+          hidden_risk: "No off-model hidden risk is flagged.",
+          reaction_quality: "Amplifying flow aligns with weak breadth.",
+          cross_asset_conflict: "No cross-asset conflict is flagged.",
+          what_changed: "Breadth Mixed to Weak increased Risk.",
+          what_matters_next:
+            "If breadth recovers to Strong, that would confirm TRIM / DEFENSIVE.",
+        },
+        payload,
+      ),
+    ).toEqual({
+      ok: false,
+      reason:
+        "TRIM / DEFENSIVE confirmation cannot be breadth improvement, flip reclaim, or stabilizing flow",
+    });
   });
 
   it("includes macro interpretation and evidence in the payload", async () => {
@@ -329,8 +704,8 @@ describe("v2 command ai study", () => {
       }
       expect(alignment.ok).toBe(true);
 
-      expect(view.aiStudy.status).toBe("ready");
-      expect(view.aiStudy.source).toBe("openai");
+      expect(view.webResearch?.content.sections).toHaveLength(3);
+      expect(view.webResearch?.content.summary.en).toBeTruthy();
 
       const spy = view.gamma[0];
       console.log(
@@ -355,6 +730,11 @@ describe("v2 command ai study", () => {
           if_then: view.aiStudy.ifThen,
           invalidation: view.aiStudy.invalidation,
           tension: view.aiStudy.tension,
+          hidden_risk: view.aiStudy.hiddenRisk,
+          reaction_quality: view.aiStudy.reactionQuality,
+          cross_asset_conflict: view.aiStudy.crossAssetConflict,
+          what_changed: view.aiStudy.whatChanged,
+          what_matters_next: view.aiStudy.whatMattersNext,
         }),
       );
     },

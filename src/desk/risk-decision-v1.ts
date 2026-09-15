@@ -10,10 +10,7 @@ import {
   writeJson,
   type RuntimeJsonStore,
 } from "./runtime-store";
-import type {
-  CtaProxySummary,
-  VolMispricingSummary,
-} from "./format-gamma";
+import type { VolMispricingSummary } from "./format-gamma";
 import type { V2SectorRotationSummary } from "./v2-command-center";
 import {
   computeLeadershipConcentrationPenalty,
@@ -21,6 +18,7 @@ import {
 } from "./risk-leadership-concentration";
 
 export const RISK_DECISION_V1_VERSION = "0.1.0";
+export const RISK_DECISION_V1_MODEL_WEIGHT = 90;
 
 export type RiskDecisionStance = "buy" | "hold" | "reduce";
 export type RiskDecisionConfidence = "high" | "moderate" | "limited";
@@ -71,7 +69,38 @@ export interface RiskDecisionV1DailyRecord {
   readonly marketSessionDate: string;
   readonly generatedAt: string;
   readonly riskScore: number;
+  /** Weighted factor score before leadership concentration (present on new publishes). */
+  readonly baseRiskScore?: number;
+  /** Leadership concentration add-on (present on new publishes). */
+  readonly concentrationPenalty?: number;
   readonly factorContributions: readonly RiskFactorContributionSnapshot[];
+}
+
+/** Canonical Risk V1 factor ids in UI order (headline market risk). */
+export const RISK_V1_FACTOR_IDS = [
+  "breadth",
+  "macro",
+  "vol",
+  "gamma",
+  "event_gate",
+] as const;
+
+export type RiskV1FactorId = (typeof RISK_V1_FACTOR_IDS)[number];
+
+export interface RiskSessionComparison {
+  readonly todaySession: string;
+  readonly previousSession: string | null;
+  readonly todayRiskScore: number | null;
+  readonly previousRiskScore: number | null;
+  readonly todayBaseRiskScore: number | null;
+  readonly previousBaseRiskScore: number | null;
+  readonly todayConcentrationPenalty: number | null;
+  readonly previousConcentrationPenalty: number | null;
+  readonly factors: readonly {
+    readonly id: RiskV1FactorId;
+    readonly todayScore: number | null;
+    readonly previousScore: number | null;
+  }[];
 }
 
 export interface RiskDecisionDayOverDay {
@@ -102,7 +131,6 @@ const PARTIAL_WEIGHT_MULTIPLIER = 0.75;
 
 const BREADTH_WEIGHT = 25;
 const MACRO_WEIGHT = 25;
-const CTA_WEIGHT = 15;
 const VOL_WEIGHT = 15;
 const GAMMA_WEIGHT = 15;
 const EVENT_GATE_WEIGHT = 10;
@@ -175,18 +203,6 @@ function breadthFactorScore(
       return 50;
     case "weak":
       return 80;
-  }
-}
-
-function ctaFactorScore(signal: CtaProxySummary["signal"]): number | null {
-  if (signal === null) return null;
-  switch (signal) {
-    case "buying":
-      return 25;
-    case "neutral":
-      return 50;
-    case "selling":
-      return 75;
   }
 }
 
@@ -263,13 +279,71 @@ function stanceFromRisk(riskScore: number): RiskDecisionStance {
 }
 
 function aggregateRiskScore(factors: readonly RiskFactorContribution[]): number {
-  const totalWeight = factors.reduce((sum, row) => sum + row.effectiveWeight, 0);
-  if (totalWeight <= 0) return 0;
-  const weighted = factors.reduce(
+  const score = aggregateRiskScoreFromContributions(
+    factors.map((row) => ({
+      id: row.id,
+      score: row.score,
+      effectiveWeight: row.effectiveWeight,
+    })),
+  );
+  return score ?? 0;
+}
+
+/** Same weighted average as `aggregateRiskScore`, from stored factor snapshots. */
+export function aggregateRiskScoreFromContributions(
+  contributions: readonly RiskFactorContributionSnapshot[],
+): number | null {
+  const totalWeight = contributions.reduce(
+    (sum, row) => sum + row.effectiveWeight,
+    0,
+  );
+  if (totalWeight <= 0) return null;
+  const weighted = contributions.reduce(
     (sum, row) => sum + row.effectiveWeight * row.score,
     0,
   );
   return roundRisk(weighted / totalWeight);
+}
+
+export function factorScoreFromContributions(
+  contributions: readonly RiskFactorContributionSnapshot[],
+  id: string,
+): number | null {
+  const row = contributions.find((factor) => factor.id === id);
+  return row?.score ?? null;
+}
+
+export function buildRiskSessionComparison(input: {
+  readonly decisionSessionDate: string;
+  readonly today: RiskDecisionV1Result;
+  readonly priorRecord: RiskDecisionV1DailyRecord | null;
+}): RiskSessionComparison | null {
+  if (input.today.status !== "ready") return null;
+
+  const priorContributions =
+    input.priorRecord?.factorContributions ?? [];
+  const factors = RISK_V1_FACTOR_IDS.map((id) => ({
+    id,
+    todayScore: factorScoreFromContributions(
+      input.today.factorContributions,
+      id,
+    ),
+    previousScore: input.priorRecord
+      ? factorScoreFromContributions(priorContributions, id)
+      : null,
+  }));
+
+  return {
+    todaySession: input.decisionSessionDate,
+    previousSession: input.priorRecord?.marketSessionDate ?? null,
+    todayRiskScore: input.today.riskScore,
+    previousRiskScore: input.priorRecord?.riskScore ?? null,
+    todayBaseRiskScore: input.today.baseRiskScore,
+    previousBaseRiskScore: input.priorRecord?.baseRiskScore ?? null,
+    todayConcentrationPenalty: input.today.concentrationPenalty,
+    previousConcentrationPenalty: input.priorRecord?.concentrationPenalty ?? null,
+    factors,
+  };
 }
 
 function buildEvidenceWithConcentration(
@@ -280,7 +354,7 @@ function buildEvidenceWithConcentration(
   concentrationReason: string | null,
 ): readonly string[] {
   const lines: string[] = [
-    `Structural risk ${adjustedRiskScore}/100 · ${coverage.confidence} input coverage (${coverage.effectiveWeight}% of model weight used).`,
+    `Structural risk ${adjustedRiskScore}/100 · ${coverage.confidence} input coverage (${coverage.effectiveWeight} of ${RISK_DECISION_V1_MODEL_WEIGHT} model weight used).`,
   ];
 
   const concentrationLine = formatLeadershipConcentrationEvidence(
@@ -323,11 +397,6 @@ const FACTOR_CHANGE_LABELS: Record<
     eased: "macro eased",
     rose: "macro added risk",
   },
-  cta: {
-    short: "CTA",
-    eased: "CTA strengthened",
-    rose: "CTA weakened",
-  },
   vol: {
     short: "vol mispricing",
     eased: "vol mispricing eased",
@@ -364,6 +433,7 @@ function factorContributionDeltas(
   const deltas: { id: string; delta: number; weight: number }[] = [];
 
   for (const id of ids) {
+    if (!(RISK_V1_FACTOR_IDS as readonly string[]).includes(id)) continue;
     const todayRow = todayById.get(id);
     const prior = previousById.get(id);
     const todayWeighted = todayRow ? factorWeightedContribution(todayRow) : 0;
@@ -485,6 +555,12 @@ function buildRiskDecisionV1DailyRecordFromResult(input: {
     marketSessionDate: input.decisionSessionDate,
     generatedAt: input.now?.toISOString() ?? new Date().toISOString(),
     riskScore,
+    ...(input.today.baseRiskScore !== null
+      ? { baseRiskScore: input.today.baseRiskScore }
+      : {}),
+    ...(input.today.concentrationPenalty !== null
+      ? { concentrationPenalty: input.today.concentrationPenalty }
+      : {}),
     factorContributions: input.today.factorContributions,
   };
 }
@@ -585,6 +661,41 @@ export function loadPriorPublishedRiskDecision(
   return prior.at(-1) ?? null;
 }
 
+/** Latest publishable record for a completed market session strictly before `decisionSessionDate`. */
+export function loadPriorPublishedRiskDecisionForMarketSession(
+  dataRoot: string,
+  decisionSessionDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const prior = listRiskDecisionV1DailyRecords(dataRoot).filter(
+    (record) =>
+      record.marketSessionDate < decisionSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return prior
+    .sort((left, right) =>
+      left.marketSessionDate.localeCompare(right.marketSessionDate),
+    )
+    .at(-1) ?? null;
+}
+
+export function loadPublishedRiskDecisionForMarketSession(
+  dataRoot: string,
+  marketSessionDate: string,
+): RiskDecisionV1DailyRecord | null {
+  const matches = listRiskDecisionV1DailyRecords(dataRoot).filter(
+    (record) =>
+      record.marketSessionDate === marketSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return matches
+    .sort((left, right) =>
+      riskDecisionPublicationDate(left).localeCompare(
+        riskDecisionPublicationDate(right),
+      ),
+    )
+    .at(-1) ?? null;
+}
+
 export async function loadPriorPublishedRiskDecisionAsync(
   artifactStore: RuntimeJsonStore,
   publicationDate: string,
@@ -597,6 +708,44 @@ export async function loadPriorPublishedRiskDecisionAsync(
       isRiskDecisionV1DailyRecordPublishable(record),
   );
   return prior.at(-1) ?? null;
+}
+
+export async function loadPriorPublishedRiskDecisionForMarketSessionAsync(
+  artifactStore: RuntimeJsonStore,
+  decisionSessionDate: string,
+): Promise<RiskDecisionV1DailyRecord | null> {
+  const prior = (
+    await listRiskDecisionV1DailyRecordsAsync(artifactStore)
+  ).filter(
+    (record) =>
+      record.marketSessionDate < decisionSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return prior
+    .sort((left, right) =>
+      left.marketSessionDate.localeCompare(right.marketSessionDate),
+    )
+    .at(-1) ?? null;
+}
+
+export async function loadPublishedRiskDecisionForMarketSessionAsync(
+  artifactStore: RuntimeJsonStore,
+  marketSessionDate: string,
+): Promise<RiskDecisionV1DailyRecord | null> {
+  const matches = (
+    await listRiskDecisionV1DailyRecordsAsync(artifactStore)
+  ).filter(
+    (record) =>
+      record.marketSessionDate === marketSessionDate &&
+      isRiskDecisionV1DailyRecordPublishable(record),
+  );
+  return matches
+    .sort((left, right) =>
+      riskDecisionPublicationDate(left).localeCompare(
+        riskDecisionPublicationDate(right),
+      ),
+    )
+    .at(-1) ?? null;
 }
 
 export function persistRiskDecisionV1Daily(
@@ -712,7 +861,10 @@ export function resolveRiskDecisionDayOverDay(input: {
 }): RiskDecisionDayOverDay {
   const previous =
     input.dataRoot !== null && input.dataRoot !== undefined
-      ? loadPriorPublishedRiskDecision(input.dataRoot, input.publicationDate)
+      ? loadPriorPublishedRiskDecisionForMarketSession(
+          input.dataRoot,
+          input.decisionSessionDate,
+        )
       : null;
 
   const record = buildRiskDecisionV1DailyRecordFromResult({
@@ -755,9 +907,9 @@ export async function resolveRiskDecisionDayOverDayAsync(input: {
   readonly now?: Date;
   readonly force?: boolean;
 }): Promise<RiskDecisionDayOverDay> {
-  const previous = await loadPriorPublishedRiskDecisionAsync(
+  const previous = await loadPriorPublishedRiskDecisionForMarketSessionAsync(
     input.artifactStore,
-    input.publicationDate,
+    input.decisionSessionDate,
   );
 
   const record = buildRiskDecisionV1DailyRecordFromResult({
@@ -809,6 +961,7 @@ export interface RiskDecisionSpyBreadthInput {
 }
 
 export interface RiskDecisionSpyGammaInput {
+  readonly volFreshness?: "fresh" | "stale" | "incomplete" | null;
   readonly status: "ready" | "unavailable" | "incomplete";
   readonly freshness: "fresh" | "stale" | "incomplete" | null;
   readonly regime: string | null;
@@ -820,7 +973,6 @@ export interface DeriveRiskDecisionV1Input {
   readonly driver: DominantDriver | null;
   readonly spyBreadth: RiskDecisionSpyBreadthInput;
   readonly spyGamma: RiskDecisionSpyGammaInput;
-  readonly ctaProxy: CtaProxySummary;
   readonly eventGate: EventGateSnapshot | null;
   readonly sectorRotation?: V2SectorRotationSummary | null;
   readonly targetSession: string;
@@ -851,7 +1003,7 @@ function auditWithheldFactors(
 
   if (effectiveWeight < MIN_EFFECTIVE_WEIGHT) {
     lines.push(
-      `Coverage ${effectiveWeight}% of 100 model weight (minimum 45% required).`,
+      `Coverage ${effectiveWeight} of ${RISK_DECISION_V1_MODEL_WEIGHT} model weight (minimum 45 required).`,
     );
   }
 
@@ -865,14 +1017,6 @@ function auditWithheldFactors(
 
   if (!used.has("macro")) {
     lines.push(`Macro driver: ${macroSkipReason(input.driver)}.`);
-  }
-
-  if (!used.has("cta")) {
-    lines.push(
-      input.ctaProxy.status === "available"
-        ? "CTA proxy signal unavailable."
-        : "CTA proxy unavailable (needs aligned SPY/QQQ quotes and bars).",
-    );
   }
 
   if (!used.has("vol")) {
@@ -949,26 +1093,12 @@ export function deriveRiskDecisionV1(
     }
   }
 
-  if (input.ctaProxy.status === "available" && input.ctaProxy.signal !== null) {
-    const score = ctaFactorScore(input.ctaProxy.signal);
-    if (score !== null) {
-      factors.push({
-        id: "cta",
-        label: "CTA proxy",
-        baseWeight: CTA_WEIGHT,
-        effectiveWeight: CTA_WEIGHT,
-        score,
-        detail: input.ctaProxy.contextLine ?? `CTA proxy ${input.ctaProxy.signal}`,
-      });
-    }
-  }
-
   const vol = input.spyGamma.volMispricing;
   if (vol.status === "available" && vol.signal !== null) {
     const score = volFactorScore(vol.signal);
     if (score !== null) {
       const multiplier =
-        input.spyGamma.freshness === "stale" ? STALE_WEIGHT_MULTIPLIER : 1;
+        (input.spyGamma.volFreshness ?? input.spyGamma.freshness) === "stale" ? STALE_WEIGHT_MULTIPLIER : 1;
       factors.push({
         id: "vol",
         label: "Vol mispricing",
@@ -1037,7 +1167,7 @@ export function deriveRiskDecisionV1(
       evidence: [],
       coverage: null,
       withheldReason:
-        "Structural risk withheld — fewer than 45% of model weight has defensible live inputs.",
+        "Structural risk withheld — fewer than 45 model-weight points have defensible live inputs.",
       withheldFactors: auditWithheldFactors(input, usedIds, effectiveWeight),
       factorContributions: [],
     };

@@ -1,17 +1,30 @@
+import { loadZeroGex } from "./zerogex";
+import {buildRelativePairs,type RelativePair} from "./relative-pairs";
+import {buildThemePilot,replayThemePilot,type ThemePilotRow} from "./theme-pilot";
+import {captureReviewThesis,publishResearchReview,readResearchReview,type ResearchReview} from "./research-review";
+import { loadWebResearch, readResearchAttempt } from "@/ai-study/web-research";
+import type { WebResearch } from "@/ai-study/web-research-contract";
+import { type ManualGammaSnapshot } from "./manual-gamma";
+import { after } from "next/server";
 import { join } from "node:path";
 import {
   buildV2AiStudyPayload,
-  generateV2CommandAiStudyInterpretation,
   previewV2AiStudyInterpretation,
 } from "@/ai-study/v2-command-interpret";
-import { loadAiStudyLlmConfig } from "@/ai-study/config";
+import {
+  loadAiStudyLlmConfig,
+  OPENAI_RESPONSES_URL,
+  openAiResponsesReasoningEffort,
+  type AiStudyLlmRuntimeConfig,
+} from "@/ai-study/config";
+import { extractOutputText } from "@/ai-study/openai-utils";
 import type {
   V2AiStudyInterpretation,
   V2CommandCenterView,
   V2Language,
 } from "./v2-command-center";
 import {
-  buildV2CommandCenterView,
+  buildV2CommandCenterViewWithLedgerContext,
   eventGateFromMarketInput,
   sectorRotationBarSymbols,
   summarizeSpyBreadthFromDurable,
@@ -32,7 +45,11 @@ import { loadAlpacaMarketPanel } from "@/alpaca";
 import { mergeMacroAlpacaWatchlist } from "@/desk/macro-display-returns";
 import { resolveAlpacaWatchlist } from "@/alpaca/config";
 import { loadAlpacaDailyBarPanel } from "@/desk/breadth/bars/alpaca-panel";
+import { HYG_LQD_BAR_SYMBOLS } from "@/desk/hyg-lqd-credit";
 import type { DailyBar } from "@/desk/breadth/bars/types";
+import type { AlpacaMarketQuote } from "@/contracts/alpaca-market";
+import type { EventGateSnapshot } from "@/contracts/event-gate";
+import type { CatalystFeedResponse } from "@/catalyst/types";
 import { resolveRuntimeDataRoot } from "@/desk/production-runtime";
 import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
 import { resolveLastCompletedMarketSessionDate } from "@/ai-study/session";
@@ -46,24 +63,48 @@ import {
 } from "./breadth/read-durable-breadth";
 import {
   buildDeterministicV2DailyReview,
-  buildV2DailyReview,
   maybePersistCommandCenterV1Daily,
   type V2DailyReview,
 } from "./command-center-v1";
+import { maybeAppendPendingDailyDecisionLedgerOutcomes, maybeFreezeDailyDecisionLedgerPrediction } from "./daily-decision-ledger";
 import { generateV2DailyReviewInterpretation } from "@/ai-study/v2-daily-review-interpret";
+import {
+  buildTechnologyInternalSummary,
+  buildTechLeadersLaggardsSummary,
+  technologyUiBarSymbols,
+  type V2TechnologyInternalSummary,
+  type V2TechLeadersLaggardsSummary,
+} from "./v2-ui-projection";
 
 export interface LoadV2HomePageInput {
   readonly demo: boolean;
   readonly source?: DeskSourceQuery | string | null;
   readonly forceFixture?: boolean;
+  /** Stream optional AI narratives after the deterministic market view. */
+  readonly deferNarratives?: boolean;
 }
 
 export type V2CommandCenterPageView = V2CommandCenterView & {
+  readonly webResearch?: WebResearch | null;
+  readonly researchReview?: ResearchReview | null;
+  readonly relativePairs?: readonly RelativePair[];
+  readonly themePilot?: readonly ThemePilotRow[];
+  readonly themeReplay?: ReturnType<typeof replayThemePilot>;
+  readonly researchAttempt?: {status:string;error?:string} | null;
   readonly aiStudy: V2AiStudyInterpretation;
   readonly dailyReview: V2DailyReview;
+  readonly eventGate: EventGateSnapshot | null;
+  readonly catalystFeed: CatalystFeedResponse | null;
+  readonly manualGammaSnapshot?: ManualGammaSnapshot | null;
+  readonly marketQuotes: readonly AlpacaMarketQuote[];
+  readonly technologyInternal: V2TechnologyInternalSummary;
+  readonly techLeadersLaggards: V2TechLeadersLaggardsSummary;
 };
 
+export type V2HomeNarratives = Pick<V2CommandCenterPageView, "aiStudy" | "dailyReview">;
+
 export interface V2HomePageModel {
+  readonly narratives?: Promise<V2HomeNarratives>;
   readonly view: V2CommandCenterPageView;
   readonly lang: V2Language;
   readonly demoMode: boolean;
@@ -73,6 +114,223 @@ export function parseV2Language(raw: string | undefined): V2Language {
   return raw === "zh" ? "zh" : "en";
 }
 
+const V2_ZH_LOCALIZATION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["aiStudy", "dailyReview"],
+  properties: {
+    aiStudy: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "regime",
+        "baseCase",
+        "ifThen",
+        "invalidation",
+        "tension",
+        "hiddenRisk",
+        "reactionQuality",
+        "crossAssetConflict",
+        "whatChanged",
+        "whatMattersNext",
+        "dataLimitations",
+      ],
+      properties: {
+        regime: { type: "string" },
+        baseCase: { type: "string" },
+        ifThen: { type: "string" },
+        invalidation: { type: "string" },
+        tension: { type: "string" },
+        hiddenRisk: { type: "string" },
+        reactionQuality: { type: "string" },
+        crossAssetConflict: { type: "string" },
+        whatChanged: { type: "string" },
+        whatMattersNext: { type: "string" },
+        dataLimitations: { type: "array", items: { type: "string" } },
+      },
+    },
+    dailyReview: {
+      type: "object",
+      additionalProperties: false,
+      required: ["actualOutcome", "whatWorked", "whatFailed", "errorExplanation", "tomorrowWatch", "dataLimitations"],
+      properties: {
+        actualOutcome: { type: "string" },
+        whatWorked: { type: "array", items: { type: "string" } },
+        whatFailed: { type: "array", items: { type: "string" } },
+        errorExplanation: { type: "string" },
+        tomorrowWatch: { type: "array", items: { type: "string" } },
+        dataLimitations: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+} as const;
+
+type V2ZhLocalization = {
+  readonly aiStudy: {
+    readonly regime: string;
+    readonly baseCase: string;
+    readonly ifThen: string;
+    readonly invalidation: string;
+    readonly tension: string;
+    readonly hiddenRisk: string;
+    readonly reactionQuality: string;
+    readonly crossAssetConflict: string;
+    readonly whatChanged: string;
+    readonly whatMattersNext: string;
+    readonly dataLimitations: string[];
+  };
+  readonly dailyReview: {
+    readonly actualOutcome: string;
+    readonly whatWorked: string[];
+    readonly whatFailed: string[];
+    readonly errorExplanation: string;
+    readonly tomorrowWatch: string[];
+    readonly dataLimitations: string[];
+  };
+};
+
+function validZhLocalization(value: unknown): value is V2ZhLocalization {
+  if (!value || typeof value !== "object") return false;
+  const root = value as Record<string, unknown>;
+  const ai = root.aiStudy as Record<string, unknown> | undefined;
+  const review = root.dailyReview as Record<string, unknown> | undefined;
+  const strings = (items: unknown) =>
+    Array.isArray(items) && items.every((item) => typeof item === "string");
+  return Boolean(
+    ai &&
+      review &&
+      typeof ai.regime === "string" &&
+      typeof ai.baseCase === "string" &&
+      typeof ai.ifThen === "string" &&
+      typeof ai.invalidation === "string" &&
+      typeof ai.tension === "string" &&
+      typeof ai.hiddenRisk === "string" &&
+      typeof ai.reactionQuality === "string" &&
+      typeof ai.crossAssetConflict === "string" &&
+      typeof ai.whatChanged === "string" &&
+      typeof ai.whatMattersNext === "string" &&
+      strings(ai.dataLimitations) &&
+      typeof review.actualOutcome === "string" &&
+      strings(review.whatWorked) &&
+      strings(review.whatFailed) &&
+      typeof review.errorExplanation === "string" &&
+      strings(review.tomorrowWatch) &&
+      strings(review.dataLimitations),
+  );
+}
+
+async function localizeV2NarrativesToChinese(
+  aiStudy: V2AiStudyInterpretation,
+  dailyReview: V2DailyReview,
+  config: AiStudyLlmRuntimeConfig,
+): Promise<{ aiStudy: V2AiStudyInterpretation; dailyReview: V2DailyReview }> {
+  if (!config.apiKey) return { aiStudy, dailyReview };
+
+  const source = {
+    aiStudy: {
+      regime: aiStudy.regime,
+      baseCase: aiStudy.baseCase,
+      ifThen: aiStudy.ifThen,
+      invalidation: aiStudy.invalidation,
+      tension: aiStudy.tension,
+      hiddenRisk: aiStudy.hiddenRisk,
+      reactionQuality: aiStudy.reactionQuality,
+      crossAssetConflict: aiStudy.crossAssetConflict,
+      whatChanged: aiStudy.whatChanged,
+      whatMattersNext: aiStudy.whatMattersNext,
+      dataLimitations: [...aiStudy.dataLimitations],
+    },
+    dailyReview: {
+      actualOutcome: dailyReview.actualOutcome,
+      whatWorked: [...dailyReview.whatWorked],
+      whatFailed: [...dailyReview.whatFailed],
+      errorExplanation: dailyReview.errorExplanation,
+      tomorrowWatch: [...dailyReview.tomorrowWatch],
+      dataLimitations: [...dailyReview.dataLimitations],
+    },
+  };
+
+  const reasoning = openAiResponsesReasoningEffort(config.model);
+  const body = {
+    model: config.model,
+    input: [
+      {
+        role: "system",
+        content: [{
+          type: "input_text",
+          text: "You are the Chinese localization layer for GammaDesk. Translate only the supplied narrative strings into concise natural Simplified Chinese. Preserve every number, percentage, date, ticker, ETF symbol, price level, and technical token exactly. Keep SPY, QQQ, CTA, IV, HV, Gamma, Call Wall, Put Wall, Gamma Flip, Net GEX, ROD, ETF symbols, and enum/status identifiers unchanged when they appear. Do not add analysis, advice, facts, levels, or explanations. Keep array item counts unchanged. Return only the required JSON object.",
+        }],
+      },
+      {
+        role: "user",
+        content: [{ type: "input_text", text: JSON.stringify(source) }],
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "v2_zh_localization",
+        strict: true,
+        schema: V2_ZH_LOCALIZATION_SCHEMA,
+      },
+    },
+    ...(reasoning ? { reasoning } : {}),
+    max_output_tokens: Math.max(1800, config.maxOutputTokens),
+  };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+    try {
+      const response = await fetch(OPENAI_RESPONSES_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!response.ok) return { aiStudy, dailyReview };
+      const raw = await response.json() as unknown;
+      const text = extractOutputText(raw);
+      if (!text) return { aiStudy, dailyReview };
+      const parsed = JSON.parse(text) as unknown;
+      if (!validZhLocalization(parsed)) return { aiStudy, dailyReview };
+
+      return {
+        aiStudy: {
+          ...aiStudy,
+          regime: parsed.aiStudy.regime,
+          baseCase: parsed.aiStudy.baseCase,
+          ifThen: parsed.aiStudy.ifThen,
+          invalidation: parsed.aiStudy.invalidation,
+          tension: parsed.aiStudy.tension,
+          hiddenRisk: parsed.aiStudy.hiddenRisk,
+          reactionQuality: parsed.aiStudy.reactionQuality,
+          crossAssetConflict: parsed.aiStudy.crossAssetConflict,
+          whatChanged: parsed.aiStudy.whatChanged,
+          whatMattersNext: parsed.aiStudy.whatMattersNext,
+          dataLimitations: parsed.aiStudy.dataLimitations,
+        },
+        dailyReview: {
+          ...dailyReview,
+          actualOutcome: parsed.dailyReview.actualOutcome,
+          whatWorked: parsed.dailyReview.whatWorked,
+          whatFailed: parsed.dailyReview.whatFailed,
+          errorExplanation: parsed.dailyReview.errorExplanation,
+          tomorrowWatch: parsed.dailyReview.tomorrowWatch,
+          dataLimitations: parsed.dailyReview.dataLimitations,
+        },
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return { aiStudy, dailyReview };
+  }
+}
+
 async function loadGamma(
   symbol: "SPY" | "QQQ",
   options: Pick<LoadBoundedGammaOptions, "forceFixture" | "publicDemo">,
@@ -80,6 +338,7 @@ async function loadGamma(
   runtime: {
     readonly dataRoot: string;
     readonly gammaDataRoot: string;
+    readonly deferRefresh?: (task: () => Promise<void>) => void;
     readonly now: Date;
     readonly env: NodeJS.ProcessEnv;
   },
@@ -98,6 +357,7 @@ async function loadGamma(
     dataRoot: runtime.gammaDataRoot,
     env: runtime.env,
     now: runtime.now,
+    deferRefresh: runtime.deferRefresh,
   });
 }
 
@@ -111,26 +371,31 @@ export async function loadV2HomePage(
   const dataRoot = resolveRuntimeDataRoot(process.env);
   const runtimeEnv = process.env;
   const artifactStore = resolveRuntimeJsonStore(runtimeEnv);
+  const deferRefresh = input.deferNarratives ? (task: () => Promise<void>) => after(task) : undefined;
   const gammaDataRoot = join(dataRoot, "gamma", "providers", "marketdata-app");
 
-  const macro = input.demo
+  const macroPromise = input.demo
     ? resolveDeskRequest({ demoPath: true, publicDemo: true })
-    : await resolveDeskRequestAsync({
+    : resolveDeskRequestAsync({
         source: input.source,
+        deferRefresh,
         publicDemo: false,
         dataRoot,
       });
 
   const gammaOptions = { forceFixture, publicDemo: input.demo } as const;
   const gammaRuntime = {
+    deferRefresh,
     dataRoot,
     gammaDataRoot,
     now,
     env: runtimeEnv,
   };
 
-  const [spyGamma, qqqGamma, spyBreadthLoad, qqqBreadthLoad, marketPanel, equityBars, catalystFeed] =
+  const zeroGexPromise = !input.demo && !forceFixture ? Promise.all((["SPY", "QQQ"] as const).map(symbol => loadZeroGex(symbol, artifactStore))) : Promise.resolve(undefined);
+  const [macro, spyGamma, qqqGamma, spyBreadthLoad, qqqBreadthLoad, marketPanel, equityBars, catalystFeed] =
     await Promise.all([
+    macroPromise,
     loadGamma("SPY", gammaOptions, input.demo, gammaRuntime),
     loadGamma("QQQ", gammaOptions, input.demo, gammaRuntime),
     input.demo
@@ -140,13 +405,13 @@ export async function loadV2HomePage(
           missingReason: "SPY breadth is not computed on the public demo path.",
         })
       : ensureDurableSpyBreadthForMarketInput({
+          deferRefresh,
           targetMarketSessionDate,
           publicDemo: false,
           dataRoot,
           env: runtimeEnv,
         }).catch((error: unknown) => {
-          const detail =
-            error instanceof Error ? error.message : String(error);
+          const detail = error instanceof Error ? error.message : String(error);
           return {
             snapshot: null,
             sourceArtifact: null,
@@ -160,13 +425,13 @@ export async function loadV2HomePage(
           missingReason: "QQQ breadth is not computed on the public demo path.",
         })
       : ensureDurableQqqBreadthForMarketInput({
+          deferRefresh,
           targetMarketSessionDate,
           publicDemo: false,
           dataRoot,
           env: runtimeEnv,
         }).catch((error: unknown) => {
-          const detail =
-            error instanceof Error ? error.message : String(error);
+          const detail = error instanceof Error ? error.message : String(error);
           return {
             snapshot: null,
             sourceArtifact: null,
@@ -180,13 +445,21 @@ export async function loadV2HomePage(
       symbols: mergeMacroAlpacaWatchlist(resolveAlpacaWatchlist(runtimeEnv)),
     }).catch(() => null),
     loadAlpacaDailyBarPanel({
-      symbols: [...new Set(["QQQ", ...sectorRotationBarSymbols()])],
+      symbols: [
+        ...new Set([
+          "QQQ", "IBIT",
+          ...sectorRotationBarSymbols(),
+          ...technologyUiBarSymbols(),
+          ...HYG_LQD_BAR_SYMBOLS,
+        ]),
+      ],
       env: runtimeEnv,
       dataRoot,
     }).catch(() => null),
     input.demo
       ? Promise.resolve(null)
       : loadCatalystFeedAsync({}, {
+          deferRefresh,
           publicDemo: false,
           now,
           dataRoot,
@@ -197,9 +470,12 @@ export async function loadV2HomePage(
   const equityBarsBySymbol = new Map<string, readonly DailyBar[]>();
   if (equityBars?.seriesBySymbol) {
     for (const [symbol, series] of equityBars.seriesBySymbol.entries()) {
-      equityBarsBySymbol.set(symbol, series.bars);
+      equityBarsBySymbol.set(symbol, series.bars.filter(bar => bar.sessionDate <= targetMarketSessionDate));
     }
   }
+
+  const technologyInternal = buildTechnologyInternalSummary(equityBarsBySymbol);
+  const techLeadersLaggards = buildTechLeadersLaggardsSummary(equityBarsBySymbol);
 
   const marketInputSnapshot = buildMarketInputSnapshot({
     targetMarketSessionDate,
@@ -217,8 +493,14 @@ export async function loadV2HomePage(
     },
   });
 
-  const baseView = await buildV2CommandCenterView({
+  const manualGammaSnapshot = null;
+  const gammaOverrides = undefined;
+  const zeroGex = !input.demo && !forceFixture ? await zeroGexPromise : undefined;
+  const { view: computedView, ledgerFreezeContext } =
+    await buildV2CommandCenterViewWithLedgerContext({
     driver: macro.driver,
+    gammaOverrides,
+    zeroGex,
     spyGamma,
     qqqGamma,
     methodologyPreview: input.demo,
@@ -236,6 +518,32 @@ export async function loadV2HomePage(
       runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
   });
 
+  const baseView = zeroGex?.every(row => row.data) ? {
+    ...computedView,
+    missingInputs: computedView.missingInputs.filter(line => !/^SPY bounded gamma|^QQQ bounded gamma/.test(line)),
+  } : computedView;
+
+  if (!input.demo && ledgerFreezeContext && baseView.decisionStatus === "ready") {
+    await maybeFreezeDailyDecisionLedgerPrediction({
+      view: baseView,
+      decision: ledgerFreezeContext.decision,
+      eventGate: ledgerFreezeContext.eventGate,
+      publicationDate: ledgerFreezeContext.publicationDate,
+      frozenAt: now.toISOString(),
+      dataRoot,
+      artifactStore,
+    });
+  }
+
+  if (!input.demo) {
+    await maybeAppendPendingDailyDecisionLedgerOutcomes({
+      now,
+      equityBarsBySymbol,
+      dataRoot,
+      artifactStore,
+    });
+  }
+
   if (!input.demo) {
     await maybePersistCommandCenterV1Daily({
       dataRoot,
@@ -252,6 +560,9 @@ export async function loadV2HomePage(
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     AI_STUDY_LLM_MODEL: process.env.AI_STUDY_LLM_MODEL,
   };
+  const llmConfig = loadAiStudyLlmConfig(llmEnv, input.deferNarratives
+    ? { timeoutMs: 8000, maxRetries: 0, parseRetries: 0 }
+    : {});
 
   const { review: deterministicReview, context: dailyReviewContext } =
     await buildDeterministicV2DailyReview({
@@ -262,28 +573,62 @@ export async function loadV2HomePage(
       equityBarsBySymbol,
     });
 
-  const dailyReview =
-    input.demo || deterministicReview.status !== "ready" || !dailyReviewContext
-      ? deterministicReview
-      : await generateV2DailyReviewInterpretation({
-          review: deterministicReview,
-          context: dailyReviewContext,
-          view: baseView,
-          config: loadAiStudyLlmConfig(llmEnv),
-          env: llmEnv,
-        });
-
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
   const payload = buildV2AiStudyPayload(baseView, eventGate);
-  const aiStudy = input.demo
-    ? previewV2AiStudyInterpretation()
-    : await generateV2CommandAiStudyInterpretation({
-        payload,
-        config: loadAiStudyLlmConfig(llmEnv),
-        env: llmEnv,
-      });
+  const webResearch = input.demo ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"},payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
+  const researchReview = input.demo ? null : await readResearchReview(artifactStore);
+  if (!input.demo) {
+    const reviewTask = async () => {
+      await captureReviewThesis({store:artifactStore,now,inputSession:baseView.sessionDate,action:baseView.marketAction,research:webResearch});
+      await publishResearchReview({store:artifactStore,now,bars:equityBarsBySymbol ?? new Map(),config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"}});
+    };
+    if (deferRefresh) deferRefresh(async()=>{try{await reviewTask();}catch{ /* Keep previously published review visible. */ }});
+    else await reviewTask().catch(()=>undefined);
+  }
+  const pendingAi: V2AiStudyInterpretation = {
+    status: "unavailable", source: "unavailable", confidence: "limited",
+    regime: "", baseCase: "", ifThen: "", invalidation: "", tension: "",
+    hiddenRisk: "", reactionQuality: "", crossAssetConflict: "",
+    whatChanged: "", whatMattersNext: "", dataLimitations: [],
+    missingReason: "AI narrative pending",
+  };
+  async function generateNarratives(): Promise<V2HomeNarratives> {
+    const [dailyReviewRaw, aiStudyRaw] = await Promise.all([
+      input.demo || deterministicReview.status !== "ready" || !dailyReviewContext
+        ? Promise.resolve(deterministicReview)
+        : generateV2DailyReviewInterpretation({
+            review: deterministicReview, context: dailyReviewContext,
+            view: baseView, config: llmConfig, env: llmEnv,
+          }).catch(() => deterministicReview),
+      input.demo ? Promise.resolve(previewV2AiStudyInterpretation()) : Promise.resolve(pendingAi),
+    ]);
+    return lang === "zh" && !input.demo
+      ? localizeV2NarrativesToChinese(aiStudyRaw, dailyReviewRaw, llmConfig)
+      : { aiStudy: aiStudyRaw, dailyReview: dailyReviewRaw };
+  }
+  // No unobserved background task: the page awaits this promise inside Suspense.
+  const narratives = input.demo ? generateNarratives() : Promise.resolve({aiStudy:pendingAi,dailyReview:deterministicReview});
+  const localized = input.deferNarratives
+    ? { aiStudy: pendingAi, dailyReview: deterministicReview }
+    : await narratives;
 
-  const view: V2CommandCenterPageView = { ...baseView, aiStudy, dailyReview };
+  const view: V2CommandCenterPageView = {
+    ...baseView,
+    relativePairs: input.demo ? [] : buildRelativePairs(equityBarsBySymbol ?? new Map(),baseView.sessionDate ?? targetMarketSessionDate),
+    themeReplay: input.demo ? [] : replayThemePilot({bars:equityBarsBySymbol ?? new Map(),sessionDate:baseView.sessionDate ?? targetMarketSessionDate}),
+    themePilot: input.demo ? [] : buildThemePilot({bars:equityBarsBySymbol ?? new Map(),sessionDate:baseView.sessionDate ?? targetMarketSessionDate,risk:baseView.riskScore,eventBlocked:baseView.opportunity?.eventBlocked ?? true}),
+    manualGammaSnapshot,
+    webResearch,
+    researchReview: input.demo ? null : researchReview ?? await readResearchReview(artifactStore),
+    researchAttempt: input.demo ? null : await readResearchAttempt(artifactStore,now),
+    aiStudy: localized.aiStudy,
+    dailyReview: localized.dailyReview,
+    eventGate,
+    catalystFeed: catalystFeed ?? null,
+    marketQuotes: marketPanel?.quotes ?? [],
+    technologyInternal,
+    techLeadersLaggards,
+  };
 
-  return { view, lang, demoMode: input.demo };
+  return { view, lang, demoMode: input.demo, ...(input.deferNarratives ? { narratives } : {}) };
 }

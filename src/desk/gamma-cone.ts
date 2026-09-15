@@ -8,6 +8,7 @@ import type { BoundedGammaProviderSnapshot } from "@/contracts";
 import type { BoundedGammaDeskView } from "./load-bounded-gamma";
 import { wallStrikeWhenAvailable } from "./bounded-gamma-freshness";
 import {
+  computeHv20AnnualizedPct,
   computeRestOfDayConeBands,
   dealerFlowRegimeLabel,
   estimateWallTouchProbabilities,
@@ -76,7 +77,9 @@ export interface GammaConeProvenance {
   readonly ivDataLabel: string | null;
   readonly optionsSessionDate: string | null;
   readonly isFixture: boolean;
-  readonly fullSessionMode: "annual_iv_over_sqrt_252";
+  readonly fullSessionMode: "annual_iv_over_sqrt_252" | "annual_hv20_over_sqrt_252";
+  readonly hvSessionDate?: string;
+  readonly referenceClose?: number;
   readonly restOfDayMode: "sqrt_remaining_session_fraction";
 }
 
@@ -407,5 +410,30 @@ export function buildGammaCone(input: {
       fullSessionMode: "annual_iv_over_sqrt_252",
       restOfDayMode: "sqrt_remaining_session_fraction",
     },
+  };
+}
+
+/** One-session closing-price bands from the latest completed close; not intraday high/low bounds. */
+export function buildHistoricalGammaCone(input: {
+  summary: import("./v2-command-center").V2GammaSummary;
+  bars?: readonly {sessionDate:string;close:number}[];
+  now: Date;
+}): GammaConeResult {
+  const {summary:g, now} = input;
+  const empty = unavailableCone(g.symbol, false);
+  const target = resolveLastCompletedMarketSessionDate(now);
+  const bars = [...(input.bars ?? [])].filter(b => b.sessionDate <= target).sort((a,b)=>a.sessionDate.localeCompare(b.sessionDate));
+  const last = bars.at(-1);
+  const hv = new Set(bars.slice(-21).map(b=>b.sessionDate)).size === 21 ? computeHv20AnnualizedPct(bars) : null;
+  if (!last || last.sessionDate !== target || hv === null || hv <= 0) return empty;
+  const bands = fullSessionConeBands(last.close, hv / 100);
+  if (!bands) return empty;
+  return {...empty, status:"available", spot:last.close,
+    volatility:{ivPct:null,hv20Pct:hv,vrpVolPts:null,vrpRegime:null},
+    fullSession:bands,
+    structure:{spot:g.spot,callWall:g.callWall,putWall:g.putWall,gammaFlip:g.gammaFlip,
+      gammaRegime:g.regime === "positive" || g.regime === "negative" || g.regime === "near_zero" ? g.regime : null, dealerFlowRegime:g.dealerFlowRegime},
+    provenance:{...empty.provenance,fullSessionMode:"annual_hv20_over_sqrt_252",hvSessionDate:target,referenceClose:last.close,optionsSessionDate:g.sessionDate},
+    interpretation:{regime:g.dealerFlowRegime,rangeReliability:"HV20 normal-model closing range, not a price target",warnings:[]},
   };
 }

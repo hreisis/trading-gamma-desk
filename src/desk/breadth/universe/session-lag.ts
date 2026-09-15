@@ -63,8 +63,16 @@ export function evaluateUniverseFreshness(input: {
       missingReason: `Target ${input.targetMarketSessionDate} is not a US trading session.`,
     };
   }
+  // Fund holdings may be effective on a weekend/holiday. Preserve their asOf,
+  // but count elapsed trading sessions from the preceding session.
+  let basis = input.universeAsOf;
+  if (basis <= input.targetMarketSessionDate) {
+    for (let days = 0; days < 14 && !calendar.isSession(basis); days++) {
+      basis = toIso(toUtc(basis) - MS_PER_DAY);
+    }
+  }
   const lag = tradingSessionLag(
-    input.universeAsOf,
+    basis,
     input.targetMarketSessionDate,
     calendar,
   );

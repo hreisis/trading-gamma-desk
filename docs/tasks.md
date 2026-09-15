@@ -1,5 +1,17 @@
 # Tasks
 
+## Dark bilingual homepage preview — 2026-09-14
+
+Branch: `codex/dark-ui-bilingual-fast-home` (base `ui-v2-preview`; not merged).
+
+- Implemented dark horizontal-navigation homepage, EN/中文 UI, full-page research sections and responsive AI/review rail.
+- Preserved provider dates, missing states, deterministic scoring and demo/live separation. 20-day breadth highs/lows are labeled honestly rather than the reference image's 52-week metrics.
+- Homepage streams its shell, then market view, then parallel AI/review narratives; Chinese narrative localization is deferred with AI. Deferred narrative requests use an 8s attempt budget and no retries.
+- Macro starts concurrently with market inputs. Existing stale Macro/Gamma/calendar snapshots can render while Next `after()` refreshes them. Cold cache/provider latency and durable breadth/ledger work still require measurement.
+- Validation pending CI: typecheck, tests, Next build and public-demo smoke. Browser visual review and live-provider latency remain pending.
+- Provider-origin prose/headlines retain their source language; EN/中文 applies to interface labels and the existing AI narrative translation layer. No fabricated translated news.
+
+
 > **V2 status:** For current phase, active milestone, and definition of done, see [`docs/v2-roadmap.md`](v2-roadmap.md). This file remains a historical living build log (M1–M9 and early V2 rows); it may lag the roadmap.
 
 ## GammaDesk V2 reset (current focus)
@@ -24,7 +36,9 @@ Living build plan. Update status as work lands. Definition of done for each phas
 
 Removed from this repo: Historical Study pipeline, Decide surface, Alpaca News panel, and related study fixtures/tests.
 
-**Queued (not started):** Market risk indicator — simple 0–100 score + green/yellow/red from current Macro + Gamma + market signals (spec only; do not implement until scheduled).
+**In progress:** AI Study qualitative sections include an Alpaca HYG/LQD credit signal in Hidden Risk, Cross-Asset Conflict, and What Changed only. Risk V1, Opportunity, Trend, Positioning, and market scoring are unchanged.
+
+**Queued (not started):** Market risk indicator UI redesign remains deferred.
 
 ### M1-6b calibration status (split)
 
@@ -244,3 +258,41 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 1. Mark task rows done in place (strike or ✅).
 2. Move **Current focus** to the active phase.
 3. Do not expand MVP scope here without updating `product.md`.
+
+## 2026-09-14 Gamma current-chain repair
+- Automatic chain requests omit historical `date` (historical Greeks/IV are null). Vendor timestamps remain authoritative.
+- Automatic sample: 15 strikes at $5 spacing around cached/Alpaca spot, next Friday expiry, maximum 30 contracts per symbol; one durable attempt per symbol per credit-reset cycle. Errors persist under gamma/attempts.
+- Unusable results no longer replace latest; Gamma coverage excludes null Greeks.
+- Removed /market route. Homepage accepts current-session manual Gamma for Risk and AI and exposes the input form. Automatic cones withheld for manual overlays.
+- Small bounded sample is not full-chain walls; a flip may legitimately remain unavailable.
+
+### Overview restoration
+- Restored all five overview information groups in dark bilingual cards, with truthful dates, risk spread and original high-beta tilt.
+- Added durable prior-input-session spread history and missing-history handling; retained all lower-page research sections.
+
+### Homepage opportunity and hierarchy (2026-09-14)
+- Added daily Opportunity V3 independent of Risk, with separate recovery confirmation and event condition. Historical V2 replay retained.
+- Overview now leads with model stance, paired scores, compact Market Consider, then exposure/spread/drivers. Methodology and option sensitivity are expandable.
+- Current APIs retained; intraday updates and empirical calibration remain future work.
+
+### Market action overlay (2026-09-14)
+- Implemented BUY/HOLD/SELL policy from Risk, Opportunity, recovery and event gate; no score or sizing changes.
+- Saved versioned action inputs/rationale in new command-center snapshots; old reviews retain original labels.
+- Review follow-up: preserve research edition and exact forecast timestamp; evaluate only subsequent outcomes and conditions, distinguish tactical entry from exposure reduction, and schedule/cache bilingual post-close publications. These review changes are not implemented by the action overlay.
+
+### Research-linked daily review (2026-09-15)
+- Implemented prospective action/research freeze, bilingual cached close review, archived citations, separate direction/timing/risk-control/watch sections, and authenticated post-close cron.
+- Live sidebar uses the new review instead of the legacy per-visit review/translation calls; legacy replay code remains available.
+- Limits: daily-bar verification only; research news/sector claims are not independently verified. Actual PnL and intraday entry quality remain unscored. Forecast capture is publication-triggered; production cron generates reviews but does not synthesize historical forecasts.
+
+### Theme policy pilot (2026-09-15)
+Added isolated SMH/IGV/MAG7 experimental table to preview workflow, using existing equity bars and no extra options requests. Validate actual availability/results before connecting it to portfolio actions or daily-review scoring. Custom themes and historical calibration remain pending.
+
+### Open relative-comparison layout
+Added unboxed SMH/IGV and IBIT/QQQ comparisons with ratio charts, aligned return tables and bilingual conclusions. Added IBIT to the existing equity-bar request; experimental theme actions/replay moved into collapsed details. No portfolio model changes.
+
+
+### ZeroGEX primary Gamma source
+Live home loads SPY/QQQ ZeroGEX once per request in parallel with other inputs. It replaces structure levels, net GEX and regimes before risk/divergence/action/narrative computation. The external reference and manual entry sections are removed. Opportunity v3 remains price/breadth based. MarketData remains IV-only for this view; independent volFreshness prevents stale IV from receiving fresh Gamma weighting. No old MarketData Gamma fallback: ZeroGEX failure retains its last snapshot, marked stale by session/age, or returns unavailable. Delayed computation timestamp is not claimed as underlying options time. Demo/fixture paths remain isolated. Old source-derived cones/touch estimates are withheld. Successful snapshots overwrite the same provider-specific latest artifact.
+
+HV20 ranges restored for ZeroGEX: latest completed-session close plus/minus normal quantiles (50%/90%) times close*HV20/sqrt(252). Requires latest-session bars and 21 closes. Explicit one-session closing-price horizon, reference close/date and HV20 shown; not intraday extremes. ZeroGEX walls are overlays only. Intraday touch/ROD remain unavailable rather than fabricated; scores unchanged.

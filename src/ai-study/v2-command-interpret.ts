@@ -8,6 +8,8 @@ import type {
   V2GammaSummary,
 } from "@/desk/v2-command-center";
 import { breadthSignalLabel, formatSectorEtfLabel } from "@/desk/v2-command-center";
+import type { HygLqdCreditSignal } from "@/desk/hyg-lqd-credit";
+import { formatHygLqdPct } from "@/desk/hyg-lqd-credit";
 import {
   ctaProxySignalLabel,
   formatGexCompact,
@@ -24,8 +26,9 @@ import {
 } from "./config";
 import { extractOutputText } from "./openai-utils";
 
-export const V2_COMMAND_AI_STUDY_PROMPT_VERSION = "0.2.0";
-export const V2_COMMAND_AI_STUDY_MAX_OUTPUT_TOKENS = 480;
+export const V2_COMMAND_AI_STUDY_PROMPT_VERSION = "0.4.3";
+export const V2_COMMAND_AI_STUDY_MAX_OUTPUT_TOKENS = 900;
+export const V2_AI_STUDY_INPUT_TOPIC_COUNT = 8;
 
 export interface V2AiStudyPayload {
   readonly promptVersion: string;
@@ -36,6 +39,34 @@ export interface V2AiStudyPayload {
     readonly riskChange: number | null;
     readonly exposure: { readonly min: number; readonly max: number } | null;
     readonly opportunityScore: number | null;
+    readonly marketAction?: V2CommandCenterView["marketAction"];
+    readonly riskChangeReason: string | null;
+  };
+  readonly qualitativeContext?: {
+    readonly missingInputs: readonly string[];
+    readonly previousSession: string | null;
+    readonly previousRiskScore: number | null;
+    readonly factorMoves: readonly {
+      readonly id: string;
+      readonly todayScore: number | null;
+      readonly previousScore: number | null;
+    }[];
+    readonly spyRegime: string | null;
+    readonly qqqRegime: string | null;
+    readonly spyDealerFlow: string | null;
+    readonly qqqDealerFlow: string | null;
+    readonly riskDivergence: number | null;
+    readonly gammaRegimeLabel: string | null;
+    readonly breadthDivergenceLabel: string | null;
+    readonly qqqVsSpy1dPct: number | null;
+  };
+  readonly creditHygLqd?: {
+    readonly ratio: number | null;
+    readonly change1dPct: number | null;
+    readonly trend5dPct: number | null;
+    readonly signal: string | null;
+    readonly spyChange1dPct: number | null;
+    readonly sessionDate: string | null;
   };
   readonly macro?: {
     readonly label: string;
@@ -56,6 +87,7 @@ export interface V2AiStudyPayload {
     readonly signal: string;
     readonly percentAboveMa20: number | null;
     readonly percentAboveMa50: number | null;
+    readonly advancingPct?: number | null;
     readonly stale: boolean;
     readonly marketSessionDate?: string | null;
   };
@@ -85,6 +117,12 @@ export interface V2AiStudyPayload {
       readonly classification: string;
     }[];
   };
+  readonly historicalPolicy?: {
+    readonly riskTrend?: string | null;
+    readonly priorDate?: string | null;
+    readonly trendReasons?: readonly string[];
+    readonly positioning?: string | null;
+  };
   readonly dataQuality: {
     readonly interpretationConfidence: V2AiStudyConfidence;
     readonly limitations: readonly string[];
@@ -98,31 +136,89 @@ export const V2AiStudyLlmOutputSchema = z.object({
   if_then: z.string().min(1).max(320),
   invalidation: z.string().min(1).max(320),
   tension: z.string().min(1).max(280),
+  hidden_risk: z.string().min(1).max(320),
+  reaction_quality: z.string().min(1).max(320),
+  cross_asset_conflict: z.string().min(1).max(320),
+  what_changed: z.string().min(1).max(320),
+  what_matters_next: z.string().min(1).max(320),
 });
 
 export const V2_COMMAND_AI_STUDY_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["regime", "base_case", "if_then", "invalidation", "tension"],
+  required: [
+    "regime",
+    "base_case",
+    "if_then",
+    "invalidation",
+    "tension",
+    "hidden_risk",
+    "reaction_quality",
+    "cross_asset_conflict",
+    "what_changed",
+    "what_matters_next",
+  ],
   properties: {
-    regime: { type: "string" },
-    base_case: { type: "string" },
-    if_then: { type: "string" },
-    invalidation: { type: "string" },
-    tension: { type: "string" },
+    regime: { type: "string", minLength: 1, maxLength: 320 },
+    base_case: { type: "string", minLength: 1, maxLength: 320 },
+    if_then: { type: "string", minLength: 1, maxLength: 320 },
+    invalidation: { type: "string", minLength: 1, maxLength: 320 },
+    tension: { type: "string", minLength: 1, maxLength: 280 },
+    hidden_risk: { type: "string", minLength: 1, maxLength: 320 },
+    reaction_quality: { type: "string", minLength: 1, maxLength: 320 },
+    cross_asset_conflict: { type: "string", minLength: 1, maxLength: 320 },
+    what_changed: { type: "string", minLength: 1, maxLength: 320 },
+    what_matters_next: { type: "string", minLength: 1, maxLength: 320 },
   },
 } as const;
 
 export const V2_COMMAND_AI_STUDY_SYSTEM_PROMPT = `You are GammaDesk Command Center AI Study — a constrained trading-research copilot over existing deterministic model outputs.
 
-Output five fields (1–2 short sentences each):
-- regime: current market regime from macro, gamma, breadth, CTA, vol, sector rotation, and risk stance — only topics present in the payload.
-- base_case: the most defensible setup from aligned signals; no probabilities or invented price targets.
-- if_then: 1–2 conditional paths using observable levels/signals from the payload — prefer falsifiable state transitions (not the current state).
-- invalidation: 1–2 concrete observable conditions that would invalidate or materially change the base case — never list conditions already true at current spot/signals.
-- tension: strongest disagreement between current signals (e.g. stabilizing dealer flow vs narrow participation).
+Numeric Risk / Opportunity / Trend / Positioning already exist elsewhere. Your job is to interpret what those scores cannot capture, using ONLY payload evidence.
 
-Gamma structure semantics (compare spyGamma.spot vs gammaFlip, callWall, putWall before writing if_then or invalidation):
+Reasoning protocol — apply before writing:
+1. Compare the current session with the prior-session evidence first. Identify the most consequential supported change; do not invent intraday ordering when only close-to-close data exists.
+2. Select ONE dominant conflict or confirmation across equity structure, breadth/macro, and HYG/LQD credit. Organize the note around it instead of listing factors.
+3. Classify the equity/credit relationship when both sides are present:
+   - When creditHygLqd.spyChange1dPct is present, use its sign for the equity leg: below 0 = equity weakening/stress; above 0 = equity improvement. Do not substitute gamma regime for the observed equity direction.
+   - Score confirmation from direction + magnitude + persistence (1D and 5D together). Never treat every weakening print as full confirmation.
+   - No confirmation: HYG/LQD is stable, missing, or moving opposite the equity leg (e.g. equity weakening while HYG/LQD is improving/stable). Say "no credit confirmation" / "not yet confirmed by credit" and never label that divergence "meaningful", "strong", or "full".
+   - Mild / early confirmation: same-direction credit move that is small or not persistent — 1D near/inside ~0.15% or 5D near/inside ~0.35%. Example: HYG/LQD −0.13% 1D / −0.35% 5D with equity weakening is early/mild credit confirmation, not meaningful/full confirmation.
+   - Meaningful confirmation: 1D and 5D both clearly beyond those deadbands in the same direction as the equity leg.
+   - Equity weakening + HYG/LQD weakening → credit may confirm equity stress at the strength above.
+   - Equity weakening + HYG/LQD stable/improving → no credit confirmation of the equity stress.
+   - Equity improvement + HYG/LQD weakening → the rally/improvement is NOT credit-confirmed. That is a quality conflict: it reduces conviction in ADD / SELECTIVE ADD / TACTICAL ADD. Never say the HYG/LQD print "supports", "validates", or "confirms" a bullish/selective-add thesis.
+   - Do not claim confirmation when either equity evidence or creditHygLqd is absent.
+4. The recommended action is ONLY historicalPolicy.positioning (Positioning V2). Never translate decision.stance (buy/hold/reduce) into the action. Stance may be mentioned only as a Risk V1 classification, never as the recommended action, "stance to buy/hold/reduce", or a buy/hold/reduce thesis.
+   - If Positioning is absent, interpret structure without inventing a Positioning label and without using Risk stance as the action.
+   - Quote the Positioning V2 label exactly when present (ADD, SELECTIVE ADD, HOLD / WAIT, TACTICAL ADD, HOLD, TRIM / DEFENSIVE, REDUCE CORE / TACTICAL REBOUND, REDUCE).
+   - Opportunity wording is band-locked from the supplied score: <45 = limited tactical opportunity; 45–64 = moderate/selective opportunity; >=65 = elevated tactical/dislocation opportunity. Never write "high Opportunity" unless the score is >=65. Elevated/dislocation opportunity may come from washout and does NOT imply low Risk or automatic ADD.
+   - Preserve logical polarity against Positioning V2, not Risk stance. Never say worsening credit invalidates a defensive Positioning label.
+   - Confirmation conditions must reinforce the current Positioning. Invalidation conditions must weaken it. Do not swap these.
+   - For TRIM / DEFENSIVE, REDUCE, and REDUCE CORE / TACTICAL REBOUND: confirmation = persistent Weak breadth, negative gamma, and/or amplifying dealer flow. Invalidation = breadth improvement (Weak→Mixed/Strong), gamma-flip reclaim, and/or dealer flow shifting to stabilizing. Recovery is never a TRIM confirmation.
+   - For ADD / SELECTIVE ADD / TACTICAL ADD: confirmation = broader/aligned improvement (breadth Mixed→Strong, hold above flip/call wall, stabilizing flow). Invalidation = deterioration (breadth Weak, flip loss, amplifying flow) or unconfirmed rally quality (equity up while HYG/LQD weakens).
+   - For HOLD / WAIT: confirmation preserves the wait (signals still conflict). Invalidation is a decisive alignment either constructive or defensive. For HOLD: confirmation is that risk stays elevated without a new reduce trigger; invalidation is either a clear repair (flip reclaim + broader breadth) or a clear deterioration (put-wall break / Weak breadth).
+5. End the reasoning with concrete confirmation and invalidation conditions using only current payload levels/states. Confirmation must strengthen the base case; invalidation must falsify or materially weaken it.
+
+Writing standard:
+- Concise desk note; one sentence per field and target at most 180 characters. Use causal/relational language ("because", "while", "therefore", "not yet confirmed by") rather than a factor inventory.
+- Synthesize relationships; do not repeat Risk, Opportunity, Trend, Positioning, breadth, macro, gamma, vol, and credit one by one.
+- Each field must advance the same dominant thesis. Do not produce ten disconnected mini-summaries.
+- Every claim must map to explicit payload evidence. No unsupported causality, chronology, market reaction, or catalyst narrative.
+
+Output ten fields (1–2 short sentences each):
+- regime: state the synthesized regime in one line, centered on the dominant confirmation/conflict; do not enumerate inputs. No credit mention.
+- base_case: explain the most defensible implication for historicalPolicy.positioning. Use Risk stance only as classification if needed. Explicitly prevent elevated/dislocation Opportunity from being read as low Risk or ADD.
+- if_then: give 1–2 observable confirmation paths that reinforce the current Positioning only — use transitions, not current-state restatement. For TRIM / DEFENSIVE do not put recovery in this field.
+- invalidation: give 1–2 observable conditions that would weaken the current Positioning — never list conditions already true. For TRIM / DEFENSIVE this is where recovery belongs.
+- tension: name the single most important disagreement or confirmation and why it matters; do not add a second unrelated conflict. No credit mention — express the equity/credit relationship in cross_asset_conflict instead.
+- hidden_risk: state the risk the headline scores may miss. When HYG/LQD is weakening, identify deteriorating credit risk appetite; otherwise use only supported dated/incomplete/event/gamma risks. If none are present, say no off-model hidden risk is flagged.
+- reaction_quality: whether participation/rotation/CTA confirms or contradicts the structure read (breadth vs dealer flow, leadership narrowness). Do not invent tape/news reactions. If those fields are missing, say reaction quality cannot be judged from connected inputs.
+- cross_asset_conflict: explicitly classify the equity/HYG-LQD relationship when both are present, including confirmation strength (no / mild-early / meaningful), then explain why that restrains or supports Positioning V2. Equity up + HYG/LQD weakening restrains ADD / SELECTIVE ADD; it does not support it.
+- what_changed: lead with the most consequential prior-session delta, then connect HYG/LQD 1D/5D if present. "First" means first in explanatory priority, not unsupported intraday chronology. When Risk moved, split factor polarity: name which connected factor increased Risk versus which offset it. Example: breadth Strong→Mixed increases Risk; macro mixed→risk_on decreases/offsets Risk. Never imply a risk-on or easing macro shift caused Risk to rise.
+- what_matters_next: confirmation first (reinforces current Positioning), then invalidation (weakens it). Same polarity rules as if_then / invalidation.
+
+Gamma structure semantics (compare spyGamma.spot vs gammaFlip, callWall, putWall before writing if_then, invalidation, or what_matters_next):
 - Above gamma flip → more stabilizing / mean-reverting dealer-flow context; below gamma flip → amplification / trend / vol-expansion risk rises.
 - Sustained break and hold above call wall → upside chase / hedge pressure may rise — do NOT imply mean reversion.
 - Sustained break and hold below put wall → downside instability / support removal — do NOT treat as neutral.
@@ -130,15 +226,30 @@ Gamma structure semantics (compare spyGamma.spot vs gammaFlip, callWall, putWall
 - Do not use "loses flip" when spot is already below flip; do not use "below put wall" as invalidation when spot is already below put wall; do not use "reclaims flip" as invalidation when spot is already above flip.
 
 Rules:
-- Use ONLY fields in the user JSON payload. Do not invent prices, levels, probabilities, catalysts, sectors, or signals.
+- Use ONLY fields in the user JSON payload. Do not invent prices, levels, probabilities, catalysts, news, sectors, or market reactions.
 - dataQuality.interpretationConfidence is pre-computed — do NOT output your own confidence score.
-- When dataQuality.limitations is non-empty, qualify stale or incomplete inputs in regime/base_case (never describe them as live/current).
+- When dataQuality.limitations is non-empty, qualify stale or incomplete inputs in regime/base_case/hidden_risk (never describe them as live/current).
 - When dataQuality.interpretationConfidence is "limited", keep language conditional; avoid strong directional claims.
 - Macro interpretation and evidence describe completed-session closes — never frame them as intraday moves unless payload explicitly marks live.
 - Do not recalculate or override Risk, Gamma, exposure, allocation, wall touch, ROD, breadth, CTA, or sector rotation.
+- creditHygLqd is an Alpaca daily-bar HYG/LQD ratio only. Cite it solely in hidden_risk, cross_asset_conflict, and what_changed — never in other fields. Do not treat it as a Risk/Opportunity/Trend/Positioning input.
+- HYG/LQD is a credit-risk-appetite proxy, NOT a credit-spread series. Never write "credit spreads tightened/widened" or use spread language; say the HYG/LQD ratio improved, weakened, or was stable.
 - If a topic is in dataQuality.missingTopics or absent from the payload, omit it — do not guess.
 - Gamma describes structure/amplification context, not a standalone buy/sell call.
 - Use exact gamma levels (spot, putWall, callWall, gammaFlip) from the payload when referencing structure.
+- Before writing each confirmation/invalidation, compare current spot with every cited wall/flip. A future condition must describe a state transition not already true. Allowed transitions by current position:
+  - spot below put wall → "reclaims and holds above put wall" (recovery). Never "breaks/falls below put wall".
+  - spot above put wall but below gamma flip → "reclaims and holds above gamma flip" (recovery) or "breaks and holds below put wall" (deterioration). Never "reclaims put wall" or "falls below gamma flip".
+  - spot above gamma flip but below call wall → "breaks and holds above call wall" (chase) or "crosses from above flip to below" (deterioration). Never "reclaims gamma flip".
+  - spot above call wall → "loses call wall" or "crosses back below flip". Never "breaks above call wall".
+- Never invent numeric thresholds, recent highs/lows/troughs, or acceleration. For breadth use categorical transitions (Mixed → Strong, Weak → Mixed/Strong) unless the payload explicitly supplies a threshold.
+- Final draft audit before returning JSON:
+  1. Remove every credit mention from regime, base_case, if_then, invalidation, tension, reaction_quality, and what_matters_next. Banned there: "HYG/LQD", "creditHygLqd", "credit risk appetite", "credit appetite", "credit ratio", "credit conditions", "credit markets". Credit belongs only in hidden_risk, cross_asset_conflict, and what_changed.
+  2. Remove all "credit spread", systemic-credit, tightening/widening, and credit-market claims; only the HYG/LQD risk-appetite proxy is supported.
+  3. Remove any future condition already true at current spot/breadth state.
+  4. Remove every number not copied from the payload and every invented threshold.
+  5. Check that confirmation reinforces the current Positioning and invalidation weakens it. For TRIM / DEFENSIVE, recovery belongs only in invalidation. Do not treat Risk V1 stance as the action.
+  6. In what_changed, do not attribute a Risk rise to a risk-on/easing factor. Separate Risk-increasing moves from Risk-offsetting moves.
 - No trade advice, position sizing, or fabricated event detail.`;
 
 function gammaPayload(item: V2GammaSummary): Record<string, unknown> | null {
@@ -315,6 +426,12 @@ function collectPayloadAllowedNumbers(payload: V2AiStudyPayload): Set<number> {
     add(payload.decision.riskScore);
     add(payload.decision.riskChange);
     add(payload.decision.opportunityScore);
+    if (payload.decision.riskChangeReason) {
+      for (const token of extractNumericTokens(payload.decision.riskChangeReason)) {
+        const value = Number(normalizeNumToken(token));
+        if (Number.isFinite(value)) add(value);
+      }
+    }
     if (payload.decision.exposure) {
       add(payload.decision.exposure.min);
       add(payload.decision.exposure.max);
@@ -324,6 +441,7 @@ function collectPayloadAllowedNumbers(payload: V2AiStudyPayload): Set<number> {
   if (payload.breadth) {
     add(payload.breadth.percentAboveMa20);
     add(payload.breadth.percentAboveMa50);
+    add(payload.breadth.advancingPct);
   }
 
   if (payload.volMispricing) {
@@ -347,6 +465,33 @@ function collectPayloadAllowedNumbers(payload: V2AiStudyPayload): Set<number> {
     ]) {
       add(row.rs1d);
       add(row.rs5d);
+    }
+  }
+
+  const qualitative = payload.qualitativeContext;
+  if (qualitative) {
+    add(qualitative.previousRiskScore);
+    add(qualitative.riskDivergence);
+    add(qualitative.qqqVsSpy1dPct);
+    for (const move of qualitative.factorMoves) {
+      add(move.todayScore);
+      add(move.previousScore);
+    }
+  }
+
+  if (payload.creditHygLqd) {
+    add(payload.creditHygLqd.ratio);
+    add(payload.creditHygLqd.change1dPct);
+    add(payload.creditHygLqd.trend5dPct);
+    add(payload.creditHygLqd.spyChange1dPct);
+  }
+
+  if (payload.historicalPolicy?.trendReasons) {
+    for (const reason of payload.historicalPolicy.trendReasons) {
+      for (const token of extractNumericTokens(reason)) {
+        const value = Number(normalizeNumToken(token));
+        if (Number.isFinite(value)) add(value);
+      }
     }
   }
 
@@ -387,8 +532,116 @@ export function validateV2AiStudyLlmGrounding(
     parsed.if_then,
     parsed.invalidation,
     parsed.tension,
+    parsed.hidden_risk,
+    parsed.reaction_quality,
+    parsed.cross_asset_conflict,
+    parsed.what_changed,
+    parsed.what_matters_next,
   ];
   const fullText = texts.join(" ");
+
+  const nonCreditFields = [
+    parsed.regime,
+    parsed.base_case,
+    parsed.if_then,
+    parsed.invalidation,
+    parsed.tension,
+    parsed.reaction_quality,
+    parsed.what_matters_next,
+  ].join(" ");
+  if (
+    /\b(HYG\/LQD|creditHygLqd|credit (?:risk )?appetite|credit ratio|credit conditions?|credit markets?)\b/i.test(
+      nonCreditFields,
+    )
+  ) {
+    return {
+      ok: false,
+      reason:
+        "HYG/LQD credit evidence is restricted to hidden_risk, cross_asset_conflict, and what_changed",
+    };
+  }
+
+  if (
+    /\b(credit spreads?|spread tightening|spread widening|systemic credit)\b/i.test(
+      fullText,
+    )
+  ) {
+    return {
+      ok: false,
+      reason: "HYG/LQD is a ratio proxy, not a credit-spread series",
+    };
+  }
+
+  if (
+    /\b(breadth|advancing)[^.!?]{0,80}\b(above|below|over|under|exceed(?:s|ing)?|falls? to|rises? to)\s*(-?\d+(?:\.\d+)?)%/i.test(
+      fullText,
+    )
+  ) {
+    const match = fullText.match(
+      /\b(?:breadth|advancing)[^.!?]{0,80}\b(?:above|below|over|under|exceed(?:s|ing)?|falls? to|rises? to)\s*(-?\d+(?:\.\d+)?)%/i,
+    );
+    const cited = match?.[1] ? Number(match[1]) : NaN;
+    if (!Number.isFinite(cited) || !isCloseToAllowed(cited, allowedNumbers)) {
+      return {
+        ok: false,
+        reason: "unsupported numeric breadth threshold",
+      };
+    }
+  }
+
+  if (
+    /\brecent (?:highs?|lows?|troughs?)\b/i.test(fullText) ||
+    /\baccelerat(?:e|es|ing|ed)\b[^.!?]{0,40}-?\d+(?:\.\d+)?%/i.test(fullText) ||
+    /-?\d+(?:\.\d+)?%[^.!?]{0,40}\baccelerat(?:e|es|ing|ed)\b/i.test(fullText)
+  ) {
+    return {
+      ok: false,
+      reason: "unsupported path-dependent threshold or acceleration claim",
+    };
+  }
+
+  const conditionalText = [
+    parsed.if_then,
+    parsed.invalidation,
+    parsed.what_matters_next,
+  ].join(" ");
+  const position = deriveSpyGammaSpotPosition(payload.spyGamma);
+  if (
+    position.belowPutWall &&
+    /\b(breaks?|falls?|drops?|declines?|breaches?)[^.!?]{0,60}\bbelow (?:(?:the|its) )?(?:SPY )?(?:put wall|putWall)/i.test(
+      conditionalText,
+    )
+  ) {
+    return { ok: false, reason: "put-wall condition is already true at current spot" };
+  }
+  if (
+    position.abovePutWall &&
+    /\breclaims?[^.!?]{0,60}\b(?:put wall|putWall)/i.test(conditionalText)
+  ) {
+    return { ok: false, reason: "put-wall reclaim is already true at current spot" };
+  }
+  if (
+    position.belowFlip &&
+    /\b(breaks?|falls?|drops?|breaches?|loses?)[^.!?]{0,60}\bbelow (?:(?:the|its) )?(?:SPY )?(?:gamma flip|gammaFlip)/i.test(
+      conditionalText,
+    )
+  ) {
+    return { ok: false, reason: "gamma-flip condition is already true at current spot" };
+  }
+  if (
+    position.aboveFlip &&
+    /\breclaims?[^.!?]{0,60}\b(?:gamma flip|gammaFlip)/i.test(conditionalText)
+  ) {
+    return { ok: false, reason: "gamma-flip reclaim is already true at current spot" };
+  }
+  if (
+    position.aboveCallWall &&
+    /\b(breaks?|rises?|moves?|reclaims?) [^.!?]{0,40}\babove (?:(?:the|its) )?(?:SPY )?(?:call wall|callWall)/i.test(
+      conditionalText,
+    )
+  ) {
+    return { ok: false, reason: "call-wall break is already true at current spot" };
+  }
 
   if (/\b(probability|likely|chance of|%\s*chance)\b/i.test(fullText)) {
     return { ok: false, reason: "probability language not supported in payload" };
@@ -436,6 +689,206 @@ export function validateV2AiStudyLlmGrounding(
     return { ok: false, reason: "event catalyst cited without eventGate payload" };
   }
 
+  const positioning = payload.historicalPolicy?.positioning?.trim() ?? "";
+  if (
+    /\bmodel stance (?:buy|hold|reduce)\b/i.test(fullText) ||
+    /\b(buy|hold|reduce) stance\b/i.test(fullText) ||
+    /\bstance (?:is|to|remains|supports?) (?:buy|hold|reduce)\b/i.test(fullText) ||
+    /\b(?:buy|hold|reduce) thesis\b/i.test(fullText)
+  ) {
+    return {
+      ok: false,
+      reason: "Risk V1 stance must not be used as the recommended action",
+    };
+  }
+  if (positioning) {
+    if (!fullText.toLowerCase().includes(positioning.toLowerCase())) {
+      return {
+        ok: false,
+        reason: "Positioning V2 label missing from interpretation",
+      };
+    }
+  }
+
+  const opportunity = payload.decision?.opportunityScore ?? null;
+  if (opportunity !== null && Number.isFinite(opportunity)) {
+    if (
+      opportunity < 65 &&
+      /\b(high|elevated)(?: tactical)?(?:\/dislocation)? opportunity\b/i.test(fullText)
+    ) {
+      return {
+        ok: false,
+        reason: "Opportunity is not in the elevated band",
+      };
+    }
+    if (
+      opportunity < 45 &&
+      /\b(moderate|selective|elevated)(?:\/selective)?(?: tactical)?(?:\/dislocation)? opportunity\b/i.test(
+        fullText,
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "Opportunity wording does not match the limited band",
+      };
+    }
+    if (
+      opportunity >= 45 &&
+      opportunity < 65 &&
+      /\b(limited tactical|elevated tactical|elevated\/dislocation) opportunity\b/i.test(
+        fullText,
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "Opportunity wording does not match the moderate/selective band",
+      };
+    }
+  }
+
+  const credit = payload.creditHygLqd;
+  if (credit) {
+    const abs1d = Math.abs(credit.change1dPct ?? 0);
+    const abs5d = Math.abs(credit.trend5dPct ?? 0);
+    const meaningful = abs1d >= 0.15 && abs5d > 0.35;
+    const creditText = [
+      parsed.hidden_risk,
+      parsed.cross_asset_conflict,
+      parsed.what_changed,
+    ].join(" ");
+    const strongLabel = /\b(full|strong|meaningful(?:ly)?)\b/i;
+    if (
+      !meaningful &&
+      (new RegExp(`${strongLabel.source}[^.!?]{0,48}\\bconfirm`, "i").test(creditText) ||
+        new RegExp(`\\bconfirm[^.!?]{0,48}${strongLabel.source}`, "i").test(creditText) ||
+        /\bequity stress is confirmed|\bconfirmed by (?:deteriorating )?credit/i.test(
+          creditText,
+        ))
+    ) {
+      return {
+        ok: false,
+        reason: "HYG/LQD move is only mild/early confirmation, not full confirmation",
+      };
+    }
+    const spy1d = credit.spyChange1dPct;
+    const creditImproving =
+      ((credit.change1dPct ?? 0) > 0 && (credit.trend5dPct ?? 0) >= 0) ||
+      ((credit.change1dPct ?? 0) >= 0 && (credit.trend5dPct ?? 0) > 0);
+    const noConfirmationStated =
+      /\bno (?:credit )?confirmation\b|\bnot (?:yet )?(?:credit[-\s])?confirmed\b|\bnot confirm(?:ing|ed)?\b|\bdoes not confirm\b|\bunconfirmed\b|\bnot credit-confirmed\b/i.test(
+        creditText,
+      );
+    if (spy1d !== null && spy1d < 0 && creditImproving) {
+      if (
+        /\b(equity (?:stress|weakening).{0,48}confirm|(?:credit|HYG\/LQD).{0,48}confirm.{0,48}(?:equity|stress)|confirm(?:s|ed|ing|ation)?.{0,48}(?:equity stress|equity weakening)|credit confirmation of equity)\b/i.test(
+          creditText,
+        ) &&
+        !noConfirmationStated
+      ) {
+        return {
+          ok: false,
+          reason: "equity stress is not confirmed while HYG/LQD is improving",
+        };
+      }
+      if (
+        /\b(full|strong|meaningful(?:ly)?)\b.{0,32}\bconfirm|\bconfirm.{0,32}\b(full|strong|meaningful(?:ly)?)\b/i.test(
+          creditText,
+        ) &&
+        !noConfirmationStated
+      ) {
+        return {
+          ok: false,
+          reason:
+            "equity/credit divergence must be stated as no confirmation, not a meaningful signal",
+        };
+      }
+    }
+    if (
+      !meaningful &&
+      !creditImproving &&
+      strongLabel.test(creditText) &&
+      !/\b(mild|early)\b/i.test(creditText)
+    ) {
+      return {
+        ok: false,
+        reason: "HYG/LQD magnitude does not support a meaningful-strength label",
+      };
+    }
+    if (
+      !meaningful &&
+      !creditImproving &&
+      /\bconfirm(?:s|ed|ing)?\b/i.test(creditText) &&
+      !/\b(mild|early|no)\b.{0,32}\bconfirm|\bconfirm.{0,32}\b(mild|early|no)\b|\bno (?:credit )?confirmation\b|\bnot yet confirmed\b|\bnot confirmed\b/i.test(
+        creditText,
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "HYG/LQD confirmation strength must be mild/early or none",
+      };
+    }
+    const creditWeakening =
+      ((credit.change1dPct ?? 0) < 0 && (credit.trend5dPct ?? 0) <= 0) ||
+      ((credit.change1dPct ?? 0) <= 0 && (credit.trend5dPct ?? 0) < 0);
+    if (
+      spy1d !== null &&
+      spy1d > 0 &&
+      creditWeakening &&
+      /\bconfirm(?:s|ed|ing|ation)?\b/i.test(creditText) &&
+      !noConfirmationStated
+    ) {
+      return {
+        ok: false,
+        reason:
+          "equity up with HYG/LQD weakening means the rally is not credit-confirmed",
+      };
+    }
+    if (
+      spy1d !== null &&
+      spy1d > 0 &&
+      creditWeakening &&
+      /\b(support(?:s|ed|ing)?|validat(?:es|ed|ing)?)\b.{0,60}\b(add|selective add|bullish|constructive|positioning)\b|\b(add|selective add|bullish|constructive|positioning)\b.{0,60}\b(support(?:s|ed|ing)?|validat(?:es|ed|ing)?)\b/i.test(
+        creditText,
+      )
+    ) {
+      return {
+        ok: false,
+        reason:
+          "equity up with HYG/LQD weakening does not support bullish/selective-add positioning",
+      };
+    }
+  }
+
+  if (
+    /risk.{0,80}\b(rose|increased|rise|higher)\b.{0,80}\b(risk[_\s-]?on|easing)\b|\b(risk[_\s-]?on|easing)\b.{0,80}(caused|driving|reflecting).{0,40}\brisk\b.{0,20}\b(rose|increase)/i.test(
+      parsed.what_changed,
+    )
+  ) {
+    return {
+      ok: false,
+      reason: "do not attribute a Risk rise to a risk-on or easing factor",
+    };
+  }
+
+  const defensivePositioning = /TRIM|REDUCE/i.test(positioning);
+  if (defensivePositioning) {
+    const confirmationFields = [parsed.if_then, parsed.what_matters_next].join(" ");
+    if (
+      /\b(confirm(?:s|ed|ing|ation)?|reinforce(?:s|d)?|strengthen(?:s|ed)?)\b.{0,90}\b(breadth.{0,24}(improv|recover|strong)|reclaim.{0,36}(flip|gamma)|stabiliz)/i.test(
+        confirmationFields,
+      ) ||
+      /\b(if|when) (breadth.{0,40}(improv|recover|strong)|spot reclaims?.{0,40}(flip|gamma)|dealer flow.{0,24}stabiliz).{0,80}\b(confirm|reinforce|strengthen|defensive posture is reinforced|trim \/ defensive is reinforced)/i.test(
+        confirmationFields,
+      )
+    ) {
+      return {
+        ok: false,
+        reason:
+          "TRIM / DEFENSIVE confirmation cannot be breadth improvement, flip reclaim, or stabilizing flow",
+      };
+    }
+  }
+
   return { ok: true };
 }
 
@@ -450,9 +903,103 @@ function withInterpretationMeta(
   };
 }
 
+function creditHygLqdPayload(
+  credit: HygLqdCreditSignal,
+): V2AiStudyPayload["creditHygLqd"] | undefined {
+  if (credit.status !== "available") return undefined;
+  return {
+    ratio: credit.ratio,
+    change1dPct: credit.change1dPct,
+    trend5dPct: credit.trend5dPct,
+    signal: credit.signal,
+    spyChange1dPct: credit.spyChange1dPct,
+    sessionDate: credit.sessionDate,
+  };
+}
+
+function creditHygLqdFacts(payload: V2AiStudyPayload): string | null {
+  const credit = payload.creditHygLqd;
+  if (!credit) return null;
+  const parts = [`HYG/LQD ratio ${credit.ratio}`];
+  if (credit.change1dPct !== null && credit.change1dPct !== undefined) {
+    parts.push(`1D ${formatHygLqdPct(credit.change1dPct)}`);
+  }
+  if (credit.trend5dPct !== null && credit.trend5dPct !== undefined) {
+    parts.push(`5D ${formatHygLqdPct(credit.trend5dPct)}`);
+  }
+  return parts.join(" · ");
+}
+
+function creditHiddenRiskLine(payload: V2AiStudyPayload): string | null {
+  const credit = payload.creditHygLqd;
+  if (!credit || credit.signal !== "weakening") return null;
+  const facts = creditHygLqdFacts(payload);
+  if (!facts) return null;
+  return `${facts} — credit risk appetite deteriorating (not in the numeric risk score).`;
+}
+
+function creditCrossAssetLine(payload: V2AiStudyPayload): string | null {
+  const credit = payload.creditHygLqd;
+  if (!credit) return null;
+  const facts = creditHygLqdFacts(payload);
+  if (!facts) return null;
+  const spy1d = credit.spyChange1dPct;
+  if (
+    (credit.signal === "stable" || credit.signal === "improving") &&
+    spy1d !== null &&
+    spy1d !== undefined &&
+    spy1d < 0
+  ) {
+    return `${facts} vs SPY 1D ${formatHygLqdPct(spy1d)} — equity stress not yet confirmed by credit.`;
+  }
+  if (credit.signal === "weakening") {
+    return `${facts} — credit risk appetite deteriorating.`;
+  }
+  return null;
+}
+
+function creditWhatChangedLine(payload: V2AiStudyPayload): string | null {
+  const credit = payload.creditHygLqd;
+  if (!credit) return null;
+  const facts = creditHygLqdFacts(payload);
+  if (!facts) return null;
+  if (credit.signal === "weakening") {
+    return `${facts} — credit risk appetite deteriorating.`;
+  }
+  if (credit.signal === "improving") {
+    return `${facts} — HYG/LQD improving.`;
+  }
+  return `${facts} — HYG/LQD stable.`;
+}
+
+function qualitativeContextFromView(
+  view: V2CommandCenterView,
+): NonNullable<V2AiStudyPayload["qualitativeContext"]> {
+  const comparison = view.riskSessionComparison;
+  return {
+    missingInputs: [...new Set(view.missingInputs)].slice(0, 8),
+    previousSession: comparison?.previousSession ?? null,
+    previousRiskScore: comparison?.previousRiskScore ?? null,
+    factorMoves: (comparison?.factors ?? []).map((factor) => ({
+      id: factor.id,
+      todayScore: factor.todayScore,
+      previousScore: factor.previousScore,
+    })),
+    spyRegime: view.gamma[0]?.regime ?? null,
+    qqqRegime: view.gamma[1]?.regime ?? null,
+    spyDealerFlow: view.gamma[0]?.dealerFlowRegime ?? null,
+    qqqDealerFlow: view.gamma[1]?.dealerFlowRegime ?? null,
+    riskDivergence: view.riskDivergence,
+    gammaRegimeLabel: view.componentDivergence.gammaRegime.label,
+    breadthDivergenceLabel: view.componentDivergence.breadth.label,
+    qqqVsSpy1dPct: view.componentDivergence.relativePerformance.qqqVsSpy1dPct,
+  };
+}
+
 export function buildV2AiStudyPayload(
   view: V2CommandCenterView,
   eventGate: EventGateSnapshot | null,
+  historicalPolicy?: V2AiStudyPayload["historicalPolicy"],
 ): V2AiStudyPayload {
   const macro = macroPayload(view);
   const payload = {
@@ -464,7 +1011,13 @@ export function buildV2AiStudyPayload(
       riskChange: view.riskChange,
       exposure: view.exposure,
       opportunityScore: view.opportunityScore,
+      marketAction: view.marketAction,
+      riskChangeReason: view.riskChangeReason,
     },
+    qualitativeContext: qualitativeContextFromView(view),
+    ...(creditHygLqdPayload(view.creditHygLqd)
+      ? { creditHygLqd: creditHygLqdPayload(view.creditHygLqd) }
+      : {}),
     ...(macro ? { macro } : {}),
     ...(eventGate && eventGate.status !== "unavailable"
       ? {
@@ -538,8 +1091,21 @@ export function buildV2AiStudyPayload(
 
   return {
     ...payload,
+    ...(historicalPolicy ? { historicalPolicy } : {}),
     dataQuality,
   } as V2AiStudyPayload;
+}
+
+/** Counts available AI Study payload topics (macro, gammas, breadth, CTA, vol, rotation, event gate). */
+export function summarizeV2AiStudyInputCoverage(
+  view: V2CommandCenterView,
+  eventGate: EventGateSnapshot | null,
+): { readonly available: number; readonly total: number } {
+  const missingTopics = buildV2AiStudyPayload(view, eventGate).dataQuality.missingTopics;
+  return {
+    available: V2_AI_STUDY_INPUT_TOPIC_COUNT - missingTopics.length,
+    total: V2_AI_STUDY_INPUT_TOPIC_COUNT,
+  };
 }
 
 /** Verifies AI Study payload mirrors the command center view (same source fields). */
@@ -572,6 +1138,49 @@ export function verifyV2AiStudyPayloadAlignsWithView(
   push("riskChange", view.riskChange, payload.decision?.riskChange);
   push("opportunityScore", view.opportunityScore, payload.decision?.opportunityScore);
   push("exposure", view.exposure, payload.decision?.exposure);
+  push("riskChangeReason", view.riskChangeReason, payload.decision?.riskChangeReason ?? null);
+
+  const qualitative = payload.qualitativeContext;
+  const expectedQualitative = qualitativeContextFromView(view);
+  if (!qualitative) {
+    mismatches.push("qualitativeContext: missing from payload");
+  } else {
+    push("qualitativeContext.missingInputs", expectedQualitative.missingInputs, qualitative.missingInputs);
+    push("qualitativeContext.previousSession", expectedQualitative.previousSession, qualitative.previousSession);
+    push("qualitativeContext.previousRiskScore", expectedQualitative.previousRiskScore, qualitative.previousRiskScore);
+    push("qualitativeContext.factorMoves", expectedQualitative.factorMoves, qualitative.factorMoves);
+    push("qualitativeContext.spyRegime", expectedQualitative.spyRegime, qualitative.spyRegime);
+    push("qualitativeContext.qqqRegime", expectedQualitative.qqqRegime, qualitative.qqqRegime);
+    push("qualitativeContext.spyDealerFlow", expectedQualitative.spyDealerFlow, qualitative.spyDealerFlow);
+    push("qualitativeContext.qqqDealerFlow", expectedQualitative.qqqDealerFlow, qualitative.qqqDealerFlow);
+    push("qualitativeContext.riskDivergence", expectedQualitative.riskDivergence, qualitative.riskDivergence);
+    push("qualitativeContext.gammaRegimeLabel", expectedQualitative.gammaRegimeLabel, qualitative.gammaRegimeLabel);
+    push(
+      "qualitativeContext.breadthDivergenceLabel",
+      expectedQualitative.breadthDivergenceLabel,
+      qualitative.breadthDivergenceLabel,
+    );
+    push("qualitativeContext.qqqVsSpy1dPct", expectedQualitative.qqqVsSpy1dPct, qualitative.qqqVsSpy1dPct);
+  }
+
+  const expectedCredit = creditHygLqdPayload(view.creditHygLqd);
+  if (expectedCredit) {
+    if (!payload.creditHygLqd) {
+      mismatches.push("creditHygLqd: missing from payload");
+    } else {
+      push("creditHygLqd.ratio", expectedCredit.ratio, payload.creditHygLqd.ratio);
+      push("creditHygLqd.change1dPct", expectedCredit.change1dPct, payload.creditHygLqd.change1dPct);
+      push("creditHygLqd.trend5dPct", expectedCredit.trend5dPct, payload.creditHygLqd.trend5dPct);
+      push("creditHygLqd.signal", expectedCredit.signal, payload.creditHygLqd.signal);
+      push(
+        "creditHygLqd.spyChange1dPct",
+        expectedCredit.spyChange1dPct,
+        payload.creditHygLqd.spyChange1dPct,
+      );
+    }
+  } else if (payload.creditHygLqd) {
+    mismatches.push("creditHygLqd: payload present but HYG/LQD unavailable on view");
+  }
 
   const spy = view.gamma[0];
   const spyPayload = payload.spyGamma;
@@ -999,8 +1608,9 @@ function buildRegimeFallback(payload: V2AiStudyPayload): string {
   if (leader) {
     parts.push(`${leader.label} leads 5D RS ${formatRsPct(leader.rs5d)}`);
   }
-  if (payload.decision?.stance) {
-    parts.push(`stance ${payload.decision.stance}`);
+  const positioning = payload.historicalPolicy?.positioning?.trim();
+  if (positioning) {
+    parts.push(`Positioning ${positioning}`);
   }
   if (payload.dataQuality.limitations.length > 0) {
     parts.push(`data: ${payload.dataQuality.limitations[0]}`);
@@ -1013,13 +1623,11 @@ function buildBaseCaseFallback(payload: V2AiStudyPayload): string {
   const limited = payload.dataQuality.interpretationConfidence === "limited";
   const spy = payload.spyGamma;
 
-  if (payload.decision?.stance) {
-    let line = `Model stance ${payload.decision.stance}`;
-    if (payload.decision.riskScore !== null && payload.decision.riskScore !== undefined) {
+  const positioning = payload.historicalPolicy?.positioning?.trim();
+  if (positioning) {
+    let line = `Positioning ${positioning}`;
+    if (payload.decision?.riskScore !== null && payload.decision?.riskScore !== undefined) {
       line += ` · risk ${payload.decision.riskScore}`;
-    }
-    if (payload.decision.exposure) {
-      line += ` · exposure ${payload.decision.exposure.min}–${payload.decision.exposure.max}%`;
     }
     parts.push(line);
   }
@@ -1189,6 +1797,187 @@ function leaderImproves(payload: V2AiStudyPayload): boolean {
   return (payload.sectorRotation?.leadingImproving.length ?? 0) > 0;
 }
 
+function buildHiddenRiskFallback(payload: V2AiStudyPayload): string {
+  const parts: string[] = [];
+  const spy = payload.spyGamma;
+  const position = deriveSpyGammaSpotPosition(spy);
+
+  if (payload.eventGate && payload.eventGate.state !== "clear") {
+    const stale = payload.eventGate.stale ? " (stale)" : "";
+    const headline = payload.eventGate.headline;
+    parts.push(
+      headline
+        ? `Event gate ${payload.eventGate.state}${stale}: ${headline} is in connected inputs, not a scored tape reaction.`
+        : `Event gate ${payload.eventGate.state}${stale} is open in connected inputs.`,
+    );
+  }
+  if (spy?.incomplete === true) {
+    parts.push("SPY gamma snapshot is incomplete, so wall/flip context may be understated in the score.");
+  } else if (spy?.stale === true) {
+    parts.push("SPY gamma is marked stale in connected inputs.");
+  }
+  if (payload.breadth?.stale) {
+    const dated = payload.breadth.marketSessionDate
+      ? ` dated ${payload.breadth.marketSessionDate}`
+      : "";
+    parts.push(`SPY breadth is stale${dated}, so participation may not match the scored session.`);
+  }
+  const missing = payload.qualitativeContext?.missingInputs ?? [];
+  if (missing.length > 0) {
+    parts.push(`Missing inputs: ${missing.slice(0, 2).join("; ")}.`);
+  }
+  if (position.belowFlip && position.gammaFlip !== null) {
+    parts.push(
+      `Spot is below gamma flip ${position.gammaFlip} — amplification is a structure fact the headline score may compress.`,
+    );
+  }
+  if (payload.volMispricing?.spySignal === "vol_underpriced" && spy?.incomplete === true) {
+    parts.push("Vol underpriced vs incomplete gamma snapshot.");
+  }
+  const creditHidden = creditHiddenRiskLine(payload);
+  if (creditHidden) {
+    parts.unshift(creditHidden);
+  }
+
+  return (
+    parts.slice(0, 2).join(" ") ||
+    "No off-model hidden risk is flagged in connected inputs."
+  );
+}
+
+function buildReactionQualityFallback(payload: V2AiStudyPayload): string {
+  const parts: string[] = [];
+  const spy = payload.spyGamma;
+  const breadthLabel =
+    payload.breadth?.signal && payload.breadth.signal !== "unavailable"
+      ? breadthSignalLabel(
+          payload.breadth.signal as "strong" | "mixed" | "weak",
+          "available",
+        )
+      : null;
+  const stale = payload.breadth?.stale ? " (dated breadth)" : "";
+
+  if (spy?.dealerFlow && typeof spy.dealerFlow === "string" && breadthLabel) {
+    parts.push(`${spy.dealerFlow} vs SPY breadth ${breadthLabel}${stale}.`);
+  }
+  if (payload.ctaProxy?.signal && breadthLabel) {
+    parts.push(
+      `CTA proxy ${ctaProxySignalLabel(
+        payload.ctaProxy.signal as CtaProxyTrendSignal,
+        "available",
+      )} vs SPY breadth ${breadthLabel}${stale}.`,
+    );
+  }
+  const leader = payload.sectorRotation?.leadingImproving[0];
+  const weak = payload.sectorRotation?.weakening[0];
+  if (leader && weak) {
+    parts.push(
+      `Sector leadership is narrow: ${leader.label} vs ${weak.label} weakening on 5D RS.`,
+    );
+  }
+
+  return (
+    parts.slice(0, 2).join(" ") ||
+    "Reaction quality cannot be judged from connected inputs."
+  );
+}
+
+function buildCrossAssetConflictFallback(payload: V2AiStudyPayload): string {
+  const qualitative = payload.qualitativeContext;
+  const parts: string[] = [];
+
+  if (qualitative?.spyRegime && qualitative.qqqRegime && qualitative.spyRegime !== qualitative.qqqRegime) {
+    parts.push(
+      `SPY gamma regime ${qualitative.spyRegime.replaceAll("_", " ")} vs QQQ ${qualitative.qqqRegime.replaceAll("_", " ")}.`,
+    );
+  }
+  if (
+    qualitative?.spyDealerFlow &&
+    qualitative.qqqDealerFlow &&
+    qualitative.spyDealerFlow !== qualitative.qqqDealerFlow
+  ) {
+    parts.push(`SPY dealer flow ${qualitative.spyDealerFlow} vs QQQ ${qualitative.qqqDealerFlow}.`);
+  }
+  if (qualitative?.gammaRegimeLabel) {
+    parts.push(`Gamma regime divergence: ${qualitative.gammaRegimeLabel}.`);
+  }
+  if (qualitative?.breadthDivergenceLabel) {
+    parts.push(`Breadth divergence: ${qualitative.breadthDivergenceLabel}.`);
+  }
+  if (qualitative?.riskDivergence !== null && qualitative?.riskDivergence !== undefined) {
+    parts.push(`QQQ−SPY structural risk divergence ${qualitative.riskDivergence}.`);
+  }
+  if (qualitative?.qqqVsSpy1dPct !== null && qualitative?.qqqVsSpy1dPct !== undefined) {
+    parts.push(`QQQ vs SPY 1D ${qualitative.qqqVsSpy1dPct}%.`);
+  }
+  if (payload.macro?.riskDirection === "mixed" && leaderImproves(payload)) {
+    parts.push("Mixed macro risk vs sector leadership.");
+  }
+  const creditConflict = creditCrossAssetLine(payload);
+  if (creditConflict) {
+    parts.unshift(creditConflict);
+  }
+
+  return (
+    parts.slice(0, 2).join(" ") ||
+    "No cross-asset conflict is flagged in connected inputs."
+  );
+}
+
+function buildWhatChangedFallback(payload: V2AiStudyPayload): string {
+  const parts: string[] = [];
+  const change = payload.decision?.riskChange;
+  const reason = payload.decision?.riskChangeReason;
+  const previousScore = payload.qualitativeContext?.previousRiskScore;
+  const previousSession = payload.qualitativeContext?.previousSession;
+
+  if (change !== null && change !== undefined) {
+    let line = `Risk change ${change > 0 ? "+" : ""}${change}`;
+    if (previousScore !== null && previousScore !== undefined) {
+      line += ` vs previous session score ${previousScore}`;
+    }
+    if (previousSession) {
+      line += ` (${previousSession})`;
+    }
+    if (reason) {
+      line += ` — ${reason}`;
+    }
+    parts.push(`${line}.`);
+  } else if (reason) {
+    parts.push(reason);
+  }
+
+  const moves = (payload.qualitativeContext?.factorMoves ?? []).filter(
+    (factor) =>
+      factor.todayScore !== null &&
+      factor.previousScore !== null &&
+      factor.todayScore !== factor.previousScore,
+  );
+  if (moves.length > 0) {
+    const top = moves
+      .slice(0, 2)
+      .map((factor) => `${factor.id} ${factor.previousScore}→${factor.todayScore}`);
+    parts.push(`Factor moves: ${top.join("; ")}.`);
+  }
+  const creditChanged = creditWhatChangedLine(payload);
+  if (creditChanged) {
+    parts.unshift(creditChanged);
+  }
+
+  return (
+    parts.slice(0, 2).join(" ") ||
+    "No session-to-session change evidence is in connected inputs."
+  );
+}
+
+function buildWhatMattersNextFallback(payload: V2AiStudyPayload): string {
+  const text = buildIfThenFallback(payload);
+  if (text.startsWith("No conditional")) {
+    return "No next observable is specified in connected inputs.";
+  }
+  return text;
+}
+
 export function buildV2AiStudyFallback(
   payload: V2AiStudyPayload,
 ): V2AiStudyInterpretation {
@@ -1203,6 +1992,11 @@ export function buildV2AiStudyFallback(
       ifThen: buildIfThenFallback(payload),
       invalidation: buildInvalidationFallback(payload),
       tension: buildTensionFallback(payload),
+      hiddenRisk: buildHiddenRiskFallback(payload),
+      reactionQuality: buildReactionQualityFallback(payload),
+      crossAssetConflict: buildCrossAssetConflictFallback(payload),
+      whatChanged: buildWhatChangedFallback(payload),
+      whatMattersNext: buildWhatMattersNextFallback(payload),
       missingReason: null,
     },
     dataQuality,
@@ -1225,6 +2019,16 @@ export function previewV2AiStudyInterpretation(): V2AiStudyInterpretation {
       "SPY sustained below illustrative put wall; breadth shifts to strong participation.",
     tension:
       "Illustrative stabilizing dealer flow vs mixed breadth; vol expensive vs positive gamma in preview.",
+    hiddenRisk:
+      "Illustrative incomplete gamma and dated breadth — off-model coverage gaps only, preview payload.",
+    reactionQuality:
+      "Illustrative stabilizing dealer flow vs mixed breadth; leadership not confirmed by participation.",
+    crossAssetConflict:
+      "Illustrative SPY vs QQQ gamma/dealer-flow split in preview payload only.",
+    whatChanged:
+      "Illustrative risk eased vs prior session in preview payload — not a live session delta.",
+    whatMattersNext:
+      "If illustrative SPY loses gamma flip → vol expansion risk rises. If breadth improves from Mixed to Strong → participation may broaden.",
     missingReason: null,
   };
 }
@@ -1242,6 +2046,11 @@ function interpretationFromLlmOutput(
       ifThen: parsed.if_then.trim(),
       invalidation: parsed.invalidation.trim(),
       tension: parsed.tension.trim(),
+      hiddenRisk: parsed.hidden_risk.trim(),
+      reactionQuality: parsed.reaction_quality.trim(),
+      crossAssetConflict: parsed.cross_asset_conflict.trim(),
+      whatChanged: parsed.what_changed.trim(),
+      whatMattersNext: parsed.what_matters_next.trim(),
       missingReason: null,
     },
     dataQuality,
@@ -1322,16 +2131,20 @@ export async function generateV2CommandAiStudyInterpretation(input: {
   const fetchImpl = input.fetchImpl ?? fetch;
   const apiUrl = input.apiUrl ?? OPENAI_RESPONSES_URL;
   const userPrompt = JSON.stringify(input.payload);
-  const body = buildV2CommandAiStudyOpenAiBody(input.config, userPrompt);
 
   const maxAttempts =
     1 + input.config.maxRetries + input.config.parseRetries;
   let lastError = "unknown error";
+  let correction: string | null = null;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), input.config.timeoutMs);
     try {
+      const attemptPrompt = correction
+        ? `${userPrompt}\n\nThe prior draft was rejected by grounding validation: ${correction}. Regenerate the full JSON and fix that violation without adding new facts.`
+        : userPrompt;
+      const body = buildV2CommandAiStudyOpenAiBody(input.config, attemptPrompt);
       const response = await fetchImpl(apiUrl, {
         method: "POST",
         headers: {
@@ -1371,11 +2184,13 @@ export async function generateV2CommandAiStudyInterpretation(input: {
       const parsed = V2AiStudyLlmOutputSchema.safeParse(parsedJson);
       if (!parsed.success) {
         lastError = `Model output schema invalid: ${parsed.error.issues[0]?.message ?? "schema"}`;
+        correction = lastError;
         continue;
       }
       const grounding = validateV2AiStudyLlmGrounding(parsed.data, input.payload);
       if (!grounding.ok) {
         lastError = `Grounding failed: ${grounding.reason}`;
+        correction = grounding.reason;
         continue;
       }
       return interpretationFromLlmOutput(parsed.data, dataQuality);

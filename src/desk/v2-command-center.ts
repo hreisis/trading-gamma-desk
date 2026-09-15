@@ -1,3 +1,7 @@
+import { applyZeroGex, type loadZeroGex } from "./zerogex";
+import { deriveMarketAction, type MarketAction } from "./market-action";
+import { deriveOpportunityV3, type OpportunityV3 } from "./opportunity-score-v3";
+import { loadPriorRiskSpread, saveRiskSpread } from "./risk-spread-history";
 import type { DominantDriver } from "@/contracts";
 import type { BreadthInternalsSnapshot } from "@/contracts/breadth-internals";
 import {
@@ -19,7 +23,11 @@ import {
 } from "@/ai-study/session";
 import type { EventGateSnapshot } from "@/contracts/event-gate";
 import {
-  deriveRiskDecisionV1,
+  buildRiskSessionComparison,
+  loadPriorPublishedRiskDecisionForMarketSession,
+  loadPriorPublishedRiskDecisionForMarketSessionAsync,
+  type RiskDecisionV1Result,
+  type RiskSessionComparison,
   resolveRiskDecisionDayOverDay,
   resolveRiskDecisionDayOverDayAsync,
 } from "./risk-decision-v1";
@@ -32,7 +40,7 @@ import {
   type RiskDivergenceTrend,
 } from "./risk-decision-v1-1";
 import type { RuntimeJsonStore } from "./runtime-store";
-import { buildGammaCone, type GammaConeResult } from "./gamma-cone";
+import { buildHistoricalGammaCone, buildGammaCone, type GammaConeResult } from "./gamma-cone";
 import {
   dealerFlowContextLines,
   dealerFlowRegimeLabel,
@@ -43,17 +51,22 @@ import {
   readGammaFlipStrike,
   resolveWallTouchDailyVolPct,
   summarizeCtaProxy,
-  summarizeSymbolCtaProxy,
   summarizeVolMispricing,
   type CtaProxySummary,
   type RestOfDayRange,
   type VolMispricingSummary,
   type WallTouchProbability,
 } from "./format-gamma";
+import {
+  deriveHygLqdCreditSignal,
+  UNAVAILABLE_HYG_LQD_CREDIT,
+  type HygLqdCreditSignal,
+} from "./hyg-lqd-credit";
 
 export type V2Language = "en" | "zh";
 
 export interface V2GammaSummary {
+  readonly volFreshness?: BoundedGammaFreshnessLabel | null;
   readonly symbol: "SPY" | "QQQ";
   readonly status: "ready" | "unavailable" | "incomplete";
   readonly freshness: BoundedGammaFreshnessLabel | null;
@@ -124,7 +137,7 @@ export const SECTOR_ETF_NAMES: Record<string, string> = {
   XLU: "Utilities",
   XLB: "Materials",
   XLRE: "Real Estate",
-  XLC: "Communication Services",
+  XLC: "Communication",
 };
 
 export function formatSectorEtfLabel(symbol: string): string {
@@ -196,11 +209,16 @@ export interface V2MacroSummary {
 
 export interface V2CommandCenterView {
   readonly decisionStatus: V2DecisionStatus;
+  readonly riskCoverage?: RiskDecisionV1Result["coverage"];
   readonly stance: V2DecisionStance | null;
   readonly riskScore: number | null;
   readonly riskChange: number | null;
   readonly riskChangeReason: string | null;
+  readonly riskSessionComparison: RiskSessionComparison | null;
   readonly opportunityScore: number | null;
+  readonly opportunity?: OpportunityV3;
+  readonly marketAction?: MarketAction;
+  readonly optionSensitivity?: { riskWithoutOptions: number | null; spreadWithoutOptions: number | null; factors: RiskDecisionV1Result["factorContributions"] };
   readonly exposure: { readonly min: number; readonly max: number } | null;
   readonly allocation:
     | {
@@ -230,6 +248,8 @@ export interface V2CommandCenterView {
   readonly riskDivergenceTrend: RiskDivergenceTrend | null;
   readonly componentDivergence: RiskComponentDivergence;
   readonly qqqBreadth: V2SpyBreadthSummary;
+  /** HYG/LQD from Alpaca daily bars — AI Study only, not a Risk V1 input. */
+  readonly creditHygLqd: HygLqdCreditSignal;
 }
 
 export type V2AiStudyConfidence = "high" | "moderate" | "limited";
@@ -244,6 +264,11 @@ export interface V2AiStudyInterpretation {
   readonly ifThen: string;
   readonly invalidation: string;
   readonly tension: string;
+  readonly hiddenRisk: string;
+  readonly reactionQuality: string;
+  readonly crossAssetConflict: string;
+  readonly whatChanged: string;
+  readonly whatMattersNext: string;
   readonly missingReason: string | null;
 }
 
@@ -258,6 +283,7 @@ const NASDAQ_BREADTH_MISSING = "Breadth: Nasdaq / high-beta / semis";
 
 export function deriveMissingInputsFromMarketSnapshot(
   snapshot: MarketInputSnapshot | null | undefined,
+  coverage?: { rotation: boolean; creditProxy: boolean; qqqBreadth: boolean },
 ): readonly string[] {
   if (!snapshot) {
     return [NASDAQ_BREADTH_MISSING, ...STATIC_MISSING_INPUTS];
@@ -271,7 +297,15 @@ export function deriveMissingInputsFromMarketSnapshot(
         : field.label,
     );
 
-  missing.push(NASDAQ_BREADTH_MISSING);
+  if (coverage?.rotation) {
+    const index = missing.findIndex(line => line.startsWith("Relative leadership / rotation:"));
+    if (index >= 0) missing.splice(index, 1);
+  }
+  if (coverage?.creditProxy) {
+    const index = missing.findIndex(line => line.startsWith("Credit stress:"));
+    if (index >= 0) missing[index] = "Credit stress: HYG/LQD ETF proxy available; direct credit-spread series unavailable.";
+  }
+  missing.push(coverage?.qqqBreadth ? "Breadth: high-beta / semis constituent coverage unavailable (QQQ available)." : NASDAQ_BREADTH_MISSING);
 
   return missing;
 }
@@ -489,28 +523,6 @@ function summarizeVolMispricingForSymbol(
   });
 }
 
-function summarizeSymbolCtaProxyFromInputs(input: {
-  readonly symbol: "SPY" | "QQQ";
-  readonly marketQuotes: readonly AlpacaMarketQuote[] | undefined;
-  readonly equityBarsBySymbol:
-    | ReadonlyMap<string, readonly { sessionDate: string; close: number }[]>
-    | undefined;
-  readonly now: Date;
-}): CtaProxySummary {
-  const price = resolveLiveEquitySpot(input.symbol, input.marketQuotes, null);
-  const targetSession = resolveLastCompletedMarketSessionDate(input.now);
-  const bars = input.equityBarsBySymbol?.get(input.symbol);
-  const spyBars = input.equityBarsBySymbol?.get("SPY");
-
-  return summarizeSymbolCtaProxy({
-    symbol: input.symbol,
-    bars,
-    price,
-    targetSession,
-    hv20BenchmarkBars: input.symbol === "SPY" ? bars : spyBars,
-  });
-}
-
 function summarizeCtaProxyFromInputs(input: {
   readonly marketQuotes: readonly AlpacaMarketQuote[] | undefined;
   readonly equityBarsBySymbol:
@@ -687,7 +699,7 @@ function summarizeGammaFromSnapshot(
     putWall: showFlow ? wallStrikeWhenAvailable(snapshot.boundedPutWall) : null,
     callWall: showFlow ? wallStrikeWhenAvailable(snapshot.boundedCallWall) : null,
     regime: showFlow ? snapshot.gammaRegime : null,
-    quality: `${snapshot.status} · bounded single expiry · ${snapshot.coverage.contractsUsed}/${snapshot.coverage.contractsIn} contracts used`,
+    quality: `${snapshot.status} · bounded single expiry · ${snapshot.coverage.contractsUsed}/${snapshot.coverage.contractsIn} contracts used${view.error ? ` · ${view.error.message}` : ""}${snapshot.status === "unavailable" ? ` · ${JSON.stringify(snapshot.coverage.skipReasons)}` : ""}`,
     source: view.sourceLabel,
     isFixture: view.isFixture,
   };
@@ -1124,7 +1136,18 @@ function previewSectorRotationSummary(): V2SectorRotationSummary {
   };
 }
 
-export async function buildV2CommandCenterView(input: {
+export interface V2CommandCenterLedgerFreezeContext {
+  readonly decision: RiskDecisionV1Result;
+  readonly eventGate: EventGateSnapshot | null;
+  readonly publicationDate: string;
+}
+
+export interface V2CommandCenterBuildResult {
+  readonly view: V2CommandCenterView;
+  readonly ledgerFreezeContext: V2CommandCenterLedgerFreezeContext | null;
+}
+
+export type V2CommandCenterBuildInput = {
   readonly driver: DominantDriver | null;
   readonly spyGamma: BoundedGammaDeskView;
   readonly qqqGamma: BoundedGammaDeskView;
@@ -1142,7 +1165,19 @@ export async function buildV2CommandCenterView(input: {
   readonly barPanelLatestSession?: string | null;
   readonly artifactStore?: RuntimeJsonStore;
   readonly forceRiskDecisionDaily?: boolean;
-}): Promise<V2CommandCenterView> {
+  readonly gammaOverrides?: readonly V2GammaSummary[];
+  readonly zeroGex?: readonly Awaited<ReturnType<typeof loadZeroGex>>[];
+};
+
+export async function buildV2CommandCenterView(
+  input: V2CommandCenterBuildInput,
+): Promise<V2CommandCenterView> {
+  return (await buildV2CommandCenterViewWithLedgerContext(input)).view;
+}
+
+export async function buildV2CommandCenterViewWithLedgerContext(
+  input: V2CommandCenterBuildInput,
+): Promise<V2CommandCenterBuildResult> {
   const preview = input.methodologyPreview === true;
   const now = input.now ?? new Date();
   const macroSummary = summarizeMacroFromDriver(input.driver, {
@@ -1166,21 +1201,11 @@ export async function buildV2CommandCenterView(input: {
       false,
     );
 
-  const spyGammaSummary = summarizeGamma("SPY", input.spyGamma, gammaOptions);
-  const qqqGammaSummary = summarizeGamma("QQQ", input.qqqGamma, gammaOptions);
+  const spyBase = input.gammaOverrides?.find(g => g.symbol === "SPY") ?? summarizeGamma("SPY", input.spyGamma, gammaOptions);
+  const qqqBase = input.gammaOverrides?.find(g => g.symbol === "QQQ") ?? summarizeGamma("QQQ", input.qqqGamma, gammaOptions);
+  const spyGammaSummary = input.zeroGex ? applyZeroGex(spyBase, input.zeroGex[0] ?? {data:null,fallback:true}, now) : spyBase;
+  const qqqGammaSummary = input.zeroGex ? applyZeroGex(qqqBase, input.zeroGex[1] ?? {data:null,fallback:true}, now) : qqqBase;
   const ctaProxy = summarizeCtaProxyFromInputs({
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-    now,
-  });
-  const spyCtaProxy = summarizeSymbolCtaProxyFromInputs({
-    symbol: "SPY",
-    marketQuotes: input.marketQuotes,
-    equityBarsBySymbol: input.equityBarsBySymbol,
-    now,
-  });
-  const qqqCtaProxy = summarizeSymbolCtaProxyFromInputs({
-    symbol: "QQQ",
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
     now,
@@ -1195,16 +1220,16 @@ export async function buildV2CommandCenterView(input: {
       },
       false,
     );
-  const spyGammaCone = buildGammaCone({
+  const spyGammaCone = input.zeroGex ? buildHistoricalGammaCone({summary:spyGammaSummary,bars:input.equityBarsBySymbol?.get("SPY"),now}) : buildGammaCone({
     symbol: "SPY",
-    view: input.spyGamma,
+    view: (input.gammaOverrides || input.zeroGex) ? { ...input.spyGamma, snapshot: null, withheldSnapshot: null } : input.spyGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
   });
-  const qqqGammaCone = buildGammaCone({
+  const qqqGammaCone = input.zeroGex ? buildHistoricalGammaCone({summary:qqqGammaSummary,bars:input.equityBarsBySymbol?.get("QQQ"),now}) : buildGammaCone({
     symbol: "QQQ",
-    view: input.qqqGamma,
+    view: (input.gammaOverrides || input.zeroGex) ? { ...input.qqqGamma, snapshot: null, withheldSnapshot: null } : input.qqqGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
@@ -1228,11 +1253,13 @@ export async function buildV2CommandCenterView(input: {
       relativePerformance: { qqqVsSpy1dPct: null, qqqVsSpy5dPct: null },
     };
     return {
+      view: {
       decisionStatus: "methodology_preview",
       stance: "buy",
       riskScore: 42,
       riskChange: -6,
       riskChangeReason: "Risk eased: breadth improved · CTA strengthened",
+      riskSessionComparison: null,
       opportunityScore: 58,
       exposure: { min: 65, max: 80 },
       allocation: { highBeta: 45, defense: 25, metals: 20, hedge: 10 },
@@ -1257,14 +1284,23 @@ export async function buildV2CommandCenterView(input: {
       riskDivergenceChange: 4,
       riskDivergenceTrend: "widening",
       componentDivergence: previewComponentDivergence,
+      creditHygLqd: UNAVAILABLE_HYG_LQD_CREDIT,
+      },
+      ledgerFreezeContext: null,
     };
   }
 
   const sectorRotation = summarizeSectorRotation(sectorRotationInput);
+  const creditHygLqd = deriveHygLqdCreditSignal({
+    equityBarsBySymbol: input.equityBarsBySymbol,
+    targetSession,
+  });
   const eventGate = eventGateFromMarketInput(input.marketInputSnapshot);
   const publicationDate = resolveCurrentMarketSessionDate(now);
-  const priorDivergence =
-    input.dataRoot !== null && input.dataRoot !== undefined
+  const spreadBasis = JSON.stringify([spyGammaSummary.source, qqqGammaSummary.source]);
+  const priorDivergence = input.artifactStore
+    ? await loadPriorRiskSpread(input.artifactStore, targetSession, spreadBasis)
+    : input.dataRoot !== null && input.dataRoot !== undefined
       ? loadPriorPublishedRiskDivergence(input.dataRoot, publicationDate)
       : null;
 
@@ -1274,9 +1310,6 @@ export async function buildV2CommandCenterView(input: {
     qqqBreadth,
     spyGamma: spyGammaSummary,
     qqqGamma: qqqGammaSummary,
-    marketCtaProxy: ctaProxy,
-    spyCtaProxy,
-    qqqCtaProxy,
     eventGate,
     sectorRotation,
     targetSession,
@@ -1284,6 +1317,13 @@ export async function buildV2CommandCenterView(input: {
     priorDivergence,
   });
   const decision = riskV1_1.marketRisk;
+  const opportunity = deriveOpportunityV3({sessionDate: targetSession, bars: input.equityBarsBySymbol, breadth: spyBreadth,
+    eventBlocked: !eventGate || eventGate.stale || eventGate.state !== 'clear'});
+  const withoutOptions = (g: V2GammaSummary): V2GammaSummary => ({...g, status:'unavailable', regime:null,
+    volMispricing:{...g.volMispricing,status:'unavailable',signal:null,spreadVolPts:null}});
+  const sensitivity = deriveRiskDecisionV1_1({driver:input.driver,spyBreadth,qqqBreadth,
+    spyGamma:withoutOptions(spyGammaSummary),qqqGamma:withoutOptions(qqqGammaSummary),eventGate,sectorRotation,targetSession});
+
 
   const driverEvidence = deriveEvidenceFromDriver(input.driver);
   const evidence =
@@ -1293,6 +1333,7 @@ export async function buildV2CommandCenterView(input: {
 
   const marketMissing = deriveMissingInputsFromMarketSnapshot(
     input.marketInputSnapshot,
+    { rotation: sectorRotation.status === "available" && !sectorRotation.stale, creditProxy: creditHygLqd.status === "available", qqqBreadth: qqqBreadth.status === "available" && !qqqBreadth.stale },
   );
   const riskMissing =
     decision.status === "withheld"
@@ -1321,7 +1362,25 @@ export async function buildV2CommandCenterView(input: {
           })
       : { riskChange: null, riskChangeReason: null };
 
-  resolveRiskDivergenceDayOverDay({
+  const priorRiskRecord = input.artifactStore
+    ? await loadPriorPublishedRiskDecisionForMarketSessionAsync(
+        input.artifactStore,
+        targetSession,
+      )
+    : input.dataRoot
+      ? loadPriorPublishedRiskDecisionForMarketSession(input.dataRoot, targetSession)
+      : null;
+  const riskSessionComparison =
+    decision.status === "ready"
+      ? buildRiskSessionComparison({
+          decisionSessionDate: targetSession,
+          today: decision,
+          priorRecord: priorRiskRecord,
+        })
+      : null;
+
+  if (input.artifactStore) await saveRiskSpread(input.artifactStore, targetSession, spreadBasis, riskV1_1);
+  else resolveRiskDivergenceDayOverDay({
     dataRoot: input.dataRoot,
     publicationDate,
     decisionSessionDate: targetSession,
@@ -1330,25 +1389,31 @@ export async function buildV2CommandCenterView(input: {
     force: input.forceRiskDecisionDaily === true,
   });
 
-  return {
+  const view: V2CommandCenterView = {
     decisionStatus: decision.status === "ready" ? "ready" : "awaiting_inputs",
+    riskCoverage: decision.coverage,
     stance: decision.stance,
     riskScore: decision.riskScore,
     riskChange: dayOverDay.riskChange,
     riskChangeReason: dayOverDay.riskChangeReason,
-    opportunityScore: decision.opportunityScore,
+    riskSessionComparison,
+    opportunityScore: opportunity.score,
+    opportunity,
+    marketAction: deriveMarketAction({risk:decision.riskScore,opportunity:opportunity.score,confirmation:opportunity.confirmation,eventBlocked:opportunity.eventBlocked}),
+    optionSensitivity: {riskWithoutOptions:sensitivity.marketRisk.riskScore,spreadWithoutOptions:sensitivity.riskDivergence,factors:decision.factorContributions},
     exposure: decision.exposure,
     allocation: decision.allocation,
     evidence,
     missingInputs: [...marketMissing, ...riskMissing],
     spyBreadth,
     qqqBreadth,
+    creditHygLqd,
     ctaProxy,
     gamma: [spyGammaSummary, qqqGammaSummary],
     gammaCone: [spyGammaCone, qqqGammaCone],
     macroLabel: macroSummary?.label ?? input.driver?.label ?? null,
     macroSummary,
-    sessionDate: publicationDate,
+    sessionDate: targetSession,
     sectorRotation,
     spyStructuralRiskScore: riskV1_1.spyStructuralRisk.riskScore,
     qqqStructuralRiskScore: riskV1_1.qqqStructuralRisk.riskScore,
@@ -1356,5 +1421,14 @@ export async function buildV2CommandCenterView(input: {
     riskDivergenceChange: riskV1_1.riskDivergenceChange,
     riskDivergenceTrend: riskV1_1.riskDivergenceTrend,
     componentDivergence: riskV1_1.componentDivergence,
+  };
+
+  return {
+    view,
+    ledgerFreezeContext: {
+      decision,
+      eventGate,
+      publicationDate,
+    },
   };
 }
