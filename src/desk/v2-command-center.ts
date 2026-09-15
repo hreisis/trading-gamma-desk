@@ -40,7 +40,7 @@ import {
   type RiskDivergenceTrend,
 } from "./risk-decision-v1-1";
 import type { RuntimeJsonStore } from "./runtime-store";
-import { buildGammaCone, type GammaConeResult } from "./gamma-cone";
+import { buildHistoricalGammaCone, buildGammaCone, type GammaConeResult } from "./gamma-cone";
 import {
   dealerFlowContextLines,
   dealerFlowRegimeLabel,
@@ -1220,14 +1220,14 @@ export async function buildV2CommandCenterViewWithLedgerContext(
       },
       false,
     );
-  const spyGammaCone = buildGammaCone({
+  const spyGammaCone = input.zeroGex ? buildHistoricalGammaCone({summary:spyGammaSummary,bars:input.equityBarsBySymbol?.get("SPY"),now}) : buildGammaCone({
     symbol: "SPY",
     view: (input.gammaOverrides || input.zeroGex) ? { ...input.spyGamma, snapshot: null, withheldSnapshot: null } : input.spyGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
   });
-  const qqqGammaCone = buildGammaCone({
+  const qqqGammaCone = input.zeroGex ? buildHistoricalGammaCone({summary:qqqGammaSummary,bars:input.equityBarsBySymbol?.get("QQQ"),now}) : buildGammaCone({
     symbol: "QQQ",
     view: (input.gammaOverrides || input.zeroGex) ? { ...input.qqqGamma, snapshot: null, withheldSnapshot: null } : input.qqqGamma,
     now,

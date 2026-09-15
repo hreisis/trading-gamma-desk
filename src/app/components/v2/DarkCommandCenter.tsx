@@ -41,7 +41,8 @@ function Panel({ title, children, id, note }: { title: string; children: ReactNo
 function LevelCard({ g, lang, cone }: { g: V2GammaSummary; lang: V2Language; cone: V2CommandCenterPageView["gammaCone"][number] | undefined }) {
   const t = (en: string, zh: string) => lang === "zh" ? zh : en;
   const range = cone?.restOfDay.status === "available" ? cone.restOfDay : cone?.fullSession;
-  const rangeLabel = cone?.restOfDay.status === "available" ? t("Rest of day", "剩余交易时段") : t("Full session", "完整交易日");
+  const historical = cone?.provenance.fullSessionMode === "annual_hv20_over_sqrt_252";
+  const rangeLabel = historical ? t("One-session closing range · HV20 estimate", "一交易日收盘区间 · HV20 估算") : cone?.restOfDay.status === "available" ? t("Rest of day", "剩余交易时段") : t("Full session", "完整交易日");
   const levels = [g.spot, g.callWall, g.gammaFlip, g.putWall].filter((n): n is number => n != null && Number.isFinite(n));
   const min = Math.min(...levels), max = Math.max(...levels);
   const pct = (n: number) => 4 + 92 * (max === min ? .5 : (n - min) / (max - min));
@@ -58,7 +59,7 @@ function LevelCard({ g, lang, cone }: { g: V2GammaSummary; lang: V2Language; con
     <p className={styles.meta}>{t("Options as of", "期权数据日期")} {g.sessionDate ?? "—"} · {t("Expiry", "到期")} {g.expiration ?? "—"} · {g.isFixture ? t("Illustrative", "示意数据") : label(g.status, lang)} {g.freshness ? `· ${label(g.freshness, lang)}` : ""}</p>
     <p className={styles.meta}>{g.quality}</p>
     <details className={styles.details}><summary>{t("Positioning & range details", "持仓与区间详情")}</summary>
-      <p>{rangeLabel}</p><dl className={styles.rows}><div><dt>{t("90% expected range", "90% 预期区间")}</dt><dd>{range?.expectedRange90 ? `${number(range.expectedRange90.lower)} – ${number(range.expectedRange90.upper)}` : "—"}</dd></div><div><dt>{t("50% core range", "50% 核心区间")}</dt><dd>{range?.coreRange50 ? `${number(range.coreRange50.lower)} – ${number(range.coreRange50.upper)}` : "—"}</dd></div><div><dt>Net GEX</dt><dd>{number(g.netGex, 0)}</dd></div><div><dt>{t("Call wall touch", "触及 Call Wall")}</dt><dd>{number(g.callWallTouch.percent)}%</dd></div><div><dt>{t("Put wall touch", "触及 Put Wall")}</dt><dd>{number(g.putWallTouch.percent)}%</dd></div></dl>
+      <p>{rangeLabel}</p>{historical && <p className={styles.meta}>{t("Reference close", "基准收盘价")} {number(cone?.provenance.referenceClose, 2)} · {cone?.provenance.hvSessionDate} · HV20 {number(cone?.volatility.hv20Pct, 2)}%<br />{t("Normal-model estimate from 20 daily returns; not intraday high/low limits or a price target.", "基于20个日收益率的正态模型估算；不是盘中高低点边界或价格目标。")}</p>}<dl className={styles.rows}><div><dt>{t("90% expected range", "90% 预期区间")}</dt><dd>{range?.expectedRange90 ? `${number(range.expectedRange90.lower)} – ${number(range.expectedRange90.upper)}` : "—"}</dd></div><div><dt>{t("50% core range", "50% 核心区间")}</dt><dd>{range?.coreRange50 ? `${number(range.coreRange50.lower)} – ${number(range.coreRange50.upper)}` : "—"}</dd></div><div><dt>Net GEX</dt><dd>{number(g.netGex, 0)}</dd></div><div><dt>{t("Call wall touch", "触及 Call Wall")}</dt><dd>{g.callWallTouch.percent == null ? t("Unavailable for this horizon", "此时间范围暂不估算") : `${number(g.callWallTouch.percent)}%`}</dd></div><div><dt>{t("Put wall touch", "触及 Put Wall")}</dt><dd>{g.putWallTouch.percent == null ? t("Unavailable for this horizon", "此时间范围暂不估算") : `${number(g.putWallTouch.percent)}%`}</dd></div></dl>
       {g.contextLines.map((line, i) => <p key={i}>{line}</p>)}
       <p>{t("Gamma describes volatility amplification or compression, not price direction.", "Gamma 描述波动的放大或抑制，不单独预测涨跌方向。")}</p>
     </details>
