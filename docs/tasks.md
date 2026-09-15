@@ -284,3 +284,6 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 - Implemented prospective action/research freeze, bilingual cached close review, archived citations, separate direction/timing/risk-control/watch sections, and authenticated post-close cron.
 - Live sidebar uses the new review instead of the legacy per-visit review/translation calls; legacy replay code remains available.
 - Limits: daily-bar verification only; research news/sector claims are not independently verified. Actual PnL and intraday entry quality remain unscored. Forecast capture is publication-triggered; production cron generates reviews but does not synthesize historical forecasts.
+
+### Theme policy pilot (2026-09-15)
+Added isolated SMH/IGV/MAG7 experimental table to preview workflow, using existing equity bars and no extra options requests. Validate actual availability/results before connecting it to portfolio actions or daily-review scoring. Custom themes and historical calibration remain pending.

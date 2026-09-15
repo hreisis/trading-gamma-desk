@@ -5,7 +5,7 @@ export const TECHNOLOGY_INTERNAL_ETFS = [
   ["IGV", "Software"],
   ["CLOU", "Cloud"],
   ["HACK", "Cybersecurity"],
-  ["AIQ", "AI Infrastructure"],
+  ["AIQ", "Broad AI & Technology"],
 ] as const;
 
 export const MAG7_SYMBOLS = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA"] as const;
