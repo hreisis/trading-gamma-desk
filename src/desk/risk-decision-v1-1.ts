@@ -142,6 +142,7 @@ export function gammaToRiskInput(summary: V2GammaSummary): RiskDecisionSpyGammaI
     regime: summary.regime,
     dealerFlowRegime: summary.dealerFlowRegime,
     volMispricing: summary.volMispricing,
+    volFreshness: summary.volFreshness,
   };
 }
 

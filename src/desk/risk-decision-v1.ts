@@ -961,6 +961,7 @@ export interface RiskDecisionSpyBreadthInput {
 }
 
 export interface RiskDecisionSpyGammaInput {
+  readonly volFreshness?: "fresh" | "stale" | "incomplete" | null;
   readonly status: "ready" | "unavailable" | "incomplete";
   readonly freshness: "fresh" | "stale" | "incomplete" | null;
   readonly regime: string | null;
@@ -1097,7 +1098,7 @@ export function deriveRiskDecisionV1(
     const score = volFactorScore(vol.signal);
     if (score !== null) {
       const multiplier =
-        input.spyGamma.freshness === "stale" ? STALE_WEIGHT_MULTIPLIER : 1;
+        (input.spyGamma.volFreshness ?? input.spyGamma.freshness) === "stale" ? STALE_WEIGHT_MULTIPLIER : 1;
       factors.push({
         id: "vol",
         label: "Vol mispricing",

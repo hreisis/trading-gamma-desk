@@ -1,3 +1,4 @@
+import { applyZeroGex, type loadZeroGex } from "./zerogex";
 import { deriveMarketAction, type MarketAction } from "./market-action";
 import { deriveOpportunityV3, type OpportunityV3 } from "./opportunity-score-v3";
 import { loadPriorRiskSpread, saveRiskSpread } from "./risk-spread-history";
@@ -65,6 +66,7 @@ import {
 export type V2Language = "en" | "zh";
 
 export interface V2GammaSummary {
+  readonly volFreshness?: BoundedGammaFreshnessLabel | null;
   readonly symbol: "SPY" | "QQQ";
   readonly status: "ready" | "unavailable" | "incomplete";
   readonly freshness: BoundedGammaFreshnessLabel | null;
@@ -1164,6 +1166,7 @@ export type V2CommandCenterBuildInput = {
   readonly artifactStore?: RuntimeJsonStore;
   readonly forceRiskDecisionDaily?: boolean;
   readonly gammaOverrides?: readonly V2GammaSummary[];
+  readonly zeroGex?: readonly Awaited<ReturnType<typeof loadZeroGex>>[];
 };
 
 export async function buildV2CommandCenterView(
@@ -1198,8 +1201,10 @@ export async function buildV2CommandCenterViewWithLedgerContext(
       false,
     );
 
-  const spyGammaSummary = input.gammaOverrides?.find(g => g.symbol === "SPY") ?? summarizeGamma("SPY", input.spyGamma, gammaOptions);
-  const qqqGammaSummary = input.gammaOverrides?.find(g => g.symbol === "QQQ") ?? summarizeGamma("QQQ", input.qqqGamma, gammaOptions);
+  const spyBase = input.gammaOverrides?.find(g => g.symbol === "SPY") ?? summarizeGamma("SPY", input.spyGamma, gammaOptions);
+  const qqqBase = input.gammaOverrides?.find(g => g.symbol === "QQQ") ?? summarizeGamma("QQQ", input.qqqGamma, gammaOptions);
+  const spyGammaSummary = input.zeroGex ? applyZeroGex(spyBase, input.zeroGex[0] ?? {data:null,fallback:true}, now) : spyBase;
+  const qqqGammaSummary = input.zeroGex ? applyZeroGex(qqqBase, input.zeroGex[1] ?? {data:null,fallback:true}, now) : qqqBase;
   const ctaProxy = summarizeCtaProxyFromInputs({
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
@@ -1217,14 +1222,14 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     );
   const spyGammaCone = buildGammaCone({
     symbol: "SPY",
-    view: input.gammaOverrides ? { ...input.spyGamma, snapshot: null, withheldSnapshot: null } : input.spyGamma,
+    view: (input.gammaOverrides || input.zeroGex) ? { ...input.spyGamma, snapshot: null, withheldSnapshot: null } : input.spyGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,
   });
   const qqqGammaCone = buildGammaCone({
     symbol: "QQQ",
-    view: input.gammaOverrides ? { ...input.qqqGamma, snapshot: null, withheldSnapshot: null } : input.qqqGamma,
+    view: (input.gammaOverrides || input.zeroGex) ? { ...input.qqqGamma, snapshot: null, withheldSnapshot: null } : input.qqqGamma,
     now,
     marketQuotes: input.marketQuotes,
     equityBarsBySymbol: input.equityBarsBySymbol,

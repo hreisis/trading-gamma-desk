@@ -1,9 +1,10 @@
+import { loadZeroGex } from "./zerogex";
 import {buildRelativePairs,type RelativePair} from "./relative-pairs";
 import {buildThemePilot,replayThemePilot,type ThemePilotRow} from "./theme-pilot";
 import {captureReviewThesis,publishResearchReview,readResearchReview,type ResearchReview} from "./research-review";
 import { loadWebResearch, readResearchAttempt } from "@/ai-study/web-research";
 import type { WebResearch } from "@/ai-study/web-research-contract";
-import { loadManualGammaSnapshot, buildManualGammaSummary, type ManualGammaSnapshot } from "./manual-gamma";
+import { type ManualGammaSnapshot } from "./manual-gamma";
 import { after } from "next/server";
 import { join } from "node:path";
 import {
@@ -391,6 +392,7 @@ export async function loadV2HomePage(
     env: runtimeEnv,
   };
 
+  const zeroGexPromise = !input.demo && !forceFixture ? Promise.all((["SPY", "QQQ"] as const).map(symbol => loadZeroGex(symbol, artifactStore))) : Promise.resolve(undefined);
   const [macro, spyGamma, qqqGamma, spyBreadthLoad, qqqBreadthLoad, marketPanel, equityBars, catalystFeed] =
     await Promise.all([
     macroPromise,
@@ -491,12 +493,14 @@ export async function loadV2HomePage(
     },
   });
 
-  const manualGammaSnapshot = input.demo ? null : await loadManualGammaSnapshot(artifactStore, targetMarketSessionDate);
-  const gammaOverrides = manualGammaSnapshot ? (["SPY", "QQQ"] as const).map(symbol => buildManualGammaSummary({ snapshot: manualGammaSnapshot, symbol, hv20Bars: equityBarsBySymbol.get(symbol) })) : undefined;
+  const manualGammaSnapshot = null;
+  const gammaOverrides = undefined;
+  const zeroGex = !input.demo && !forceFixture ? await zeroGexPromise : undefined;
   const { view: computedView, ledgerFreezeContext } =
     await buildV2CommandCenterViewWithLedgerContext({
     driver: macro.driver,
     gammaOverrides,
+    zeroGex,
     spyGamma,
     qqqGamma,
     methodologyPreview: input.demo,
@@ -514,7 +518,7 @@ export async function loadV2HomePage(
       runtimeEnv.GAMMADESK_FORCE_COMMAND_CENTER_SNAPSHOT === "1",
   });
 
-  const baseView = gammaOverrides ? {
+  const baseView = zeroGex?.every(row => row.data) ? {
     ...computedView,
     missingInputs: computedView.missingInputs.filter(line => !/^SPY bounded gamma|^QQQ bounded gamma/.test(line)),
   } : computedView;

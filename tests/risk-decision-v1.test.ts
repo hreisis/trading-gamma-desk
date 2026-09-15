@@ -689,3 +689,9 @@ describe("Risk V1 daily publication", () => {
     expect(aggregateRiskScoreFromContributions(today.factorContributions)).not.toBeNull();
   });
 });
+
+it('uses fresh Gamma weight while retaining independently stale IV weight', () => {
+ const result = deriveRiskDecisionV1({driver:null, spyBreadth:strongBreadth(), spyGamma:spyGammaInput({status:'ready',freshness:'fresh',volFreshness:'stale'}),eventGate:clearEventGate,targetSession:'2026-08-10'});
+ expect(result.factorContributions.find(f=>f.id==='gamma')?.effectiveWeight).toBe(15);
+ expect(result.factorContributions.find(f=>f.id==='vol')?.effectiveWeight).toBe(7.5);
+});
