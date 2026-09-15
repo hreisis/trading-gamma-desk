@@ -1,3 +1,4 @@
+import {RelativePairs} from "./RelativePairs";
 import {ResearchReviewPanel} from "./ResearchReviewPanel";
 import { WebResearchPanel } from "./WebResearchPanel";
 import { MarketConsider } from "./MarketConsider";
@@ -151,16 +152,17 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
         <Panel title={t("Sector Performance (1D)", "板块表现（1日）")} note={view.sectorRotation.sessionDate ?? "—"}><Bars rows={rotation.map(r => ({ symbol: r.symbol, value: r.return1d }))} lang={lang} /></Panel>
       </div>
       <div className={styles.sectionHeading} id="rotation"><span>03</span><h2>{t("Rotation & participation", "轮动与市场参与度")}</h2><small>{t("Relative performance, not reported fund flows", "相对表现，不代表已确认资金流向")}</small></div>
+      {!demoMode && <RelativePairs pairs={view.relativePairs ?? []} lang={lang} />}
       <div className={styles.twoColumns}>
         <Panel title={t("Sector Rotation", "板块轮动")} note={t("5D vs SPY · percentage points", "5日相对 SPY · 百分点")}><Bars rows={[...view.sectorRotation.sectors].sort((a, b) => b.rs5d - a.rs5d).map(r => ({ symbol: r.symbol, value: r.rs5d }))} lang={lang} /><p className={styles.meta}>{view.sectorRotation.sessionDate ?? "—"} · {view.sectorRotation.stale ? t("Stale", "已过期") : label(view.sectorRotation.status, lang)}</p></Panel>
         <Panel title={t("Technology Internal", "科技内部轮动")} note={t("5D vs XLK · percentage points", "5日相对 XLK · 百分点")}><Bars rows={view.technologyInternal.rows.map(r => ({ symbol: r.symbol, value: r.rs5dVsXlk }))} lang={lang} /><p className={styles.meta}>{view.technologyInternal.sessionDate ?? "—"} · {label(view.technologyInternal.status, lang)}</p></Panel>
       </div>
-      {!demoMode && <Panel title={t("Theme decisions · EXPERIMENT", "主题决策 · 试算")} note={view.sessionDate ?? "—"}>
+      {!demoMode && <details className={styles.details}><summary>{t("Experimental theme signals & historical audit", "实验信号与历史检查")}</summary><Panel title={t("Theme decisions · EXPERIMENT", "主题决策 · 试算")} note={view.sessionDate ?? "—"}>
         <p className={styles.meta}>{t("Daily rules under evaluation. Does not change the portfolio action or allocation. MAG7 uses a daily-rebalanced equal-weight basket.", "日频实验规则，不改变组合操作和仓位。MAG7 为每日再平衡的等权研究组合。")}</p>
         <div className={styles.themeTable}><table data-testid="theme-pilot"><thead><tr>{[t("Theme","主题"),t("Action","操作"),t("1D","当日"),"RS 5D / 20D",t("Trend","趋势"),t("Opportunity","机会"),t("Recovery","修复")].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{view.themePilot?.map(r=><tr key={r.symbol}><td>{r.symbol}<small>{r.name[lang]}</small></td><td>{r.action ?? '—'}{r.marketGated&&<small>{t("Market gate","大盘限制")}</small>}</td><td>{signed(r.return1d,2)}</td><td>{number(r.rs5,2)} / {number(r.rs20,2)}</td><td>{r.trend==='up'?t('Up','向上'):r.trend==='down'?t('Down','向下'):r.trend==='mixed'?t('Mixed','混合'):'—'}</td><td>{number(r.opportunity)}</td><td>{r.status==='unavailable'?t('Insufficient history','历史不足'):r.recovering?t('Starting','启动'):t('Unconfirmed','未确认')}</td></tr>)}</tbody></table></div>
         <details className={styles.details}><summary>{t("SMH historical setup audit", "SMH 历史信号检查")}</summary><p>{t("Each row uses only that session and earlier closes; signals apply afterwards. Intrinsic theme setup only, without reconstructed historical market gates.", "每行仅使用当日及此前收盘数据，信号适用于之后。这里只检查主题本身，不重建历史大盘与事件限制。")}</p><div className={styles.themeTable}><table data-testid="theme-replay"><thead><tr>{[t('Session','日期'),t('Daily return','当日涨跌'),t('Setup after close','收盘后信号'),'RS 5D / 20D',t('Vs MA20','偏离 MA20'),t('Opportunity','机会')].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{view.themeReplay?.map(r=><tr key={r.sessionDate}><td>{r.sessionDate}</td><td>{signed(r.return1d,2)}</td><td>{r.setup??'—'}</td><td>{number(r.rs5,2)} / {number(r.rs20,2)}</td><td>{signed(r.belowMa20Pct,2)}</td><td>{number(r.opportunity)}</td></tr>)}</tbody></table></div></details>
         <p className={styles.meta}>{t("RS is return difference versus SPY, in percentage points. Theme opportunity uses price only and is not comparable to the market opportunity score. Crypto, AI infrastructure and defense/aerospace are not yet connected.", "RS 为相对 SPY 的收益差（百分点）。主题机会仅使用价格，不能与大盘机会分直接比较。Crypto、AI Infra、国防／航空航天尚未接入。")}</p>
-      </Panel>}
+      </Panel></details>}
       <div className={styles.twoColumns}><Panel title={t("Nasdaq Participation", "纳斯达克参与度")}><Breadth data={view.qqqBreadth} symbol="QQQ" lang={lang} /></Panel>
         <Panel title={t("Technology Leaders & Laggards", "科技领涨与领跌")} note={view.techLeadersLaggards.sessionDate ?? "—"}><Bars rows={[...view.techLeadersLaggards.leaders, ...view.techLeadersLaggards.laggards].map(r => ({ symbol: r.symbol, value: r.return1dPct }))} lang={lang} /></Panel></div>
       <div className={styles.sectionHeading} id="macro"><span>04</span><h2>{t("Macro & risk context", "宏观与风险背景")}</h2></div>

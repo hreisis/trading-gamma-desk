@@ -1,3 +1,4 @@
+import {buildRelativePairs,type RelativePair} from "./relative-pairs";
 import {buildThemePilot,replayThemePilot,type ThemePilotRow} from "./theme-pilot";
 import {captureReviewThesis,publishResearchReview,readResearchReview,type ResearchReview} from "./research-review";
 import { loadWebResearch, readResearchAttempt } from "@/ai-study/web-research";
@@ -85,6 +86,7 @@ export interface LoadV2HomePageInput {
 export type V2CommandCenterPageView = V2CommandCenterView & {
   readonly webResearch?: WebResearch | null;
   readonly researchReview?: ResearchReview | null;
+  readonly relativePairs?: readonly RelativePair[];
   readonly themePilot?: readonly ThemePilotRow[];
   readonly themeReplay?: ReturnType<typeof replayThemePilot>;
   readonly researchAttempt?: {status:string;error?:string} | null;
@@ -443,7 +445,7 @@ export async function loadV2HomePage(
     loadAlpacaDailyBarPanel({
       symbols: [
         ...new Set([
-          "QQQ",
+          "QQQ", "IBIT",
           ...sectorRotationBarSymbols(),
           ...technologyUiBarSymbols(),
           ...HYG_LQD_BAR_SYMBOLS,
@@ -608,6 +610,7 @@ export async function loadV2HomePage(
 
   const view: V2CommandCenterPageView = {
     ...baseView,
+    relativePairs: input.demo ? [] : buildRelativePairs(equityBarsBySymbol ?? new Map(),baseView.sessionDate ?? targetMarketSessionDate),
     themeReplay: input.demo ? [] : replayThemePilot({bars:equityBarsBySymbol ?? new Map(),sessionDate:baseView.sessionDate ?? targetMarketSessionDate}),
     themePilot: input.demo ? [] : buildThemePilot({bars:equityBarsBySymbol ?? new Map(),sessionDate:baseView.sessionDate ?? targetMarketSessionDate,risk:baseView.riskScore,eventBlocked:baseView.opportunity?.eventBlocked ?? true}),
     manualGammaSnapshot,

@@ -287,3 +287,6 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 
 ### Theme policy pilot (2026-09-15)
 Added isolated SMH/IGV/MAG7 experimental table to preview workflow, using existing equity bars and no extra options requests. Validate actual availability/results before connecting it to portfolio actions or daily-review scoring. Custom themes and historical calibration remain pending.
+
+### Open relative-comparison layout
+Added unboxed SMH/IGV and IBIT/QQQ comparisons with ratio charts, aligned return tables and bilingual conclusions. Added IBIT to the existing equity-bar request; experimental theme actions/replay moved into collapsed details. No portfolio model changes.
