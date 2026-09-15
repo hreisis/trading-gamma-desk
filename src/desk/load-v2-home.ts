@@ -1,3 +1,4 @@
+import {captureReviewThesis,publishResearchReview,readResearchReview,type ResearchReview} from "./research-review";
 import { loadWebResearch, readResearchAttempt } from "@/ai-study/web-research";
 import type { WebResearch } from "@/ai-study/web-research-contract";
 import { loadManualGammaSnapshot, buildManualGammaSummary, type ManualGammaSnapshot } from "./manual-gamma";
@@ -82,6 +83,7 @@ export interface LoadV2HomePageInput {
 
 export type V2CommandCenterPageView = V2CommandCenterView & {
   readonly webResearch?: WebResearch | null;
+  readonly researchReview?: ResearchReview | null;
   readonly researchAttempt?: {status:string;error?:string} | null;
   readonly aiStudy: V2AiStudyInterpretation;
   readonly dailyReview: V2DailyReview;
@@ -565,6 +567,15 @@ export async function loadV2HomePage(
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
   const payload = buildV2AiStudyPayload(baseView, eventGate);
   const webResearch = input.demo ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"},payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
+  const researchReview = input.demo ? null : await readResearchReview(artifactStore);
+  if (!input.demo) {
+    const reviewTask = async () => {
+      await captureReviewThesis({store:artifactStore,now,inputSession:baseView.sessionDate,action:baseView.marketAction,research:webResearch});
+      await publishResearchReview({store:artifactStore,now,bars:equityBarsBySymbol ?? new Map(),config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"}});
+    };
+    if (deferRefresh) deferRefresh(async()=>{try{await reviewTask();}catch{ /* Keep previously published review visible. */ }});
+    else await reviewTask().catch(()=>undefined);
+  }
   const pendingAi: V2AiStudyInterpretation = {
     status: "unavailable", source: "unavailable", confidence: "limited",
     regime: "", baseCase: "", ifThen: "", invalidation: "", tension: "",
@@ -587,7 +598,7 @@ export async function loadV2HomePage(
       : { aiStudy: aiStudyRaw, dailyReview: dailyReviewRaw };
   }
   // No unobserved background task: the page awaits this promise inside Suspense.
-  const narratives = generateNarratives();
+  const narratives = input.demo ? generateNarratives() : Promise.resolve({aiStudy:pendingAi,dailyReview:deterministicReview});
   const localized = input.deferNarratives
     ? { aiStudy: pendingAi, dailyReview: deterministicReview }
     : await narratives;
@@ -596,6 +607,7 @@ export async function loadV2HomePage(
     ...baseView,
     manualGammaSnapshot,
     webResearch,
+    researchReview: input.demo ? null : researchReview ?? await readResearchReview(artifactStore),
     researchAttempt: input.demo ? null : await readResearchAttempt(artifactStore,now),
     aiStudy: localized.aiStudy,
     dailyReview: localized.dailyReview,

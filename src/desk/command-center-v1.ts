@@ -77,6 +77,7 @@ export interface CommandCenterV1DailySnapshot {
   readonly sessionDate: string;
   readonly generatedAt: string;
   readonly stance: V2CommandCenterView["stance"];
+  readonly marketAction?: V2CommandCenterView["marketAction"];
   readonly riskScore: number | null;
   readonly exposure: V2CommandCenterView["exposure"];
   readonly spy: CommandCenterV1GammaSnapshot;
@@ -163,6 +164,7 @@ export function buildCommandCenterV1SnapshotFromView(
     sessionDate: view.sessionDate,
     generatedAt,
     stance: view.stance,
+    ...(view.marketAction ? {marketAction:view.marketAction} : {}),
     riskScore: view.riskScore,
     exposure: view.exposure,
     spy: gammaSnapshotFromSummary(view.gamma[0]),
@@ -343,7 +345,8 @@ function stanceLabel(stance: V2CommandCenterView["stance"]): string {
 }
 
 function buildMorningStance(snapshot: CommandCenterV1DailySnapshot): string {
-  const parts = [stanceLabel(snapshot.stance)];
+  const parts = [snapshot.marketAction?.action ?? stanceLabel(snapshot.stance)];
+  if (snapshot.marketAction) parts.push(`${snapshot.marketAction.version}/${snapshot.marketAction.rule}`, snapshot.marketAction.reason.en);
   if (snapshot.riskScore !== null) parts.push(`risk ${snapshot.riskScore}`);
   if (snapshot.exposure) {
     parts.push(`exposure ${snapshot.exposure.min}–${snapshot.exposure.max}%`);

@@ -4,11 +4,12 @@ import styles from './DarkCommandCenter.module.css';
 
 export function MarketConsider({view, lang}: {view: V2CommandCenterPageView; lang: V2Language}) {
  const t = (en: string, zh: string) => lang === 'zh' ? zh : en;
- const ready = view.decisionStatus === 'ready';
+ const ready = view.marketAction ? view.marketAction.action !== null : view.decisionStatus === 'ready';
+ const stance = view.marketAction ? (view.marketAction.action === 'SELL' ? 'reduce' : view.marketAction.action === 'BUY' ? 'buy' : 'hold') : view.stance;
  const weak = view.spyBreadth.breadthSignal === 'weak';
  const negative = view.gamma.filter(g => g.status === 'ready' && g.regime === 'negative').map(g=>g.symbol);
  const event = view.eventGate;
- const title = !ready ? t('Wait for a clearer picture before taking a new position.','信息尚不完整，先等待更清晰的判断。') : view.stance === 'reduce' ? t('Reduce exposure; the structure calls for caution.','先收缩风险敞口，当前结构需要谨慎。') : view.stance === 'buy' ? t('Conditions support measured additions.','条件支持分步增加敞口。') : t('Hold selectively; wait for broader confirmation.','选择性持有，等待更广泛的确认。');
+ const title = !ready ? t('Wait for a clearer picture before taking a new position.','信息尚不完整，先等待更清晰的判断。') : stance === 'reduce' ? t('Reduce exposure; the structure calls for caution.','先收缩风险敞口，当前结构需要谨慎。') : stance === 'buy' ? t('Conditions support measured additions.','条件支持分步增加敞口。') : t('Hold selectively; wait for broader confirmation.','选择性持有，等待更广泛的确认。');
  const reasons = [
   weak ? t('Weak SPY breadth suggests that strength is not widely shared across stocks.','SPY 市场宽度偏弱，指数表现尚未得到多数成分股的支持。') : view.spyBreadth.breadthSignal === 'strong' ? t('Strong SPY breadth gives the market move broader support.','SPY 市场宽度较强，行情得到更多成分股支持。') : t('Breadth does not yet provide a strong directional confirmation.','市场宽度尚未提供明确的方向确认。'),
   negative.length ? t(`${negative.join(' / ')} negative Gamma can amplify moves in either direction; it is not a bearish forecast.`,`${negative.join(' / ')} 为负 Gamma，可能放大双向波动，不能单独据此判断下跌。`) : t('Use the option levels below to assess where the current structure may change.','结合下方期权关键位，观察结构可能在哪里发生变化。'),

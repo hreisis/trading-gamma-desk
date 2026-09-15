@@ -1,3 +1,4 @@
+import { deriveMarketAction, type MarketAction } from "./market-action";
 import { deriveOpportunityV3, type OpportunityV3 } from "./opportunity-score-v3";
 import { loadPriorRiskSpread, saveRiskSpread } from "./risk-spread-history";
 import type { DominantDriver } from "@/contracts";
@@ -214,6 +215,7 @@ export interface V2CommandCenterView {
   readonly riskSessionComparison: RiskSessionComparison | null;
   readonly opportunityScore: number | null;
   readonly opportunity?: OpportunityV3;
+  readonly marketAction?: MarketAction;
   readonly optionSensitivity?: { riskWithoutOptions: number | null; spreadWithoutOptions: number | null; factors: RiskDecisionV1Result["factorContributions"] };
   readonly exposure: { readonly min: number; readonly max: number } | null;
   readonly allocation:
@@ -1392,6 +1394,7 @@ export async function buildV2CommandCenterViewWithLedgerContext(
     riskSessionComparison,
     opportunityScore: opportunity.score,
     opportunity,
+    marketAction: deriveMarketAction({risk:decision.riskScore,opportunity:opportunity.score,confirmation:opportunity.confirmation,eventBlocked:opportunity.eventBlocked}),
     optionSensitivity: {riskWithoutOptions:sensitivity.marketRisk.riskScore,spreadWithoutOptions:sensitivity.riskDivergence,factors:decision.factorContributions},
     exposure: decision.exposure,
     allocation: decision.allocation,

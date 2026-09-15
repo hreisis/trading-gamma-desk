@@ -274,3 +274,13 @@ Phases P1–P4 below remain as historical skeleton references. **Active planning
 - Added daily Opportunity V3 independent of Risk, with separate recovery confirmation and event condition. Historical V2 replay retained.
 - Overview now leads with model stance, paired scores, compact Market Consider, then exposure/spread/drivers. Methodology and option sensitivity are expandable.
 - Current APIs retained; intraday updates and empirical calibration remain future work.
+
+### Market action overlay (2026-09-14)
+- Implemented BUY/HOLD/SELL policy from Risk, Opportunity, recovery and event gate; no score or sizing changes.
+- Saved versioned action inputs/rationale in new command-center snapshots; old reviews retain original labels.
+- Review follow-up: preserve research edition and exact forecast timestamp; evaluate only subsequent outcomes and conditions, distinguish tactical entry from exposure reduction, and schedule/cache bilingual post-close publications. These review changes are not implemented by the action overlay.
+
+### Research-linked daily review (2026-09-15)
+- Implemented prospective action/research freeze, bilingual cached close review, archived citations, separate direction/timing/risk-control/watch sections, and authenticated post-close cron.
+- Live sidebar uses the new review instead of the legacy per-visit review/translation calls; legacy replay code remains available.
+- Limits: daily-bar verification only; research news/sector claims are not independently verified. Actual PnL and intraday entry quality remain unscored. Forecast capture is publication-triggered; production cron generates reviews but does not synthesize historical forecasts.

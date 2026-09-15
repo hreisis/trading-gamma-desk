@@ -39,6 +39,7 @@ export interface V2AiStudyPayload {
     readonly riskChange: number | null;
     readonly exposure: { readonly min: number; readonly max: number } | null;
     readonly opportunityScore: number | null;
+    readonly marketAction?: V2CommandCenterView["marketAction"];
     readonly riskChangeReason: string | null;
   };
   readonly qualitativeContext?: {
@@ -1010,6 +1011,7 @@ export function buildV2AiStudyPayload(
       riskChange: view.riskChange,
       exposure: view.exposure,
       opportunityScore: view.opportunityScore,
+      marketAction: view.marketAction,
       riskChangeReason: view.riskChangeReason,
     },
     qualitativeContext: qualitativeContextFromView(view),

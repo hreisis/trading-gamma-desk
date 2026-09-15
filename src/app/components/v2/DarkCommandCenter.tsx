@@ -1,3 +1,4 @@
+import {ResearchReviewPanel} from "./ResearchReviewPanel";
 import { WebResearchPanel } from "./WebResearchPanel";
 import { MarketConsider } from "./MarketConsider";
 import { OverviewCards } from "./OverviewCards";
@@ -100,14 +101,14 @@ export async function NarrativeRail({ promise, lang, showStudy = true }: { promi
         <ul>{ai.dataLimitations.map((line, i) => <li key={i}>{line}</li>)}</ul>
       </details>
     </Panel>}
-    <Panel title={t("DAILY REVIEW", "每日复盘")} id="daily-review">
+    {showStudy && <Panel title={t("DAILY REVIEW", "每日复盘")} id="daily-review">
       <h3>{t("Outcome", "实际结果")}</h3><p>{review.actualOutcome || t("Pending close validation", "等待收盘验证")}</p>
       <h4>{t("WHAT WORKED", "有效部分")}</h4><ul>{review.whatWorked.map((line, i) => <li key={i}>{line}</li>)}</ul>
       <h4>{t("WHAT FAILED", "失效部分")}</h4><ul>{review.whatFailed.map((line, i) => <li key={i}>{line}</li>)}</ul>
       {review.errorExplanation && <p>{review.errorExplanation}</p>}
       <h4>{t("NEXT SESSION", "下一交易日")}</h4><ul>{review.tomorrowWatch.map((line, i) => <li key={i}>{line}</li>)}</ul>
       <details className={styles.details}><summary>{t("Review limitations", "复盘数据限制")}</summary><ul>{review.dataLimitations.map((line, i) => <li key={i}>{line}</li>)}</ul></details>
-    </Panel>
+    </Panel>}
   </div>;
 }
 export function DarkCommandCenter({ view, lang, demoMode = false, narratives, source, forceFixture = false }: {
@@ -116,7 +117,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
   const t = (en: string, zh: string) => lang === "zh" ? zh : en;
   const home = demoMode ? "/demo" : "/";
   const languageHref = (next: string) => { const q = new URLSearchParams({ lang: next }); if (source) q.set("source", source); if (forceFixture) q.set("gamma", "fixture"); return `${home}?${q}`; };
-  const state = view.decisionStatus === "ready" || demoMode ? label(view.stance, lang) : t("Awaiting inputs", "等待数据");
+  const state = view.marketAction ? view.marketAction.action ?? t("AWAITING INPUTS", "等待数据") : demoMode ? (view.stance === "buy" ? "BUY" : view.stance === "reduce" ? "SELL" : "HOLD") : t("AWAITING INPUTS", "等待数据");
   const rotation = [...view.sectorRotation.sectors].sort((a, b) => b.return1d - a.return1d);
   const feed = view.catalystFeed;
   const news = feed ? selectNewsFeedCatalysts(feed.catalysts, { now: new Date() }) : [];
@@ -135,7 +136,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
     <main className={styles.layout}><div className={styles.center}>
       <section className={styles.marketDecision} aria-label={t("Market decision", "市场决策")}>
         <div className={styles.decisionHeading}><h1>MARKET DECISION <span>{t("Today's view", "今日决策")}</span></h1><span>{view.sessionDate ?? "—"}</span></div>
-        <div className={styles.stanceLine}><strong>{state}</strong><small>{t("Market stance · daily inputs", "市场立场 · 日频数据")}</small></div>
+        <div className={styles.stanceLine}><strong>{state}</strong><small>{view.marketAction?.reason[lang] ?? t("Market stance · daily inputs", "市场立场 · 日频数据")}</small></div>
         <MarketConsider view={view} lang={lang} />
       </section>
       <section className={styles.overview} id="overview">
@@ -170,7 +171,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
       <Panel title={t("News & Market Events", "新闻与市场事件")} note={feed?.generatedAt ?? "—"} id="news">
         {news.length ? <ul className={styles.news}>{news.map(item => <li key={item.id}><time>{item.occurredAt.replace("T", " ").slice(0, 16)} UTC</time><span>{item.headline}</span><small>{label(item.importance, lang)}</small></li>)}</ul> : <p>{feed ? t("No events in the selected window.", "所选时间窗口内暂无事件。") : t("Event feed unavailable.", "事件数据暂不可用。")}</p>}
       </Panel>
-    </div><aside className={styles.rail}>{!demoMode && <WebResearchPanel research={view.webResearch ?? null} lang={lang} />}<Suspense fallback={demoMode ? <NarrativePending lang={lang} /> : <p className={styles.meta}>{t("Preparing daily review…", "正在准备每日复盘…")}</p>}><NarrativeRail showStudy={demoMode} promise={narratives ?? Promise.resolve({ aiStudy: view.aiStudy, dailyReview: view.dailyReview })} lang={lang} /></Suspense></aside></main>
+    </div><aside className={styles.rail}>{!demoMode && <WebResearchPanel research={view.webResearch ?? null} lang={lang} />}<ResearchReviewPanel review={view.researchReview ?? null} lang={lang} hidden={demoMode} /><Suspense fallback={demoMode ? <NarrativePending lang={lang} /> : <p className={styles.meta}>{t("Preparing daily review…", "正在准备每日复盘…")}</p>}><NarrativeRail showStudy={demoMode} promise={narratives ?? Promise.resolve({ aiStudy: view.aiStudy, dailyReview: view.dailyReview })} lang={lang} /></Suspense></aside></main>
     <footer className={styles.footer}><b>GammaDesk</b><span>{t("Options flow. Market structure. Clearer decisions.", "期权结构 · 市场研究 · 清晰决策")}</span><small>{t("Market data for information only. Not investment advice.", "市场信息仅供参考，不构成投资建议。")}</small></footer>
   </div>;
 }
