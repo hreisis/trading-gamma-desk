@@ -16,3 +16,11 @@ it('computes equal-weight returns rather than averaging constituent share prices
  const r=buildThemePilot({bars,sessionDate:dates.at(-1)!,risk:40,eventBlocked:false});
  expect(r[2]?.return1d).toBe(r[1]?.return1d);expect(r[2]?.rs5).toBe(0);
 });
+
+it('replay ignores all rows after each evaluation date',async()=>{
+ const {replayThemePilot}=await import('@/desk/theme-pilot');
+ const bars=data();const cutoff=dates.at(-1)!;
+ const expected=replayThemePilot({bars,sessionDate:cutoff,count:1});
+ for(const [symbol,rows] of bars)bars.set(symbol,[...rows,{sessionDate:'2027-01-01',close:999999}]);
+ expect(replayThemePilot({bars,sessionDate:cutoff,count:1})).toEqual(expected);
+});

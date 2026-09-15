@@ -47,3 +47,14 @@ export function buildThemePilot(input:{bars:ReadonlyMap<string,readonly Bar[]>;s
  return {...empty,status:'ready',reason:setup==='SELL'?'Trend and relative strength are deteriorating':setup==='BUY'?'Dip opportunity with price recovery':'No aligned entry or exit conditions',return1d:round(ret(prices,1)),rs5,rs20,trend,opportunity,recovering,setup,action:marketGated?'HOLD':setup,marketGated};
  });
 }
+
+/** Diagnostic replay: intrinsic theme setup only; historical market gates are not reconstructed. */
+export function replayThemePilot(input:{bars:ReadonlyMap<string,readonly Bar[]>;sessionDate:string;count?:number}){
+ const dates=[...new Set((input.bars.get('SPY')??[]).filter(b=>b.sessionDate<=input.sessionDate).map(b=>b.sessionDate))].sort().slice(-(input.count??10));
+ return dates.map(sessionDate=>{
+  const result=buildThemePilot({...input,sessionDate,risk:null,eventBlocked:true}).find(r=>r.symbol==='SMH')!;
+  const closes=(input.bars.get('SMH')??[]).filter(b=>b.sessionDate<=sessionDate).sort((a,b)=>a.sessionDate.localeCompare(b.sessionDate)).map(b=>b.close);
+  const ma20=closes.length>=20?mean(closes.slice(-20)):null;
+  return {sessionDate,status:result.status,setup:result.setup,return1d:result.return1d,rs5:result.rs5,rs20:result.rs20,trend:result.trend,opportunity:result.opportunity,belowMa20Pct:ma20&&closes.at(-1)!>0?round((closes.at(-1)!/ma20-1)*100):null};
+ });
+}
