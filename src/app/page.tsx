@@ -1,3 +1,4 @@
+import styles from "@/app/components/v2/DarkCommandCenter.module.css";
 import { after } from "next/server";
 import { readHomeDisplay, saveHomeDisplay } from "@/desk/home-display-cache";
 import { resolveRuntimeJsonStore } from "@/desk/runtime-store";
@@ -38,16 +39,24 @@ async function MarketHome({
   );
 }
 
-function InitialHome({zh}:{zh:boolean}) {
-  return <main style={{minHeight:"100vh",background:"#07111b",color:"#edf3ff",padding:"32px",fontFamily:"system-ui"}}>
-    <h1>Gamma<span style={{color:"#3196ff"}}>Desk</span></h1>
-    <p>{zh ? "市场决策 · 市场结构 · 板块轮动 · AI 研究" : "Market decision · Structure · Rotation · AI Study"}</p>
-    <p role="status">{zh ? "正在连接市场数据…" : "Connecting to market data…"}</p>
-  </main>;
+/** Normal homepage frame for a first visit with no saved data; never invent scores. */
+function HomeFrame({zh}:{zh:boolean}) {
+  const sections=zh ? ["决策总览","市场结构","轮动与市场参与度","宏观与风险背景","新闻与事件"] : ["Decision overview","Market structure","Rotation & participation","Macro & risk context","News & events"];
+  return <div className={styles.app}>
+    <header className={styles.nav}>
+      <a className={styles.logo} href="/">Gamma<span>Desk</span></a>
+      <nav aria-label={zh ? "页面导航" : "Sections"}>{sections.map((title,i)=><a key={title} href={`#${["overview","structure","rotation","macro","news"][i]}`}>{title}</a>)}</nav>
+      <div className={styles.languages}><a href="/?lang=en">EN</a><span>/</span><a href="/?lang=zh">中文</a></div>
+    </header>
+    <main className={styles.layout} aria-busy="true"><div className={styles.center}>
+      <section className={styles.marketDecision}><div className={styles.decisionHeading}><h1>MARKET DECISION</h1></div></section>
+      {sections.map((title,i)=><section key={title} id={["overview","structure","rotation","macro","news"][i]} style={{minHeight:160}}><div className={styles.sectionHeading}><span>{String(i+1).padStart(2,"0")}</span><h2>{title}</h2></div></section>)}
+    </div></main>
+  </div>;
 }
 async function CachedHome({lang}:{lang:"en"|"zh"}) {
   const cached = await readHomeDisplay(resolveRuntimeJsonStore(),lang);
-  if(!cached) return <InitialHome zh={lang==="zh"}/>;
+  if(!cached) return <HomeFrame zh={lang==="zh"}/>;
   return <>
     <div role="status" style={{padding:"10px 24px",background:"#132536",color:"#b8d8f1",fontSize:13}}>
       {lang==="zh" ? "正在更新 · 当前显示上次成功快照，保存于 " : "Updating · showing the last successful snapshot, saved "}{cached.savedAt}
@@ -58,7 +67,7 @@ async function CachedHome({lang}:{lang:"en"|"zh"}) {
 export default async function Home({searchParams}:{searchParams:Promise<{source?:string;gamma?:string;lang?:string}>}) {
   const params=await searchParams;
   const lang=params.lang==="zh"?"zh":"en";
-  const shell=<InitialHome zh={lang==="zh"}/>;
+  const shell=<HomeFrame zh={lang==="zh"}/>;
   const fallback=!params.source&&!params.gamma ? <Suspense fallback={shell}><CachedHome lang={lang}/></Suspense> : shell;
   return <Suspense fallback={fallback}><MarketHome searchParams={Promise.resolve(params)}/></Suspense>;
 }

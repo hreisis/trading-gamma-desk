@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { createTestDirectory as mkdtempSync } from "./helpers/temp-directory";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EtfUniverseArtifact } from "@/contracts/etf-universe-artifact";
