@@ -1,5 +1,8 @@
 # Tasks
 
+## Score chart visual refinement
+- Removed the chart heading. Risk and opportunity use thin connecting lines; opportunity retains gradient area fill. Adjacent available points can connect across legacy records as visual guides, with model comparability explicitly unverified. Missing values and larger date gaps remain unfilled. No score recalculation.
+
 ## Compact score history with price underlays
 - Read legacy command-center snapshots and preserve saved timestamps/missing scores; do not assume schema version equals model version.
 - Move chart directly below paired scores, reduce width/height, add default-off SPY/QQQ/IBIT daily-close relative-return underlays with separate percentage axis. Price requests occur only when enabled; no persistence writes. Legacy listing is cached five minutes per warm instance; it can consume Blob list operations on cold instances.
