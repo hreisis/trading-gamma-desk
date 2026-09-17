@@ -1,5 +1,13 @@
 # Tasks
 
+## Risk/opportunity history — 2026-09-17
+- Added score-colored risk polyline and opportunity gradient area, daily date axis and fixed 0–100 scale. Range controls retain daily values without aggregation.
+- Per-language display snapshots retain up to 730 daily observations with no additional Blob writes. History begins at activation; missing values remain absent. Last observed daily values are not guaranteed official close scores. Research refresh changes are included in this release.
+
+## Research refresh correction — 2026-09-17
+- FOMC research waits until the 16:00 New York close edition, triggered by a subsequent request. Added bounded cooldown retries and read-only client completion checks for study/summary. No scoring changes or notifications.
+- Typecheck and research/review regression tests passed; production generation and browser interaction still require deployment verification. Not committed or deployed.
+
 ## Dark bilingual homepage preview — 2026-09-14
 
 Branch: `codex/dark-ui-bilingual-fast-home` (base `ui-v2-preview`; not merged).

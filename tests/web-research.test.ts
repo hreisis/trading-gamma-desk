@@ -19,10 +19,30 @@ it('accepts native citations but never treats model-written URLs as evidence',()
  expect(searchSources(raw)).toEqual([]);
 });
 it('uses New York publication windows including overnight and winter offsets',()=>{
+ expect(researchSlot(new Date('2026-09-16T18:05:00Z'))).toBe('2026-09-16-pre');
+ expect(researchSlot(new Date('2026-09-16T19:59:59Z'))).toBe('2026-09-16-pre');
+ expect(researchSlot(new Date('2026-09-16T20:00:00Z'))).toBe('2026-09-16-post');
  expect(researchSlot(new Date('2026-09-14T12:00:00Z'))).toBe('2026-09-13-post');
  expect(researchSlot(new Date('2026-09-14T14:00:00Z'))).toBe('2026-09-14-pre');
  expect(researchSlot(new Date('2026-09-14T20:00:00Z'))).toBe('2026-09-14-post');
  expect(researchSlot(new Date('2026-12-14T14:00:00Z'))).toBe('2026-12-14-pre');
+});
+it('retries failed research after cooldown, with a three-attempt cap',async()=>{
+ const store=createFilesystemRuntimeJsonStore({dataRoot:mkdtempSync(join(tmpdir(),'research-'))});
+ const fetchImpl=vi.fn(async()=>new Response('{}',{status:500}));
+ const args={store,config,payload:{},inputSession:'2026-09-16',fetchImpl};
+ for(const time of ['21:00','21:01','21:15','21:30','21:45'])await loadWebResearch({...args,now:new Date(`2026-09-16T${time}:00Z`)});
+ expect(fetchImpl).toHaveBeenCalledTimes(3);
+});
+it('keeps the pre-event cache until close, even after nextEvent has advanced',async()=>{
+ const store=createFilesystemRuntimeJsonStore({dataRoot:mkdtempSync(join(tmpdir(),'research-'))});
+ await writeJson(store,'research/web-v1/latest.json',{version:2,event:{headline:'FOMC',at:'2026-09-16T18:00:00Z',et:'14:00 ET',sourceUrl:'https://www.federalreserve.gov'},slot:'2026-09-16-pre',generatedAt:'2026-09-16T14:00:00Z',model:'test',inputSession:'2026-09-15',content});
+ const fetchImpl=vi.fn(async()=>new Response('{}',{status:500}));
+ await loadWebResearch({store,config,payload:{},inputSession:'2026-09-16',fetchImpl,now:new Date('2026-09-16T18:06:00Z')});
+ expect(fetchImpl).not.toHaveBeenCalled();
+ await loadWebResearch({store,config,payload:{},inputSession:'2026-09-16',fetchImpl,now:new Date('2026-09-16T20:00:00Z')});
+ expect(fetchImpl).toHaveBeenCalledOnce();
+ expect(await readJson(store,'research/web-v1/attempts/2026-09-16-post.json')).toMatchObject({status:'failed'});
 });
 it('shares a published bilingual cache and does not search on subsequent reads',async()=>{
  const store=createFilesystemRuntimeJsonStore({dataRoot:mkdtempSync(join(tmpdir(),'research-'))});

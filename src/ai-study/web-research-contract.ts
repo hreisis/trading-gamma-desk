@@ -12,3 +12,6 @@ export function researchSlot(now: Date): string {
  if(hour<9) return `${new Date(new Date(`${date}T12:00:00Z`).getTime()-86400000).toISOString().slice(0,10)}-post`;
  return `${date}-${hour<16?'pre':'post'}`;
 }
+export function researchIsStale(research:WebResearch,now:Date):boolean {
+ return research.slot!==researchSlot(now);
+}

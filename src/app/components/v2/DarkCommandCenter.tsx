@@ -138,7 +138,7 @@ export function DarkCommandCenter({ view, lang, demoMode = false, narratives, so
       <section className={styles.marketDecision} aria-label={t("Market decision", "市场决策")}>
         <div className={styles.decisionHeading}><h1>MARKET DECISION <span>{t("Today's view", "今日决策")}</span></h1><span>{view.sessionDate ?? "—"}</span></div>
         <div className={styles.stanceLine}><strong>{state}</strong><small>{view.marketAction?.reason[lang] ?? t("Market stance · daily inputs", "市场立场 · 日频数据")}</small></div>
-        <MarketConsider view={view} lang={lang} />
+        <MarketConsider view={view} lang={lang} demoMode={demoMode} />
       </section>
       <section className={styles.overview} id="overview">
         <div className={styles.sectionHeading}><span>01</span><h2>{t("Decision overview", "决策总览")}</h2><small>{t("Risk, opportunity & exposure", "风险、机会与仓位")}</small></div>

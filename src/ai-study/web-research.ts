@@ -7,7 +7,7 @@ import { readJson, writeJson, type RuntimeJsonStore } from '@/desk/runtime-store
 const ROOT='research/web-v1';
 const REQUEST_VERSION='6';
 function canonical(url:string):string {try {const u=new URL(url);for(const key of [...u.searchParams.keys()])if(key.startsWith('utm_')||key==='gclid')u.searchParams.delete(key);u.hash='';return u.href.replace(/\/$/,'');}catch{return '';}}
-type ResearchInput={now:Date;payload:unknown;inputSession:string|null;config:AiStudyLlmRuntimeConfig;fetchImpl?:typeof fetch};
+type ResearchInput={now:Date;payload:unknown;inputSession:string|null;config:AiStudyLlmRuntimeConfig;fetchImpl?:typeof fetch;slot?:string};
 type ApiOutput={status?:string;output?:Array<Record<string,unknown>>};
 export function searchSources(raw:ApiOutput):Array<{id:string;url:string;title:string}>{
  const sources=new Map<string,{url:string;title:string}>();
@@ -64,22 +64,35 @@ export async function generateWebResearch(input:ResearchInput):Promise<WebResear
  const pair=(value:{en:string;zh:string})=>({en:clean(value.en),zh:clean(value.zh)});
  content={...content,headline:pair(content.headline),summary:pair(content.summary),sections:content.sections.map(s=>({...s,title:pair(s.title),body:pair(s.body),sources:s.sources.map(r=>({...r,publishedAt:r.publishedAt?.slice(0,10)??null}))})),limitations:pair(content.limitations)};
  if(/\b\d{1,2}:\d{2}\b/.test(JSON.stringify([content.summary,...content.sections.map(s=>s.body)])))throw new Error('Clock times must use the verified event panel');
- return {version:2,event,slot:researchSlot(input.now),generatedAt:new Date().toISOString(),inputSession:input.inputSession,model:input.config.model,content};
+ return {version:2,event,slot:input.slot??researchSlot(input.now),generatedAt:new Date().toISOString(),inputSession:input.inputSession,model:input.config.model,content};
 }
 export async function loadWebResearch(input:{store:RuntimeJsonStore;now:Date;payload:unknown;inputSession:string|null;config:AiStudyLlmRuntimeConfig;deferRefresh?:(task:()=>Promise<void>)=>void;fetchImpl?:typeof fetch}):Promise<WebResearch|null>{
  let cached:WebResearch|null=null;
  try{cached=ResearchRecord.parse(await readJson(input.store,`${ROOT}/latest.json`));}catch{}
+ const payload=input.payload as {nextEvent?:{kind?:string;occurredAt?:string}};
+ const currentEvent=payload.nextEvent?.kind==='fomc_decision'?payload.nextEvent.occurredAt:null;
+ // Keep the just-released event even when the calendar has advanced to its next entry.
+ const previousEvent=cached?.event;
+ const recentEvent=previousEvent && input.now.getTime()-Date.parse(previousEvent.at)>=0 && input.now.getTime()-Date.parse(previousEvent.at)<86400000?previousEvent:null;
+ const eventAt=recentEvent?.at??currentEvent;
  const slot=researchSlot(input.now);
  if(cached?.slot===slot||!input.config.apiKey)return cached;
  async function refresh(){
   let reserved=false;
   // One shared EN/ZH attempt per publication window. A failed run retains last success.
   try{
-   if(!await writeJson(input.store,`${ROOT}/attempts/${slot}-${REQUEST_VERSION}.json`,{attemptedAt:input.now.toISOString(),status:'running'}))return;
+   let attempt=0;
+   for(;attempt<3;attempt++) {
+    const reservation=await readJson(input.store,`${ROOT}/attempts/${slot}-${REQUEST_VERSION}-retry-${attempt}.json`) as {attemptedAt?:string}|null;
+    if(!reservation)break;
+    if(!reservation.attemptedAt || input.now.getTime()-Date.parse(reservation.attemptedAt)<15*60000)return;
+   }
+   if(attempt===3)return;
+   if(!await writeJson(input.store,`${ROOT}/attempts/${slot}-${REQUEST_VERSION}-retry-${attempt}.json`,{attemptedAt:input.now.toISOString(),status:'running'}))return;
    reserved=true;
    await writeJson(input.store,`${ROOT}/attempts/${slot}.json`,{status:'running'},{allowOverwrite:true});
-   const result=await generateWebResearch(input);
-   await writeJson(input.store,`${ROOT}/history/${slot}-${REQUEST_VERSION}.json`,result);
+   const result=await generateWebResearch({...input,slot,payload:{...payload,...(recentEvent?{nextEvent:{kind:'fomc_decision',occurredAt:recentEvent.at,headline:recentEvent.headline}}:{}),researchPhase:slot.endsWith('-post')&&eventAt&&Date.parse(eventAt)<=input.now.getTime()?'post-event-close':'scheduled',eventInstruction:'Compare currentTime with the event time. For past events seek the official released decision and subsequent reaction. Never describe a past release as upcoming; if its outcome cannot be verified, explicitly say so.'}});
+   await writeJson(input.store,`${ROOT}/history/${slot}-${REQUEST_VERSION}-retry-${attempt}.json`,result);
    const latest=await readJson(input.store,`${ROOT}/latest.json`) as WebResearch|null;
    if(!latest||latest.generatedAt<result.generatedAt)await writeJson(input.store,`${ROOT}/latest.json`,result,{allowOverwrite:true});
    await writeJson(input.store,`${ROOT}/attempts/${slot}.json`,{status:'ready',generatedAt:result.generatedAt},{allowOverwrite:true});

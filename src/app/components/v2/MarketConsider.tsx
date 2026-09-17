@@ -1,8 +1,12 @@
+'use client';
+import {usePublishedResearch} from './usePublishedResearch';
 import type { V2CommandCenterPageView } from '@/desk/load-v2-home';
 import type { V2Language } from '@/desk/v2-command-center';
 import styles from './DarkCommandCenter.module.css';
 
-export function MarketConsider({view, lang}: {view: V2CommandCenterPageView; lang: V2Language}) {
+export function MarketConsider({view, lang, demoMode=false}: {view: V2CommandCenterPageView; lang: V2Language;demoMode?:boolean}) {
+ const published=usePublishedResearch(view.webResearch??null,!demoMode);
+ view={...view,webResearch:published};
  const t = (en: string, zh: string) => lang === 'zh' ? zh : en;
  const ready = view.marketAction ? view.marketAction.action !== null : view.decisionStatus === 'ready';
  const stance = view.marketAction ? (view.marketAction.action === 'SELL' ? 'reduce' : view.marketAction.action === 'BUY' ? 'buy' : 'hold') : view.stance;
