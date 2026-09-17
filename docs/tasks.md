@@ -1,5 +1,9 @@
 # Tasks
 
+## Compact score history with price underlays
+- Read legacy command-center snapshots and preserve saved timestamps/missing scores; do not assume schema version equals model version.
+- Move chart directly below paired scores, reduce width/height, add default-off SPY/QQQ/IBIT daily-close relative-return underlays with separate percentage axis. Price requests occur only when enabled; no persistence writes. Legacy listing is cached five minutes per warm instance; it can consume Blob list operations on cold instances.
+
 ## Risk/opportunity history — 2026-09-17
 - Added score-colored risk polyline and opportunity gradient area, daily date axis and fixed 0–100 scale. Range controls retain daily values without aggregation.
 - Per-language display snapshots retain up to 730 daily observations with no additional Blob writes. History begins at activation; missing values remain absent. Last observed daily values are not guaranteed official close scores. Research refresh changes are included in this release.
