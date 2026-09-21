@@ -46,9 +46,9 @@ export function createBlobRuntimeJsonStore(
 
     async writeText(relativePath, body, putOptions?: RuntimeJsonStorePutOptions) {
       const key = blobKey(prefix, relativePath);
-      const exists = await client.get(key);
-      if (exists !== null && putOptions?.allowOverwrite !== true) {
-        return false;
+      if (putOptions?.allowOverwrite !== true) {
+        const exists = await client.get(key);
+        if (exists !== null) return false;
       }
       await client.put(key, body, {
         allowOverwrite: putOptions?.allowOverwrite ?? false,

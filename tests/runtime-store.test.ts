@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createInMemoryBlobStoreClient } from "@/desk/breadth/store/blob";
 import { createBlobRuntimeJsonStore } from "@/desk/runtime-store/blob";
 import { createFilesystemRuntimeJsonStore } from "@/desk/runtime-store/filesystem";
@@ -45,6 +45,16 @@ describe("runtime json store filesystem", () => {
 });
 
 describe("runtime json store blob", () => {
+  it("overwrites without a read but keeps create-only protection", async () => {
+    const client = createInMemoryBlobStoreClient();
+    const get = vi.spyOn(client, "get");
+    const store = createBlobRuntimeJsonStore({ client });
+    await store.writeText("test.json", "first", { allowOverwrite: true });
+    await store.writeText("test.json", "second", { allowOverwrite: true });
+    expect(get).not.toHaveBeenCalled();
+    expect(await store.writeText("test.json", "third")).toBe(false);
+    expect(await store.readText("test.json")).toBe("second");
+  });
   it("reads and writes JSON via in-memory blob client", async () => {
     const client = createInMemoryBlobStoreClient();
     const store = createBlobRuntimeJsonStore({ client, prefix: "desk" });

@@ -1,5 +1,10 @@
 # Tasks
 
+## Blob read budget
+- Research completion polling reduced to once per minute for five minutes; focus checks share the same throttle. Research reads use a shared Next Data Cache (60-second revalidation).
+- Score history uses shared caches: current history 5 minutes, legacy history 1 hour. These supersede the warm-instance cache described below. Revalidation is request-triggered and stale-while-revalidate, not a scheduled refresh or strict freshness deadline.
+- Overwrite writes skip the redundant existence read. Create-only writes retain existing conflict protection. No scoring changes or extra Blob writes. Existing exhausted quota is not restored by this change.
+
 ## Score chart visual refinement
 - Removed the chart heading. Risk and opportunity use thin connecting lines; opportunity retains gradient area fill. Adjacent available points can connect across legacy records as visual guides, with model comparability explicitly unverified. Missing values and larger date gaps remain unfilled. No score recalculation.
 
