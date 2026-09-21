@@ -140,8 +140,14 @@ export function createVercelBlobStoreClient(input: {
 
     async list(prefix) {
       try {
-        const result = await blobList({ prefix, token });
-        return result.blobs.map((blob) => blob.pathname);
+        const paths:string[]=[];let cursor:string|undefined;
+        do {
+          const result=await blobList({prefix,token,cursor});
+          paths.push(...result.blobs.map(blob=>blob.pathname));
+          if(result.hasMore&&(!result.cursor||result.cursor===cursor))throw new Error('Invalid Blob list pagination');
+          cursor=result.hasMore?result.cursor:undefined;
+        }while(cursor);
+        return paths;
       } catch (error) {
         logBlobStoreError("get", error);
         throw toSafeBlobClientError("get", error);

@@ -4,6 +4,7 @@ import {
   readBreadthBlobToken,
 } from "@/desk/breadth/store/blob-client";
 import { createVercelBlobStoreClient } from "@/desk/breadth/store/vercel-blob-sdk";
+import {createR2StoreClient,readR2Config} from '@/desk/breadth/store/r2-client';
 import { createFilesystemRuntimeJsonStore } from "./filesystem";
 import { createBlobRuntimeJsonStore } from "./blob";
 import type { RuntimeJsonStore } from "./types";
@@ -33,6 +34,8 @@ export function resolveEphemeralDataRoot(env: NodeJS.ProcessEnv = process.env): 
 export function resolveRuntimeJsonStore(
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeJsonStore {
+  const r2=readR2Config(env);
+  if(r2)return createBlobRuntimeJsonStore({client:createR2StoreClient(r2),prefix:RUNTIME_ARTIFACT_BLOB_PREFIX});
   const localRoot = join(process.cwd(), "data");
   const useLocalFilesystem =
     !isServerlessHost(env) || existsSync(localRoot);

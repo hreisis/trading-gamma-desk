@@ -1,6 +1,18 @@
 {
   "crons": [
     {
+      "path": "/api/cron/storage-migrate",
+      "schedule": "10 21 * * *"
+    },
+    {
+      "path": "/api/cron/scores-daily?retry=1",
+      "schedule": "30 1 * * 2-6"
+    },
+    {
+      "path": "/api/cron/scores-daily",
+      "schedule": "30 23 * * 1-5"
+    },
+    {
       "path": "/api/cron/breadth-daily",
       "schedule": "0 22 * * *"
     },

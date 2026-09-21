@@ -34,6 +34,7 @@
     "smoke:demo:prod": "GAMMADESK_PUBLIC_DEMO=1 next build && vitest run --config vitest.prod.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1136.0",
     "@vercel/blob": "^2.7.0",
     "fflate": "^0.8.3",
     "next": "16.2.12",

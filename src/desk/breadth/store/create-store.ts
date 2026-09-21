@@ -1,5 +1,6 @@
 import { isServerlessHost } from "@/desk/production-runtime";
 import { breadthConfigForFund } from "../config";
+import {createR2StoreClient,readR2Config} from './r2-client';
 import {
   createBlobBreadthSnapshotStore,
   createFilesystemBreadthSnapshotStore,
@@ -26,6 +27,9 @@ export function resolveBreadthSnapshotStoreFromEnv(
   },
 ): BreadthStoreResolution {
   const config = breadthConfigForFund(options?.fundSymbol ?? "SPY");
+  const r2=readR2Config(env);
+  if(r2)return {ok:true,store:createBlobBreadthSnapshotStore({client:createR2StoreClient(r2),
+    prefix:options?.blobPrefix??'breadth',universeId:config.universeId,fundSymbol:config.fundSymbol})};
   const token = readBreadthBlobToken(env);
   if (token) {
     return {

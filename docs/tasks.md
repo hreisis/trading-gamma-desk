@@ -1,5 +1,17 @@
 # Tasks
 
+## R2 durable storage
+- Complete R2 server configuration takes priority for both desk and breadth storage. Partial configuration fails explicitly; existing Blob adapter remains available if R2 is not configured. No public bucket or browser credentials.
+- S3 adapter preserves create-only writes with If-None-Match, supports paginated listings, and returns null only for NoSuchKey; access errors remain failures.
+- Authenticated migration cron at 21:10 UTC copies up to 100 JSON objects per day with a 120-second soft budget and checkpoints. Keeps verified original copies in legacy-vercel/, never deletes source or overwrites newer destination data. Suspended sources retry only on a later day; migration stops after completion. Archived homepage histories are included in the score chart.
+- Score capture and retry schedules deploy with this change. Production R2 connectivity must be verified after deployment; local tests use fake storage and contain no production credentials.
+
+## Independent daily score archive
+- Added authenticated `/api/cron/scores-daily`, weekdays 23:30 UTC and retry 01:30 UTC Tuesday–Saturday (same ET session). US calendar guards weekends/holidays/pre-close; existing successful date skips collection. No browser visit required.
+- Saves one consolidated `scores/daily-v1.json` (730 sessions): scores, model version, collection time, input session, Gamma/coverage provenance and available SPY/QQQ/IBIT closes. Requires same-session ready non-fixture scores and QQQ close. Missing inputs/storage failures are explicit failures, never backfilled with invented scores.
+- Score-only loader bypasses research generation; archive is authoritative over page snapshots in chart and archived closes support price overlays. Cached reads remain request-triggered. These are post-close observations from available inputs, not guaranteed real-time closing Gamma.
+- Requires deployment, configured CRON_SECRET and working durable storage. Exhausted Blob prevents recording; two attempts are not a guarantee against provider/storage outages. Does not reconstruct missed historical sessions.
+
 ## Blob read budget
 - Research completion polling reduced to once per minute for five minutes; focus checks share the same throttle. Research reads use a shared Next Data Cache (60-second revalidation).
 - Score history uses shared caches: current history 5 minutes, legacy history 1 hour. These supersede the warm-instance cache described below. Revalidation is request-triggered and stale-while-revalidate, not a scheduled refresh or strict freshness deadline.

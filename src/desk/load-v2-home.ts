@@ -82,6 +82,8 @@ export interface LoadV2HomePageInput {
   readonly forceFixture?: boolean;
   /** Stream optional AI narratives after the deterministic market view. */
   readonly deferNarratives?: boolean;
+  /** Scheduled score capture must not start optional research/LLM work. */
+  readonly scoresOnly?: boolean;
 }
 
 export type V2CommandCenterPageView = V2CommandCenterView & {
@@ -575,9 +577,9 @@ export async function loadV2HomePage(
 
   const eventGate = eventGateFromMarketInput(marketInputSnapshot);
   const payload = buildV2AiStudyPayload(baseView, eventGate);
-  const webResearch = input.demo ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"},payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
-  const researchReview = input.demo ? null : await readResearchReview(artifactStore);
-  if (!input.demo) {
+  const webResearch = input.demo || input.scoresOnly ? null : await loadWebResearch({store:artifactStore,now,inputSession:baseView.sessionDate,config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"},payload:{...payload,technologyInternal,techLeadersLaggards,nextEvent:eventGate?.nextEvent},deferRefresh});
+  const researchReview = input.demo || input.scoresOnly ? null : await readResearchReview(artifactStore);
+  if (!input.demo && !input.scoresOnly) {
     const reviewTask = async () => {
       await captureReviewThesis({store:artifactStore,now,inputSession:baseView.sessionDate,action:baseView.marketAction,research:webResearch});
       await publishResearchReview({store:artifactStore,now,bars:equityBarsBySymbol ?? new Map(),config:{...llmConfig,model:runtimeEnv.AI_STUDY_RESEARCH_MODEL || "gpt-4.1"}});
@@ -619,8 +621,8 @@ export async function loadV2HomePage(
     themePilot: input.demo ? [] : buildThemePilot({bars:equityBarsBySymbol ?? new Map(),sessionDate:baseView.sessionDate ?? targetMarketSessionDate,risk:baseView.riskScore,eventBlocked:baseView.opportunity?.eventBlocked ?? true}),
     manualGammaSnapshot,
     webResearch,
-    researchReview: input.demo ? null : researchReview ?? await readResearchReview(artifactStore),
-    researchAttempt: input.demo ? null : await readResearchAttempt(artifactStore,now),
+    researchReview: input.demo || input.scoresOnly ? null : researchReview ?? await readResearchReview(artifactStore),
+    researchAttempt: input.demo || input.scoresOnly ? null : await readResearchAttempt(artifactStore,now),
     aiStudy: localized.aiStudy,
     dailyReview: localized.dailyReview,
     eventGate,
