@@ -5,6 +5,7 @@ import {mergeScoreHistory,type ScorePoint} from '@/desk/score-history';
 import {legacyScorePoint} from '@/desk/score-chart-data';
 import {readDailyScores} from '@/desk/read-daily-scores';
 import {readR2Config,createR2StoreClient} from '@/desk/breadth/store/r2-client';
+import {storageErrorCode} from '@/desk/storage-error';
 export const dynamic='force-dynamic';
 // Shared Data Cache, rather than a cache limited to one warm function instance.
 // Throw on read failures so failed refreshes cannot replace valid cached history.
@@ -28,5 +29,5 @@ export async function GET() {
  try {
   const [current,legacy,daily]=await Promise.all([readCurrent(),readLegacy().catch(()=>[]),readDailyScores()]);
   return NextResponse.json({points:mergeScoreHistory([...legacy,...current,...daily])},{headers:{'Cache-Control':'private, max-age=60','X-Storage-Backend':readR2Config(process.env)?'r2':'legacy'}});
- }catch{return NextResponse.json({points:[]},{status:503});}
+ }catch(error){return NextResponse.json({points:[],storageError:storageErrorCode(error)},{status:503,headers:{'Cache-Control':'no-store'}});}
 }
