@@ -41,7 +41,8 @@
     "node-html-parser": "^9.0.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@vercel/analytics": "^1.5.0"
   },
   "devDependencies": {
     "@types/node": "26.1.2",
