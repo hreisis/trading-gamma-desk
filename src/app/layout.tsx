@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/desk/public-demo";
 import "./globals.css";
@@ -167,6 +168,7 @@ export default function RootLayout({
     >
       <body style={{ background: "#fff" }}>
         {children}
+        <Analytics />
         <script dangerouslySetInnerHTML={{ __html: previewLanguageScript }} />
       </body>
     </html>
